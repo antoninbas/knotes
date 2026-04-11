@@ -51,10 +51,15 @@ function serializeEntries(entries: LogEntry[]): string {
   );
 }
 
-/** Ensure a log document exists, creating it if needed. */
-async function ensureLog(logicalPath: string, title?: string): Promise<void> {
+/** Create a new log document. Throws if it already exists. */
+export async function createLog(
+  logicalPath: string,
+  title?: string
+): Promise<void> {
   const filePath = resolvePath(logicalPath);
-  if (await Bun.file(filePath).exists()) return;
+  if (await Bun.file(filePath).exists()) {
+    throw new Error(`Log already exists: ${logicalPath}`);
+  }
 
   await mkdir(dirname(filePath), { recursive: true });
   await createNote(logicalPath, {
@@ -67,9 +72,11 @@ export async function addEntry(
   logicalPath: string,
   content: string
 ): Promise<LogEntry> {
-  await ensureLog(logicalPath);
-
   const filePath = resolvePath(logicalPath);
+  if (!(await Bun.file(filePath).exists())) {
+    throw new Error(`Log not found: ${logicalPath}. Create it first.`);
+  }
+
   const raw = await Bun.file(filePath).text();
   const parsed = matter(raw);
 
@@ -111,6 +118,33 @@ export async function getEntry(
 ): Promise<LogEntry | null> {
   const entries = await listEntries(logicalPath);
   return entries.find((e) => e.id === entryId) || null;
+}
+
+/** Update an entry's content. Preserves timestamp and order. */
+export async function updateEntry(
+  logicalPath: string,
+  entryId: string,
+  content: string
+): Promise<LogEntry> {
+  const filePath = resolvePath(logicalPath);
+  const raw = await Bun.file(filePath).text();
+  const parsed = matter(raw);
+
+  const entries = parseEntries(parsed.content);
+  const entry = entries.find((e) => e.id === entryId);
+
+  if (!entry) {
+    throw new Error(`Entry not found: ${entryId}`);
+  }
+
+  entry.content = content;
+
+  parsed.data.modified = nowISO();
+  const frontmatter = matter.stringify("", parsed.data).trim();
+  const body = serializeEntries(entries);
+  await Bun.write(filePath, frontmatter + "\n\n" + body);
+
+  return entry;
 }
 
 export async function deleteEntry(

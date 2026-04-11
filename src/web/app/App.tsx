@@ -24,6 +24,9 @@ export default function App() {
     setSidebarRefresh((n) => n + 1);
   }
 
+  const currentPath = () => currentNote()?.path;
+  const isLog = () => currentNote()?.type === "log";
+
   // Keyboard shortcut: Ctrl+K for search
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -42,6 +45,7 @@ export default function App() {
         onSelect={handleNoteSelect}
         refreshTrigger={sidebarRefresh()}
         onNewNote={handleNoteSaved}
+        currentPath={currentPath}
       />
 
       {/* Main content */}
@@ -59,10 +63,16 @@ export default function App() {
               <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-bg-surface)", color: "var(--color-text-muted)" }}>
                 {currentNote()!.path}
               </span>
+              <Show when={isLog()}>
+                <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-bg-surface)", color: "var(--color-accent)" }}>
+                  log
+                </span>
+              </Show>
             </Show>
           </div>
           <div class="flex items-center gap-2">
-            <Show when={currentNote()}>
+            {/* Only show Edit button for notes, not logs */}
+            <Show when={currentNote() && !isLog()}>
               <button
                 onClick={() => setViewMode(viewMode() === "view" ? "edit" : "view")}
                 class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
@@ -103,7 +113,7 @@ export default function App() {
             }
           >
             <Show
-              when={currentNote()!.type === "log"}
+              when={isLog()}
               fallback={
                 <Show
                   when={viewMode() === "edit"}

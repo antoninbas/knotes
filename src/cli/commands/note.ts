@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import { ensureHome, resolvePath } from "../../core/config.ts";
 import {
   createNote,
+  createFolder,
   getNote,
   updateNote,
   deleteNote,
@@ -35,6 +36,16 @@ export function registerNoteCommands(program: Command): void {
       if (opts.edit) {
         await openInEditor(result.filePath);
       }
+    });
+
+  note
+    .command("mkdir")
+    .description("Create a new folder")
+    .argument("<path>", "Folder path (e.g. notes/projects)")
+    .action(async (path: string) => {
+      await ensureHome();
+      await createFolder(path);
+      console.log(`Created folder: ${path}`);
     });
 
   note

@@ -114,6 +114,26 @@ export async function updateNote(
   return parseNote(filePath, fileContent);
 }
 
+/** Create a folder with a .keep file for git tracking. */
+export async function createFolder(logicalPath: string): Promise<string> {
+  const home = getHome();
+  const dirPath = join(home, logicalPath);
+
+  // Check if it already exists
+  try {
+    const s = await stat(dirPath);
+    if (s.isDirectory()) {
+      throw new Error(`Folder already exists: ${logicalPath}`);
+    }
+  } catch (err: any) {
+    if (err.code !== "ENOENT") throw err;
+  }
+
+  await mkdir(dirPath, { recursive: true });
+  await Bun.write(join(dirPath, ".keep"), "");
+  return logicalPath;
+}
+
 export async function deleteNote(logicalPath: string): Promise<void> {
   const filePath = resolvePath(logicalPath);
 

@@ -2,14 +2,17 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   createNote,
+  createFolder,
   getNote,
   updateNote,
   deleteNote,
   listNotes,
 } from "../core/notes.ts";
 import {
+  createLog,
   addEntry,
   listEntries,
+  updateEntry,
   deleteEntry,
 } from "../core/logs.ts";
 import { search } from "../core/search.ts";
@@ -106,11 +109,36 @@ export function registerTools(server: McpServer): void {
     }
   );
 
+  server.tool(
+    "knotes_folder_create",
+    "Create a new folder in the hierarchy",
+    {
+      path: z.string().describe("Folder path (e.g. notes/projects)"),
+    },
+    async ({ path }) => {
+      await createFolder(path);
+      return text(`Created folder: ${path}`);
+    }
+  );
+
   // --- Log tools ---
 
   server.tool(
+    "knotes_log_create",
+    "Create a new log/journal document",
+    {
+      path: z.string().describe("Logical path for the log (e.g. logs/daily)"),
+      title: z.string().optional().describe("Log title"),
+    },
+    async ({ path, title }) => {
+      await createLog(path, title);
+      return text(`Created log: ${path}`);
+    }
+  );
+
+  server.tool(
     "knotes_log_add",
-    "Add a new entry to a log/journal document",
+    "Add a new entry to an existing log/journal document",
     {
       path: z
         .string()
@@ -148,6 +176,20 @@ export function registerTools(server: McpServer): void {
         return `[${e.id}] ${date}\n${preview}`;
       });
       return text(lines.join("\n\n"));
+    }
+  );
+
+  server.tool(
+    "knotes_log_update",
+    "Update an existing log entry's content (preserves timestamp and order)",
+    {
+      path: z.string().describe("Logical path of the log"),
+      entryId: z.string().describe("Entry ID to update (e.g. e-3f7a)"),
+      content: z.string().describe("New entry content"),
+    },
+    async ({ path, entryId, content }) => {
+      const entry = await updateEntry(path, entryId, content);
+      return text(`Updated entry ${entry.id} in ${path}`);
     }
   );
 

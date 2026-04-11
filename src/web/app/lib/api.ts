@@ -71,10 +71,22 @@ export const notes = {
     request<{ ok: boolean }>(`/notes?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
     }),
+
+  createFolder: (path: string) =>
+    request<{ ok: boolean; path: string }>("/notes/folder", {
+      method: "POST",
+      body: JSON.stringify({ path }),
+    }),
 };
 
 // Logs API
 export const logs = {
+  create: (path: string, title?: string) =>
+    request<{ ok: boolean; path: string }>("/logs", {
+      method: "POST",
+      body: JSON.stringify({ path, title }),
+    }),
+
   listEntries: (path: string, limit?: number) =>
     request<LogEntry[]>(
       `/logs/entries?path=${encodeURIComponent(path)}${limit ? `&limit=${limit}` : ""}`
@@ -84,6 +96,12 @@ export const logs = {
     request<LogEntry>("/logs/entries", {
       method: "POST",
       body: JSON.stringify({ path, content }),
+    }),
+
+  updateEntry: (path: string, entryId: string, content: string) =>
+    request<LogEntry>("/logs/entries", {
+      method: "PUT",
+      body: JSON.stringify({ path, entryId, content }),
     }),
 
   deleteEntry: (path: string, entryId: string) =>

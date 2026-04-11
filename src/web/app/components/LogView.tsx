@@ -9,6 +9,8 @@ export default function LogView(props: Props) {
   const [entries, setEntries] = createSignal<LogEntry[]>([]);
   const [newContent, setNewContent] = createSignal("");
   const [adding, setAdding] = createSignal(false);
+  const [editingId, setEditingId] = createSignal<string | null>(null);
+  const [editContent, setEditContent] = createSignal("");
 
   async function loadEntries() {
     try {
@@ -20,7 +22,6 @@ export default function LogView(props: Props) {
   }
 
   createEffect(() => {
-    // Reload when note changes
     const _ = props.note.path;
     loadEntries();
   });
@@ -37,6 +38,29 @@ export default function LogView(props: Props) {
       console.error("Failed to add entry:", err);
     } finally {
       setAdding(false);
+    }
+  }
+
+  function startEdit(entry: LogEntry) {
+    setEditingId(entry.id);
+    setEditContent(entry.content);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditContent("");
+  }
+
+  async function handleUpdate(entryId: string) {
+    const content = editContent().trim();
+    if (!content) return;
+    try {
+      await logs.updateEntry(props.note.path, entryId, content);
+      setEditingId(null);
+      setEditContent("");
+      await loadEntries();
+    } catch (err) {
+      console.error("Failed to update entry:", err);
     }
   }
 
@@ -106,20 +130,72 @@ export default function LogView(props: Props) {
                     {new Date(entry.timestamp).toLocaleString()}
                   </span>
                 </div>
-                <button
-                  onClick={() => handleDelete(entry.id)}
-                  class="text-xs px-2 py-0.5 rounded cursor-pointer transition-opacity opacity-50 hover:opacity-100"
-                  style={{ color: "var(--color-danger)" }}
-                >
-                  Delete
-                </button>
+                <div class="flex items-center gap-2">
+                  <Show when={editingId() !== entry.id}>
+                    <button
+                      onClick={() => startEdit(entry)}
+                      class="text-xs px-2 py-0.5 rounded cursor-pointer transition-opacity opacity-50 hover:opacity-100"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      Edit
+                    </button>
+                  </Show>
+                  <button
+                    onClick={() => handleDelete(entry.id)}
+                    class="text-xs px-2 py-0.5 rounded cursor-pointer transition-opacity opacity-50 hover:opacity-100"
+                    style={{ color: "var(--color-danger)" }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-              <div
-                class="text-sm whitespace-pre-wrap"
-                style={{ color: "var(--color-text-primary)" }}
+
+              <Show
+                when={editingId() === entry.id}
+                fallback={
+                  <div
+                    class="text-sm whitespace-pre-wrap"
+                    style={{ color: "var(--color-text-primary)" }}
+                  >
+                    {entry.content}
+                  </div>
+                }
               >
-                {entry.content}
-              </div>
+                <textarea
+                  value={editContent()}
+                  onInput={(e) => setEditContent(e.currentTarget.value)}
+                  rows={4}
+                  class="w-full p-2 rounded border outline-none resize-y text-sm mb-2"
+                  style={{
+                    "background-color": "var(--color-bg-primary)",
+                    "border-color": "var(--color-border)",
+                    color: "var(--color-text-primary)",
+                  }}
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      handleUpdate(entry.id);
+                    }
+                    if (e.key === "Escape") cancelEdit();
+                  }}
+                />
+                <div class="flex gap-2">
+                  <button
+                    onClick={() => handleUpdate(entry.id)}
+                    class="px-3 py-1 text-xs rounded cursor-pointer"
+                    style={{ background: "var(--color-accent)", color: "#fff" }}
+                  >
+                    Save (Ctrl+Enter)
+                  </button>
+                  <button
+                    onClick={cancelEdit}
+                    class="px-3 py-1 text-xs rounded cursor-pointer"
+                    style={{ background: "var(--color-bg-hover)", color: "var(--color-text-secondary)" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </Show>
             </div>
           )}
         </For>

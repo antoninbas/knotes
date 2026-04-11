@@ -1,8 +1,28 @@
 import { Hono } from "hono";
 import { ensureHome } from "../../core/config.ts";
-import { addEntry, listEntries, deleteEntry } from "../../core/logs.ts";
+import {
+  createLog,
+  addEntry,
+  listEntries,
+  updateEntry,
+  deleteEntry,
+} from "../../core/logs.ts";
 
 export const logsApi = new Hono();
+
+// Create a new log
+logsApi.post("/", async (c) => {
+  await ensureHome();
+  const body = await c.req.json();
+  const { path, title } = body;
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    await createLog(path, title);
+    return c.json({ ok: true, path }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
 
 // List entries in a log
 logsApi.get("/entries", async (c) => {
@@ -21,7 +41,6 @@ logsApi.get("/entries", async (c) => {
 
 // Add an entry to a log
 logsApi.post("/entries", async (c) => {
-  await ensureHome();
   const body = await c.req.json();
   const { path, content } = body;
   if (!path) return c.json({ error: "path is required" }, 400);
@@ -31,6 +50,21 @@ logsApi.post("/entries", async (c) => {
     return c.json(entry, 201);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
+  }
+});
+
+// Update an entry
+logsApi.put("/entries", async (c) => {
+  const body = await c.req.json();
+  const { path, entryId, content } = body;
+  if (!path) return c.json({ error: "path is required" }, 400);
+  if (!entryId) return c.json({ error: "entryId is required" }, 400);
+  if (!content) return c.json({ error: "content is required" }, 400);
+  try {
+    const entry = await updateEntry(path, entryId, content);
+    return c.json(entry);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
   }
 });
 

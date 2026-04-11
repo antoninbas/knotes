@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { ensureHome } from "../../core/config.ts";
 import {
   createNote,
+  createFolder,
   getNote,
   updateNote,
   deleteNote,
@@ -54,6 +55,20 @@ notesApi.put("/", async (c) => {
     return c.json(note);
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
+  }
+});
+
+// Create a folder
+notesApi.post("/folder", async (c) => {
+  await ensureHome();
+  const body = await c.req.json();
+  const { path } = body;
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    await createFolder(path);
+    return c.json({ ok: true, path }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
   }
 });
 

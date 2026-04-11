@@ -1,41 +1,42 @@
 import { createSignal, createEffect, For, Show } from "solid-js";
-import { notes, type ListEntry, type NoteResult } from "../lib/api.ts";
+import { notes, logs, type ListEntry, type NoteResult } from "../lib/api.ts";
 
 interface Props {
   onSelect: (note: NoteResult) => void;
   refreshTrigger: number;
   onNewNote: () => void;
+  currentPath: () => string | undefined;
 }
+
+type CreateMode = null | "note" | "folder" | "log";
 
 export default function Sidebar(props: Props) {
   const [entries, setEntries] = createSignal<ListEntry[]>([]);
-  const [currentPath, setCurrentPath] = createSignal<string | undefined>(undefined);
+  const [browsePath, setBrowsePath] = createSignal<string | undefined>(undefined);
   const [pathStack, setPathStack] = createSignal<string[]>([]);
-  const [showCreateDialog, setShowCreateDialog] = createSignal(false);
-  const [newNotePath, setNewNotePath] = createSignal("");
-  const [newNoteTitle, setNewNoteTitle] = createSignal("");
+  const [createMode, setCreateMode] = createSignal<CreateMode>(null);
+  const [inputName, setInputName] = createSignal("");
+  const [inputTitle, setInputTitle] = createSignal("");
 
   async function loadEntries(prefix?: string) {
     try {
       const items = await notes.list(prefix);
       setEntries(items);
-      setCurrentPath(prefix);
+      setBrowsePath(prefix);
     } catch (err) {
       console.error("Failed to load entries:", err);
     }
   }
 
   createEffect(() => {
-    // Reload when refreshTrigger changes
     const _ = props.refreshTrigger;
-    loadEntries(currentPath());
+    loadEntries(browsePath());
   });
 
-  // Initial load
   loadEntries();
 
   function navigateInto(path: string) {
-    setPathStack([...pathStack(), currentPath() || ""]);
+    setPathStack([...pathStack(), browsePath() || ""]);
     loadEntries(path);
   }
 
@@ -60,21 +61,45 @@ export default function Sidebar(props: Props) {
     }
   }
 
+  function openCreate(mode: CreateMode) {
+    setCreateMode(mode);
+    setInputName("");
+    setInputTitle("");
+  }
+
   async function handleCreate() {
-    const path = newNotePath().trim();
-    if (!path) return;
+    const name = inputName().trim();
+    if (!name) return;
+
+    const prefix = browsePath();
+    const fullPath = prefix ? `${prefix}/${name}` : name;
+
     try {
-      const note = await notes.create(path, {
-        title: newNoteTitle().trim() || undefined,
-      });
-      setShowCreateDialog(false);
-      setNewNotePath("");
-      setNewNoteTitle("");
-      props.onNewNote();
-      props.onSelect(note);
+      if (createMode() === "folder") {
+        await notes.createFolder(fullPath);
+        props.onNewNote();
+        loadEntries(browsePath());
+      } else if (createMode() === "log") {
+        await logs.create(fullPath, inputTitle().trim() || undefined);
+        props.onNewNote();
+        const note = await notes.get(fullPath);
+        props.onSelect(note);
+      } else {
+        const note = await notes.create(fullPath, {
+          title: inputTitle().trim() || undefined,
+        });
+        props.onNewNote();
+        props.onSelect(note);
+      }
+      setCreateMode(null);
     } catch (err: any) {
       alert(err.message);
     }
+  }
+
+  function handleCreateKeyDown(e: KeyboardEvent) {
+    if (e.key === "Enter") handleCreate();
+    if (e.key === "Escape") setCreateMode(null);
   }
 
   return (
@@ -93,28 +118,114 @@ export default function Sidebar(props: Props) {
         <h1 class="text-lg font-bold" style={{ color: "var(--color-accent)" }}>
           Knotes
         </h1>
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          class="w-7 h-7 flex items-center justify-center rounded text-lg cursor-pointer"
-          style={{
-            background: "var(--color-bg-surface)",
-            color: "var(--color-text-secondary)",
-          }}
-          title="New note"
-        >
-          +
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            onClick={() => openCreate("folder")}
+            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+            style={{
+              background: "var(--color-bg-surface)",
+              color: "var(--color-text-secondary)",
+            }}
+            title="New folder"
+          >
+            {"\u{1F4C1}"}
+          </button>
+          <button
+            onClick={() => openCreate("note")}
+            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+            style={{
+              background: "var(--color-bg-surface)",
+              color: "var(--color-text-secondary)",
+            }}
+            title="New note"
+          >
+            {"\u{1F4C4}"}
+          </button>
+          <button
+            onClick={() => openCreate("log")}
+            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+            style={{
+              background: "var(--color-bg-surface)",
+              color: "var(--color-text-secondary)",
+            }}
+            title="New log"
+          >
+            {"\u{1F4CB}"}
+          </button>
+        </div>
       </div>
 
       {/* Breadcrumb / back */}
-      <Show when={currentPath()}>
+      <Show when={browsePath()}>
         <div
           class="flex items-center gap-2 px-4 py-2 text-sm border-b cursor-pointer"
           style={{ "border-color": "var(--color-border)", color: "var(--color-text-muted)" }}
           onClick={navigateBack}
         >
           <span>&#8592;</span>
-          <span>{currentPath()}</span>
+          <span>{browsePath()}</span>
+        </div>
+      </Show>
+
+      {/* Create inline form */}
+      <Show when={createMode()}>
+        <div
+          class="px-4 py-3 border-b space-y-2"
+          style={{ "border-color": "var(--color-border)", "background-color": "var(--color-bg-surface)" }}
+        >
+          <p class="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
+            {createMode() === "folder"
+              ? "New Folder"
+              : createMode() === "log"
+                ? "New Log"
+                : "New Note"}
+            {browsePath() ? ` in ${browsePath()}` : ""}
+          </p>
+          <input
+            type="text"
+            placeholder="Name"
+            value={inputName()}
+            onInput={(e) => setInputName(e.currentTarget.value)}
+            onKeyDown={handleCreateKeyDown}
+            autofocus
+            class="w-full px-2 py-1 text-sm rounded border outline-none"
+            style={{
+              "background-color": "var(--color-bg-primary)",
+              "border-color": "var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          />
+          <Show when={createMode() !== "folder"}>
+            <input
+              type="text"
+              placeholder="Title (optional)"
+              value={inputTitle()}
+              onInput={(e) => setInputTitle(e.currentTarget.value)}
+              onKeyDown={handleCreateKeyDown}
+              class="w-full px-2 py-1 text-sm rounded border outline-none"
+              style={{
+                "background-color": "var(--color-bg-primary)",
+                "border-color": "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+          </Show>
+          <div class="flex gap-2">
+            <button
+              onClick={handleCreate}
+              class="flex-1 px-2 py-1 text-sm rounded cursor-pointer"
+              style={{ background: "var(--color-accent)", color: "#fff" }}
+            >
+              Create
+            </button>
+            <button
+              onClick={() => setCreateMode(null)}
+              class="flex-1 px-2 py-1 text-sm rounded cursor-pointer"
+              style={{ background: "var(--color-bg-hover)", color: "var(--color-text-secondary)" }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </Show>
 
@@ -129,83 +240,37 @@ export default function Sidebar(props: Props) {
           }
         >
           <For each={entries()}>
-            {(entry) => (
-              <div
-                class="flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors text-sm"
-                style={{ color: "var(--color-text-secondary)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.backgroundColor = "transparent")
-                }
-                onClick={() => handleSelect(entry)}
-              >
-                <span class="shrink-0">
-                  {entry.type === "directory"
-                    ? "\u{1F4C1}"
-                    : entry.type === "log"
-                      ? "\u{1F4CB}"
-                      : "\u{1F4C4}"}
-                </span>
-                <span class="truncate">{entry.title}</span>
-              </div>
-            )}
+            {(entry) => {
+              const isActive = () => props.currentPath() === entry.path;
+              return (
+                <div
+                  class="flex items-center gap-2 px-4 py-1.5 cursor-pointer transition-colors text-sm"
+                  style={{
+                    color: isActive() ? "var(--color-accent)" : "var(--color-text-secondary)",
+                    "background-color": isActive() ? "var(--color-bg-surface)" : "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive()) e.currentTarget.style.backgroundColor = "var(--color-bg-hover)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive()) e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                  onClick={() => handleSelect(entry)}
+                >
+                  <span class="shrink-0">
+                    {entry.type === "directory"
+                      ? "\u{1F4C1}"
+                      : entry.type === "log"
+                        ? "\u{1F4CB}"
+                        : "\u{1F4C4}"}
+                  </span>
+                  <span class="truncate">{entry.title}</span>
+                </div>
+              );
+            }}
           </For>
         </Show>
       </div>
-
-      {/* Create dialog */}
-      <Show when={showCreateDialog()}>
-        <div
-          class="p-4 border-t space-y-2"
-          style={{ "border-color": "var(--color-border)", "background-color": "var(--color-bg-surface)" }}
-        >
-          <p class="text-sm font-medium" style={{ color: "var(--color-text-primary)" }}>
-            New Note
-          </p>
-          <input
-            type="text"
-            placeholder="Path (e.g. notes/ideas/foo)"
-            value={newNotePath()}
-            onInput={(e) => setNewNotePath(e.currentTarget.value)}
-            class="w-full px-2 py-1 text-sm rounded border outline-none"
-            style={{
-              "background-color": "var(--color-bg-primary)",
-              "border-color": "var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          />
-          <input
-            type="text"
-            placeholder="Title (optional)"
-            value={newNoteTitle()}
-            onInput={(e) => setNewNoteTitle(e.currentTarget.value)}
-            class="w-full px-2 py-1 text-sm rounded border outline-none"
-            style={{
-              "background-color": "var(--color-bg-primary)",
-              "border-color": "var(--color-border)",
-              color: "var(--color-text-primary)",
-            }}
-          />
-          <div class="flex gap-2">
-            <button
-              onClick={handleCreate}
-              class="flex-1 px-2 py-1 text-sm rounded cursor-pointer"
-              style={{ background: "var(--color-accent)", color: "#fff" }}
-            >
-              Create
-            </button>
-            <button
-              onClick={() => setShowCreateDialog(false)}
-              class="flex-1 px-2 py-1 text-sm rounded cursor-pointer"
-              style={{ background: "var(--color-bg-hover)", color: "var(--color-text-secondary)" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </Show>
     </aside>
   );
 }
