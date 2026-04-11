@@ -33,6 +33,7 @@ export function getConfig(): KnotesConfig {
     editor: process.env["EDITOR"] || saved.editor || "vi",
     webPort: saved.webPort || 3000,
     theme: saved.theme || "system",
+    embedInterval: saved.embedInterval || 300,
   };
 
   return cachedConfig;

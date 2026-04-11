@@ -3,6 +3,8 @@ export interface KnotesConfig {
   editor: string;
   webPort: number;
   theme: "light" | "dark" | "system";
+  /** Interval in seconds for the background embed task (default: 300). */
+  embedInterval: number;
 }
 
 export interface NoteMeta {

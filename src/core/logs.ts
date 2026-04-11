@@ -3,6 +3,7 @@ import { mkdir } from "fs/promises";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath } from "./config.ts";
 import { writeMarkdownFile, getNote } from "./notes.ts";
+import { updateIndex } from "./search.ts";
 import type { LogEntry } from "./types.ts";
 
 const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
@@ -65,6 +66,7 @@ export async function createLog(
     title: title || logicalPath.split("/").pop() || "Log",
     tags: [],
   });
+  await updateIndex();
 }
 
 export async function addEntry(
@@ -95,6 +97,7 @@ export async function addEntry(
   const body = serializeEntries(entries);
   await Bun.write(filePath, frontmatter + "\n\n" + body);
 
+  await updateIndex();
   return entry;
 }
 
@@ -143,6 +146,7 @@ export async function updateEntry(
   const body = serializeEntries(entries);
   await Bun.write(filePath, frontmatter + "\n\n" + body);
 
+  await updateIndex();
   return entry;
 }
 
@@ -165,4 +169,6 @@ export async function deleteEntry(
   const frontmatter = matter.stringify("", parsed.data).trim();
   const body = serializeEntries(filtered);
   await Bun.write(filePath, frontmatter + "\n\n" + body);
+
+  await updateIndex();
 }

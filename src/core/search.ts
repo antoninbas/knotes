@@ -34,27 +34,19 @@ async function getStore() {
   }
 }
 
-/** Update the search index for changed files. */
-export async function updateIndex(
-  collections?: ("notes" | "logs")[]
-): Promise<void> {
+/** Update the search index for changed files (incremental by default). */
+export async function updateIndex(options?: { force?: boolean }): Promise<void> {
   const store = await getStore();
-  if (collections) {
-    for (const c of collections) {
-      await store.update({ collections: [c] });
-    }
-  } else {
-    await store.update();
-  }
+  await store.update({ force: options?.force });
 }
 
-/** Generate embeddings for vector search. */
-export async function embed(): Promise<void> {
+/** Generate embeddings for vector search (incremental by default). */
+export async function embed(options?: { force?: boolean }): Promise<void> {
   const store = await getStore();
-  await store.embed();
+  await store.embed({ force: options?.force });
 }
 
-/** Search through notes and logs. */
+/** Search through notes and logs. Always updates the index first. */
 export async function search(
   query: string,
   options?: {
@@ -63,6 +55,8 @@ export async function search(
     mode?: "hybrid" | "bm25" | "vector";
   }
 ): Promise<SearchResult[]> {
+  await updateIndex();
+
   const store = await getStore();
   const limit = options?.limit ?? 10;
 

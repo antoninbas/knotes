@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { search, updateIndex } from "../../core/search.ts";
+import { search, updateIndex, embed } from "../../core/search.ts";
 
 export function registerSearchCommand(program: Command): void {
   program
@@ -12,13 +12,7 @@ export function registerSearchCommand(program: Command): void {
       "Search mode: hybrid, bm25, or vector",
       "hybrid"
     )
-    .option("--reindex", "Re-index before searching")
     .action(async (query: string, opts) => {
-      if (opts.reindex) {
-        console.log("Updating index...");
-        await updateIndex();
-      }
-
       const results = await search(query, {
         limit: parseInt(opts.limit, 10),
         mode: opts.mode as "hybrid" | "bm25" | "vector",
@@ -44,19 +38,30 @@ export function registerSearchCommand(program: Command): void {
     });
 
   program
-    .command("reindex")
-    .description("Re-index all notes and logs for search")
-    .option("--embed", "Also generate embeddings for vector search")
+    .command("index")
+    .description("Update the search index")
+    .option("--force", "Force full reindex instead of incremental")
+    .action(async (opts) => {
+      console.log(
+        opts.force ? "Rebuilding search index..." : "Updating search index..."
+      );
+      await updateIndex({ force: opts.force });
+      console.log("Index updated.");
+    });
+
+  program
+    .command("embed")
+    .description("Generate embeddings for vector/hybrid search")
+    .option("--force", "Recompute all embeddings instead of incremental")
     .action(async (opts) => {
       console.log("Updating search index...");
       await updateIndex();
-      console.log("Index updated.");
-
-      if (opts.embed) {
-        console.log("Generating embeddings...");
-        const { embed } = await import("../../core/search.ts");
-        await embed();
-        console.log("Embeddings generated.");
-      }
+      console.log(
+        opts.force
+          ? "Recomputing all embeddings..."
+          : "Computing new embeddings..."
+      );
+      await embed({ force: opts.force });
+      console.log("Embeddings updated.");
     });
 }

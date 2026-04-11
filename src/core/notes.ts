@@ -2,6 +2,7 @@ import { mkdir, unlink, readdir, stat } from "fs/promises";
 import { dirname, join, basename } from "path";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath, getHome } from "./config.ts";
+import { updateIndex } from "./search.ts";
 import type {
   NoteResult,
   CreateNoteOptions,
@@ -80,7 +81,9 @@ export async function createNote(
   if (!logicalPath.startsWith("notes/")) {
     throw new Error(`Notes must be created under notes/. Got: ${logicalPath}`);
   }
-  return writeMarkdownFile(logicalPath, options);
+  const result = await writeMarkdownFile(logicalPath, options);
+  await updateIndex();
+  return result;
 }
 
 export async function getNote(logicalPath: string): Promise<NoteResult> {
@@ -124,7 +127,9 @@ export async function updateNote(
   const fileContent = buildFrontmatter(meta) + "\n\n" + content + "\n";
   await Bun.write(filePath, fileContent);
 
-  return parseNote(filePath, fileContent);
+  const result = parseNote(filePath, fileContent);
+  await updateIndex();
+  return result;
 }
 
 /** Create a folder with a .keep file for git tracking. */
@@ -159,6 +164,7 @@ export async function deleteNote(logicalPath: string): Promise<void> {
   }
 
   await unlink(filePath);
+  await updateIndex();
 }
 
 export interface ListEntry {

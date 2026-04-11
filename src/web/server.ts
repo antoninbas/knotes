@@ -5,6 +5,8 @@ import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
 import { embeddedAssets } from "./embedded-assets.ts";
+import { updateIndex, embed } from "../core/search.ts";
+import { getConfig } from "../core/config.ts";
 
 const MIME_TYPES: Record<string, string> = {
   html: "text/html",
@@ -78,11 +80,30 @@ export function createWebServer(port: number) {
     return c.html(DEV_HTML);
   });
 
-  return Bun.serve({
+  const server = Bun.serve({
     port,
     hostname: "127.0.0.1",
     fetch: app.fetch,
   });
+
+  // Background task: update index + embeddings periodically
+  const config = getConfig();
+  const intervalMs = config.embedInterval * 1000;
+
+  async function backgroundEmbed() {
+    try {
+      await updateIndex();
+      await embed();
+    } catch (err) {
+      console.error("Background embed task failed:", err);
+    }
+  }
+
+  // Run immediately on startup, then on interval
+  backgroundEmbed();
+  setInterval(backgroundEmbed, intervalMs);
+
+  return server;
 }
 
 const DEV_HTML = `<!DOCTYPE html>

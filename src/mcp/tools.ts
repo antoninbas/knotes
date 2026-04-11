@@ -15,7 +15,7 @@ import {
   updateEntry,
   deleteEntry,
 } from "../core/logs.ts";
-import { search } from "../core/search.ts";
+import { search, updateIndex, embed } from "../core/search.ts";
 import { importDocument, checkMarkitdown } from "../core/importer.ts";
 
 function text(content: string) {
@@ -233,6 +233,37 @@ export function registerTools(server: McpServer): void {
           `${r.path} (score: ${r.score.toFixed(3)})\n  ${r.title}\n  ${r.snippet.slice(0, 150).replace(/\n/g, " ")}`
       );
       return text(lines.join("\n\n"));
+    }
+  );
+
+  server.tool(
+    "knotes_index",
+    "Update the search index (incremental by default)",
+    {
+      force: z
+        .boolean()
+        .optional()
+        .describe("Force full reindex instead of incremental"),
+    },
+    async ({ force }) => {
+      await updateIndex({ force });
+      return text("Search index updated.");
+    }
+  );
+
+  server.tool(
+    "knotes_embed",
+    "Generate embeddings for vector/hybrid search (incremental by default)",
+    {
+      force: z
+        .boolean()
+        .optional()
+        .describe("Recompute all embeddings instead of incremental"),
+    },
+    async ({ force }) => {
+      await updateIndex();
+      await embed({ force });
+      return text("Embeddings updated.");
     }
   );
 
