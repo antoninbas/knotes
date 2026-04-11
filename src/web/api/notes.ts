@@ -1,0 +1,70 @@
+import { Hono } from "hono";
+import { ensureHome } from "../../core/config.ts";
+import {
+  createNote,
+  getNote,
+  updateNote,
+  deleteNote,
+  listNotes,
+} from "../../core/notes.ts";
+
+export const notesApi = new Hono();
+
+// List notes at a prefix
+notesApi.get("/", async (c) => {
+  await ensureHome();
+  const prefix = c.req.query("prefix") || undefined;
+  const entries = await listNotes(prefix);
+  return c.json(entries);
+});
+
+// Get a note by path (path passed as query param since it contains slashes)
+notesApi.get("/get", async (c) => {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    const note = await getNote(path);
+    return c.json(note);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+// Create a note
+notesApi.post("/", async (c) => {
+  await ensureHome();
+  const body = await c.req.json();
+  const { path, title, content, tags } = body;
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    const note = await createNote(path, { title, content, tags });
+    return c.json(note, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+// Update a note
+notesApi.put("/", async (c) => {
+  const body = await c.req.json();
+  const { path, title, content, tags } = body;
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    const note = await updateNote(path, { title, content, tags });
+    return c.json(note);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+// Delete a note
+notesApi.delete("/", async (c) => {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    await deleteNote(path);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});

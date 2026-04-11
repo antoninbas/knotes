@@ -1,0 +1,135 @@
+import { dirname } from "path";
+import { mkdir } from "fs/promises";
+import matter from "gray-matter";
+import { resolvePath, toLogicalPath } from "./config.ts";
+import { createNote, getNote } from "./notes.ts";
+import type { LogEntry } from "./types.ts";
+
+const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
+
+function generateId(): string {
+  const hex = Math.random().toString(16).slice(2, 6);
+  return `e-${hex}`;
+}
+
+function nowISO(): string {
+  return new Date().toISOString();
+}
+
+/** Parse all entries from a log file's content (after frontmatter). */
+function parseEntries(content: string): LogEntry[] {
+  const entries: LogEntry[] = [];
+  const sections = content.split(/\n(?=## )/);
+
+  for (const section of sections) {
+    const lines = section.trim().split("\n");
+    if (!lines[0]) continue;
+
+    const match = lines[0].match(ENTRY_HEADING_RE);
+    if (!match) continue;
+
+    const [, timestamp, id] = match;
+    const body = lines.slice(1).join("\n").trim();
+
+    entries.push({
+      id: id!,
+      timestamp: timestamp!,
+      content: body,
+    });
+  }
+
+  return entries;
+}
+
+/** Serialize entries back to markdown content (without frontmatter). */
+function serializeEntries(entries: LogEntry[]): string {
+  if (entries.length === 0) return "";
+  return (
+    entries
+      .map((e) => `## ${e.timestamp} {#${e.id}}\n\n${e.content}`)
+      .join("\n\n") + "\n"
+  );
+}
+
+/** Ensure a log document exists, creating it if needed. */
+async function ensureLog(logicalPath: string, title?: string): Promise<void> {
+  const filePath = resolvePath(logicalPath);
+  if (await Bun.file(filePath).exists()) return;
+
+  await mkdir(dirname(filePath), { recursive: true });
+  await createNote(logicalPath, {
+    title: title || logicalPath.split("/").pop() || "Log",
+    tags: [],
+  });
+}
+
+export async function addEntry(
+  logicalPath: string,
+  content: string
+): Promise<LogEntry> {
+  await ensureLog(logicalPath);
+
+  const filePath = resolvePath(logicalPath);
+  const raw = await Bun.file(filePath).text();
+  const parsed = matter(raw);
+
+  const entries = parseEntries(parsed.content);
+  const entry: LogEntry = {
+    id: generateId(),
+    timestamp: nowISO(),
+    content,
+  };
+
+  // Prepend (newest first)
+  entries.unshift(entry);
+
+  // Update modified timestamp in frontmatter
+  parsed.data.modified = nowISO();
+  const frontmatter = matter.stringify("", parsed.data).trim();
+  const body = serializeEntries(entries);
+  await Bun.write(filePath, frontmatter + "\n\n" + body);
+
+  return entry;
+}
+
+export async function listEntries(
+  logicalPath: string,
+  options?: { limit?: number }
+): Promise<LogEntry[]> {
+  const note = await getNote(logicalPath);
+  const entries = parseEntries(note.content);
+
+  if (options?.limit) {
+    return entries.slice(0, options.limit);
+  }
+  return entries;
+}
+
+export async function getEntry(
+  logicalPath: string,
+  entryId: string
+): Promise<LogEntry | null> {
+  const entries = await listEntries(logicalPath);
+  return entries.find((e) => e.id === entryId) || null;
+}
+
+export async function deleteEntry(
+  logicalPath: string,
+  entryId: string
+): Promise<void> {
+  const filePath = resolvePath(logicalPath);
+  const raw = await Bun.file(filePath).text();
+  const parsed = matter(raw);
+
+  const entries = parseEntries(parsed.content);
+  const filtered = entries.filter((e) => e.id !== entryId);
+
+  if (filtered.length === entries.length) {
+    throw new Error(`Entry not found: ${entryId}`);
+  }
+
+  parsed.data.modified = nowISO();
+  const frontmatter = matter.stringify("", parsed.data).trim();
+  const body = serializeEntries(filtered);
+  await Bun.write(filePath, frontmatter + "\n\n" + body);
+}

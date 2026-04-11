@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  /* Obsidian-inspired color tokens */
+  --color-bg-primary: #1e1e2e;
+  --color-bg-secondary: #181825;
+  --color-bg-surface: #313244;
+  --color-bg-hover: #45475a;
+  --color-text-primary: #cdd6f4;
+  --color-text-secondary: #a6adc8;
+  --color-text-muted: #6c7086;
+  --color-border: #45475a;
+  --color-accent: #89b4fa;
+  --color-accent-hover: #74c7ec;
+  --color-success: #a6e3a1;
+  --color-warning: #f9e2af;
+  --color-danger: #f38ba8;
+
+  /* Light mode overrides applied via class */
+  --color-bg-primary-light: #eff1f5;
+  --color-bg-secondary-light: #e6e9ef;
+  --color-bg-surface-light: #ccd0da;
+  --color-bg-hover-light: #bcc0cc;
+  --color-text-primary-light: #4c4f69;
+  --color-text-secondary-light: #5c5f77;
+  --color-text-muted-light: #8c8fa1;
+  --color-border-light: #bcc0cc;
+  --color-accent-light: #1e66f5;
+  --color-accent-hover-light: #209fb5;
+}
+
+/* Base styles */
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Light mode */
+.light body,
+body.light {
+  --color-bg-primary: var(--color-bg-primary-light);
+  --color-bg-secondary: var(--color-bg-secondary-light);
+  --color-bg-surface: var(--color-bg-surface-light);
+  --color-bg-hover: var(--color-bg-hover-light);
+  --color-text-primary: var(--color-text-primary-light);
+  --color-text-secondary: var(--color-text-secondary-light);
+  --color-text-muted: var(--color-text-muted-light);
+  --color-border: var(--color-border-light);
+  --color-accent: var(--color-accent-light);
+  --color-accent-hover: var(--color-accent-hover-light);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-hover);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}

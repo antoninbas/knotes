@@ -1,0 +1,102 @@
+const BASE = "/api";
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Types matching the core layer
+export interface ListEntry {
+  path: string;
+  title: string;
+  type: "note" | "log" | "directory";
+  modified?: string;
+}
+
+export interface NoteResult {
+  path: string;
+  filePath: string;
+  title: string;
+  created: string;
+  modified: string;
+  tags: string[];
+  type: "note" | "log";
+  content: string;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  content: string;
+}
+
+export interface SearchResult {
+  path: string;
+  title: string;
+  snippet: string;
+  score: number;
+}
+
+// Notes API
+export const notes = {
+  list: (prefix?: string) =>
+    request<ListEntry[]>(`/notes?${prefix ? `prefix=${encodeURIComponent(prefix)}` : ""}`),
+
+  get: (path: string) =>
+    request<NoteResult>(`/notes/get?path=${encodeURIComponent(path)}`),
+
+  create: (path: string, opts?: { title?: string; content?: string; tags?: string[] }) =>
+    request<NoteResult>("/notes", {
+      method: "POST",
+      body: JSON.stringify({ path, ...opts }),
+    }),
+
+  update: (path: string, opts: { title?: string; content?: string; tags?: string[] }) =>
+    request<NoteResult>("/notes", {
+      method: "PUT",
+      body: JSON.stringify({ path, ...opts }),
+    }),
+
+  delete: (path: string) =>
+    request<{ ok: boolean }>(`/notes?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
+};
+
+// Logs API
+export const logs = {
+  listEntries: (path: string, limit?: number) =>
+    request<LogEntry[]>(
+      `/logs/entries?path=${encodeURIComponent(path)}${limit ? `&limit=${limit}` : ""}`
+    ),
+
+  addEntry: (path: string, content: string) =>
+    request<LogEntry>("/logs/entries", {
+      method: "POST",
+      body: JSON.stringify({ path, content }),
+    }),
+
+  deleteEntry: (path: string, entryId: string) =>
+    request<{ ok: boolean }>(
+      `/logs/entries?path=${encodeURIComponent(path)}&entryId=${encodeURIComponent(entryId)}`,
+      { method: "DELETE" }
+    ),
+};
+
+// Search API
+export const searchApi = {
+  search: (query: string, opts?: { limit?: number; mode?: string }) =>
+    request<SearchResult[]>(
+      `/search?q=${encodeURIComponent(query)}${opts?.limit ? `&limit=${opts.limit}` : ""}${opts?.mode ? `&mode=${opts.mode}` : ""}`
+    ),
+};
