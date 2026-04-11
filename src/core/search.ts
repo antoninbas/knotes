@@ -1,16 +1,13 @@
+import { createStore } from "@tobilu/qmd";
+import { getHome } from "./config.ts";
 import type { SearchResult } from "./types.ts";
 
-// QMD store integration — placeholder until @tobilu/qmd is installed.
-// The store will be initialized lazily on first search.
-
-let storeInstance: any = null;
+let storeInstance: Awaited<ReturnType<typeof createStore>> | null = null;
 
 async function getStore() {
   if (storeInstance) return storeInstance;
 
   try {
-    const { createStore } = await import("@tobilu/qmd");
-    const { getHome } = await import("./config.ts");
     const home = getHome();
 
     storeInstance = await createStore({
@@ -31,9 +28,7 @@ async function getStore() {
 
     return storeInstance;
   } catch (err) {
-    throw new Error(
-      `Failed to initialize search index. Make sure @tobilu/qmd is installed.\n${err}`
-    );
+    throw new Error(`Failed to initialize search index: ${err}`);
   }
 }
 

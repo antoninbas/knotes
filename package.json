@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1",
+    "@tobilu/qmd": "^2.1.0",
     "commander": "^13",
     "gray-matter": "^4",
     "hono": "^4",
