@@ -22,26 +22,13 @@ function text(content: string) {
   return { content: [{ type: "text" as const, text: content }] };
 }
 
-export function registerTools(server: McpServer): void {
-  // --- Note tools ---
+export function registerTools(
+  server: McpServer,
+  options?: { readOnly?: boolean }
+): void {
+  const readOnly = options?.readOnly ?? false;
 
-  server.tool(
-    "knotes_note_create",
-    "Create a new note at a given path in the hierarchy",
-    {
-      path: z.string().describe("Logical path (e.g. notes/projects/foo)"),
-      title: z.string().optional().describe("Note title"),
-      content: z.string().optional().describe("Note content (markdown)"),
-      tags: z
-        .array(z.string())
-        .optional()
-        .describe("Tags for the note"),
-    },
-    async ({ path, title, content, tags }) => {
-      const result = await createNote(path, { title, content, tags });
-      return text(`Created note: ${result.path} (${result.title})`);
-    }
-  );
+  // --- Read-only tools (always registered) ---
 
   server.tool(
     "knotes_note_get",
@@ -54,36 +41,6 @@ export function registerTools(server: McpServer): void {
       return text(
         `# ${result.title}\n\nPath: ${result.path}\nCreated: ${result.created}\nModified: ${result.modified}\nTags: ${result.tags.join(", ") || "none"}\n\n${result.content}`
       );
-    }
-  );
-
-  server.tool(
-    "knotes_note_update",
-    "Update an existing note's content or metadata",
-    {
-      path: z.string().describe("Logical path of the note"),
-      title: z.string().optional().describe("New title"),
-      content: z.string().optional().describe("New content (markdown)"),
-      tags: z
-        .array(z.string())
-        .optional()
-        .describe("New tags"),
-    },
-    async ({ path, title, content, tags }) => {
-      const result = await updateNote(path, { title, content, tags });
-      return text(`Updated note: ${result.path}`);
-    }
-  );
-
-  server.tool(
-    "knotes_note_delete",
-    "Delete a note",
-    {
-      path: z.string().describe("Logical path of the note to delete"),
-    },
-    async ({ path }) => {
-      await deleteNote(path);
-      return text(`Deleted note: ${path}`);
     }
   );
 
@@ -106,50 +63,6 @@ export function registerTools(server: McpServer): void {
         return `${icon} ${e.path} — ${e.title}`;
       });
       return text(lines.join("\n"));
-    }
-  );
-
-  server.tool(
-    "knotes_folder_create",
-    "Create a new folder in the hierarchy",
-    {
-      path: z.string().describe("Folder path (e.g. notes/projects)"),
-    },
-    async ({ path }) => {
-      await createFolder(path);
-      return text(`Created folder: ${path}`);
-    }
-  );
-
-  // --- Log tools ---
-
-  server.tool(
-    "knotes_log_create",
-    "Create a new log/journal document",
-    {
-      path: z.string().describe("Logical path for the log (e.g. logs/daily)"),
-      title: z.string().optional().describe("Log title"),
-    },
-    async ({ path, title }) => {
-      await createLog(path, title);
-      return text(`Created log: ${path}`);
-    }
-  );
-
-  server.tool(
-    "knotes_log_add",
-    "Add a new entry to an existing log/journal document",
-    {
-      path: z
-        .string()
-        .describe("Logical path of the log (e.g. logs/daily)"),
-      content: z.string().describe("Entry content (markdown)"),
-    },
-    async ({ path, content }) => {
-      const entry = await addEntry(path, content);
-      return text(
-        `Added entry ${entry.id} at ${entry.timestamp} to ${path}`
-      );
     }
   );
 
@@ -178,37 +91,6 @@ export function registerTools(server: McpServer): void {
       return text(lines.join("\n\n"));
     }
   );
-
-  server.tool(
-    "knotes_log_update",
-    "Update an existing log entry's content (preserves timestamp and order)",
-    {
-      path: z.string().describe("Logical path of the log"),
-      entryId: z.string().describe("Entry ID to update (e.g. e-3f7a)"),
-      content: z.string().describe("New entry content"),
-    },
-    async ({ path, entryId, content }) => {
-      const entry = await updateEntry(path, entryId, content);
-      return text(`Updated entry ${entry.id} in ${path}`);
-    }
-  );
-
-  server.tool(
-    "knotes_log_delete",
-    "Delete an entry from a log/journal document",
-    {
-      path: z.string().describe("Logical path of the log"),
-      entryId: z
-        .string()
-        .describe("Entry ID to delete (e.g. e-3f7a)"),
-    },
-    async ({ path, entryId }) => {
-      await deleteEntry(path, entryId);
-      return text(`Deleted entry ${entryId} from ${path}`);
-    }
-  );
-
-  // --- Search tools ---
 
   server.tool(
     "knotes_search",
@@ -267,7 +149,128 @@ export function registerTools(server: McpServer): void {
     }
   );
 
-  // --- Import tool ---
+  // --- Write tools (only in read-write mode) ---
+
+  if (readOnly) return;
+
+  server.tool(
+    "knotes_note_create",
+    "Create a new note at a given path in the hierarchy",
+    {
+      path: z.string().describe("Logical path (e.g. notes/projects/foo)"),
+      title: z.string().optional().describe("Note title"),
+      content: z.string().optional().describe("Note content (markdown)"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("Tags for the note"),
+    },
+    async ({ path, title, content, tags }) => {
+      const result = await createNote(path, { title, content, tags });
+      return text(`Created note: ${result.path} (${result.title})`);
+    }
+  );
+
+  server.tool(
+    "knotes_note_update",
+    "Update an existing note's content or metadata",
+    {
+      path: z.string().describe("Logical path of the note"),
+      title: z.string().optional().describe("New title"),
+      content: z.string().optional().describe("New content (markdown)"),
+      tags: z
+        .array(z.string())
+        .optional()
+        .describe("New tags"),
+    },
+    async ({ path, title, content, tags }) => {
+      const result = await updateNote(path, { title, content, tags });
+      return text(`Updated note: ${result.path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_note_delete",
+    "Delete a note",
+    {
+      path: z.string().describe("Logical path of the note to delete"),
+    },
+    async ({ path }) => {
+      await deleteNote(path);
+      return text(`Deleted note: ${path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_folder_create",
+    "Create a new folder in the hierarchy",
+    {
+      path: z.string().describe("Folder path (e.g. notes/projects)"),
+    },
+    async ({ path }) => {
+      await createFolder(path);
+      return text(`Created folder: ${path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_log_create",
+    "Create a new log/journal document",
+    {
+      path: z.string().describe("Logical path for the log (e.g. logs/daily)"),
+      title: z.string().optional().describe("Log title"),
+    },
+    async ({ path, title }) => {
+      await createLog(path, title);
+      return text(`Created log: ${path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_log_add",
+    "Add a new entry to an existing log/journal document",
+    {
+      path: z
+        .string()
+        .describe("Logical path of the log (e.g. logs/daily)"),
+      content: z.string().describe("Entry content (markdown)"),
+    },
+    async ({ path, content }) => {
+      const entry = await addEntry(path, content);
+      return text(
+        `Added entry ${entry.id} at ${entry.timestamp} to ${path}`
+      );
+    }
+  );
+
+  server.tool(
+    "knotes_log_update",
+    "Update an existing log entry's content (preserves timestamp and order)",
+    {
+      path: z.string().describe("Logical path of the log"),
+      entryId: z.string().describe("Entry ID to update (e.g. e-3f7a)"),
+      content: z.string().describe("New entry content"),
+    },
+    async ({ path, entryId, content }) => {
+      const entry = await updateEntry(path, entryId, content);
+      return text(`Updated entry ${entry.id} in ${path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_log_delete",
+    "Delete an entry from a log/journal document",
+    {
+      path: z.string().describe("Logical path of the log"),
+      entryId: z
+        .string()
+        .describe("Entry ID to delete (e.g. e-3f7a)"),
+    },
+    async ({ path, entryId }) => {
+      await deleteEntry(path, entryId);
+      return text(`Deleted entry ${entryId} from ${path}`);
+    }
+  );
 
   server.tool(
     "knotes_import",
