@@ -41,15 +41,18 @@ function parseNote(filePath: string, raw: string): NoteResult {
   };
 }
 
-export async function createNote(
+/**
+ * Internal: write a markdown file with frontmatter. No path validation.
+ * Used by both createNote and createLog.
+ */
+export async function writeMarkdownFile(
   logicalPath: string,
   options?: CreateNoteOptions
 ): Promise<NoteResult> {
   const filePath = resolvePath(logicalPath);
 
-  // Check if file already exists
   if (await Bun.file(filePath).exists()) {
-    throw new Error(`Note already exists: ${logicalPath}`);
+    throw new Error(`File already exists: ${logicalPath}`);
   }
 
   await mkdir(dirname(filePath), { recursive: true });
@@ -68,6 +71,16 @@ export async function createNote(
   await Bun.write(filePath, fileContent);
 
   return parseNote(filePath, fileContent);
+}
+
+export async function createNote(
+  logicalPath: string,
+  options?: CreateNoteOptions
+): Promise<NoteResult> {
+  if (!logicalPath.startsWith("notes/")) {
+    throw new Error(`Notes must be created under notes/. Got: ${logicalPath}`);
+  }
+  return writeMarkdownFile(logicalPath, options);
 }
 
 export async function getNote(logicalPath: string): Promise<NoteResult> {
@@ -116,6 +129,10 @@ export async function updateNote(
 
 /** Create a folder with a .keep file for git tracking. */
 export async function createFolder(logicalPath: string): Promise<string> {
+  if (!logicalPath.startsWith("notes/") && !logicalPath.startsWith("logs/")) {
+    throw new Error(`Folders must be created under notes/ or logs/. Got: ${logicalPath}`);
+  }
+
   const home = getHome();
   const dirPath = join(home, logicalPath);
 

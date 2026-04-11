@@ -2,7 +2,7 @@ import { dirname } from "path";
 import { mkdir } from "fs/promises";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath } from "./config.ts";
-import { createNote, getNote } from "./notes.ts";
+import { writeMarkdownFile, getNote } from "./notes.ts";
 import type { LogEntry } from "./types.ts";
 
 const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
@@ -56,13 +56,12 @@ export async function createLog(
   logicalPath: string,
   title?: string
 ): Promise<void> {
-  const filePath = resolvePath(logicalPath);
-  if (await Bun.file(filePath).exists()) {
-    throw new Error(`Log already exists: ${logicalPath}`);
+  if (!logicalPath.startsWith("logs/")) {
+    throw new Error(`Logs must be created under logs/. Got: ${logicalPath}`);
   }
 
-  await mkdir(dirname(filePath), { recursive: true });
-  await createNote(logicalPath, {
+  await mkdir(dirname(resolvePath(logicalPath)), { recursive: true });
+  await writeMarkdownFile(logicalPath, {
     title: title || logicalPath.split("/").pop() || "Log",
     tags: [],
   });

@@ -102,6 +102,19 @@ export default function Sidebar(props: Props) {
     if (e.key === "Escape") setCreateMode(null);
   }
 
+  // Determine which zone we're in based on browsePath
+  const zone = (): "root" | "notes" | "logs" => {
+    const p = browsePath();
+    if (!p) return "root";
+    if (p === "notes" || p.startsWith("notes/")) return "notes";
+    if (p === "logs" || p.startsWith("logs/")) return "logs";
+    return "root";
+  };
+
+  const canCreateFolder = () => zone() !== "root";
+  const canCreateNote = () => zone() === "notes";
+  const canCreateLog = () => zone() === "logs";
+
   return (
     <aside
       class="w-64 flex flex-col border-r overflow-hidden shrink-0"
@@ -119,39 +132,45 @@ export default function Sidebar(props: Props) {
           Knotes
         </h1>
         <div class="flex items-center gap-1">
-          <button
-            onClick={() => openCreate("folder")}
-            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
-            style={{
-              background: "var(--color-bg-surface)",
-              color: "var(--color-text-secondary)",
-            }}
-            title="New folder"
-          >
-            {"\u{1F4C1}"}
-          </button>
-          <button
-            onClick={() => openCreate("note")}
-            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
-            style={{
-              background: "var(--color-bg-surface)",
-              color: "var(--color-text-secondary)",
-            }}
-            title="New note"
-          >
-            {"\u{1F4C4}"}
-          </button>
-          <button
-            onClick={() => openCreate("log")}
-            class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
-            style={{
-              background: "var(--color-bg-surface)",
-              color: "var(--color-text-secondary)",
-            }}
-            title="New log"
-          >
-            {"\u{1F4CB}"}
-          </button>
+          <Show when={canCreateFolder()}>
+            <button
+              onClick={() => openCreate("folder")}
+              class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-secondary)",
+              }}
+              title="New folder"
+            >
+              {"\u{1F4C1}"}
+            </button>
+          </Show>
+          <Show when={canCreateNote()}>
+            <button
+              onClick={() => openCreate("note")}
+              class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-secondary)",
+              }}
+              title="New note"
+            >
+              {"\u{1F4C4}"}
+            </button>
+          </Show>
+          <Show when={canCreateLog()}>
+            <button
+              onClick={() => openCreate("log")}
+              class="w-7 h-7 flex items-center justify-center rounded text-sm cursor-pointer"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-secondary)",
+              }}
+              title="New log"
+            >
+              {"\u{1F4CB}"}
+            </button>
+          </Show>
         </div>
       </div>
 
