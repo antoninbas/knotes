@@ -29,7 +29,7 @@ export function createApp(): Hono {
   return app;
 }
 
-export function createWebServer(port: number, hostname?: string) {
+export function createWebServer(port: number) {
   const app = createApp();
 
   const hasEmbeddedAssets = Object.keys(embeddedAssets).length > 0;
@@ -80,7 +80,7 @@ export function createWebServer(port: number, hostname?: string) {
 
   return Bun.serve({
     port,
-    hostname,
+    hostname: "127.0.0.1",
     fetch: app.fetch,
   });
 }

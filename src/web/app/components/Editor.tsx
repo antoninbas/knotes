@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup, createEffect } from "solid-js";
+import { createSignal, onMount, onCleanup } from "solid-js";
 import { notes, type NoteResult } from "../lib/api.ts";
 import { EditorView, keymap, placeholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
@@ -135,19 +135,6 @@ export default function Editor(props: Props) {
 
   onCleanup(() => {
     editorView?.destroy();
-  });
-
-  // Rebuild editor when theme changes
-  createEffect(() => {
-    const t = theme();
-    if (editorView) {
-      const isDark = t !== "light";
-      editorView.dispatch({
-        effects: EditorView.reconfigure.of([]),
-      });
-      // Full reconfigure is complex; for now the theme at mount time is used.
-      // A full theme switch would require compartments — acceptable trade-off.
-    }
   });
 
   return (
