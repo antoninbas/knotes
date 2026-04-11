@@ -84,6 +84,21 @@ export default function App() {
                 {viewMode() === "view" ? "Edit" : "View"}
               </button>
             </Show>
+            <Show when={currentNote()}>
+              <a
+                href={`/api/notes/download?path=${encodeURIComponent(currentNote()!.path)}`}
+                download=""
+                class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+                style={{
+                  background: "var(--color-bg-surface)",
+                  color: "var(--color-text-secondary)",
+                  "text-decoration": "none",
+                }}
+                title="Download as Markdown"
+              >
+                Download
+              </a>
+            </Show>
             <button
               onClick={() => setShowSearch(true)}
               class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"

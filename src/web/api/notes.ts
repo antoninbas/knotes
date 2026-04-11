@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { ensureHome } from "../../core/config.ts";
+import { ensureHome, resolvePath } from "../../core/config.ts";
 import {
   createNote,
   createFolder,
@@ -8,6 +8,7 @@ import {
   deleteNote,
   listNotes,
 } from "../../core/notes.ts";
+import { basename } from "path";
 
 export const notesApi = new Hono();
 
@@ -26,6 +27,29 @@ notesApi.get("/get", async (c) => {
   try {
     const note = await getNote(path);
     return c.json(note);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+// Download the raw markdown file
+notesApi.get("/download", async (c) => {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    const filePath = resolvePath(path);
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) {
+      return c.json({ error: "not found" }, 404);
+    }
+    const raw = await file.text();
+    const filename = basename(filePath);
+    return new Response(raw, {
+      headers: {
+        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
   }
