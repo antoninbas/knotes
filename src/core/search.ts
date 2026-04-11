@@ -1,13 +1,15 @@
-import { createStore } from "@tobilu/qmd";
 import { getHome } from "./config.ts";
 import type { SearchResult } from "./types.ts";
 
-let storeInstance: Awaited<ReturnType<typeof createStore>> | null = null;
+// qmd (and its node-llama-cpp dep) is imported lazily to avoid issues
+// with bun build --compile and to keep startup fast for non-search commands.
+let storeInstance: any = null;
 
 async function getStore() {
   if (storeInstance) return storeInstance;
 
   try {
+    const { createStore } = await import("@tobilu/qmd");
     const home = getHome();
 
     storeInstance = await createStore({
