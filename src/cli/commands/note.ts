@@ -1,14 +1,17 @@
 import type { Command } from "commander";
-import { ensureHome, resolvePath } from "../../core/config.ts";
+import { ensureHome, resolvePath, getConfig } from "../../core/config.ts";
 import {
   createNote,
-  createFolder,
   getNote,
   updateNote,
   deleteNote,
   listNotes,
-} from "../../core/notes.ts";
+  createFolder,
+} from "../../core/router.ts";
 import { openInEditor } from "../editor.ts";
+import { tmpdir } from "os";
+import { join } from "path";
+import { unlink } from "fs/promises";
 
 export function registerNoteCommands(program: Command): void {
   const note = program
@@ -34,7 +37,7 @@ export function registerNoteCommands(program: Command): void {
       console.log(`Created: ${result.path}`);
 
       if (opts.edit) {
-        await openInEditor(result.filePath);
+        await editNoteViaTemp(result.path);
       }
     });
 
@@ -53,28 +56,17 @@ export function registerNoteCommands(program: Command): void {
     .description("Open a note in your editor")
     .argument("<path>", "Logical path of the note")
     .action(async (path: string) => {
-      const filePath = resolvePath(path);
-      const ok = await openInEditor(filePath);
-      if (!ok) {
-        console.error("Editor exited with error");
-        process.exit(1);
-      }
+      await editNoteViaTemp(path);
     });
 
   note
     .command("show")
     .description("Display a note's content")
     .argument("<path>", "Logical path of the note")
-    .option("--raw", "Show raw markdown including frontmatter")
-    .action(async (path: string, opts) => {
+    .action(async (path: string) => {
       const result = await getNote(path);
-      if (opts.raw) {
-        const raw = await Bun.file(result.filePath).text();
-        console.log(raw);
-      } else {
-        console.log(`# ${result.title}\n`);
-        console.log(result.content);
-      }
+      console.log(`# ${result.title}\n`);
+      console.log(result.content);
     });
 
   note
@@ -103,4 +95,32 @@ export function registerNoteCommands(program: Command): void {
         console.log(`${icon} ${entry.path}  ${entry.title !== entry.path.split("/").pop() ? `(${entry.title})` : ""}`);
       }
     });
+}
+
+/**
+ * Edit a note by fetching its content, writing to a temp file,
+ * opening the editor, then saving back via the router.
+ */
+async function editNoteViaTemp(path: string): Promise<void> {
+  const note = await getNote(path);
+  const tempFile = join(tmpdir(), `knotes-edit-${Date.now()}.md`);
+  await Bun.write(tempFile, note.content);
+
+  const ok = await openInEditor(tempFile);
+  if (!ok) {
+    console.error("Editor exited with error");
+    await unlink(tempFile).catch(() => {});
+    process.exit(1);
+  }
+
+  const newContent = await Bun.file(tempFile).text();
+  await unlink(tempFile).catch(() => {});
+
+  if (newContent === note.content) {
+    console.log("No changes.");
+    return;
+  }
+
+  await updateNote(path, { content: newContent });
+  console.log(`Updated: ${path}`);
 }

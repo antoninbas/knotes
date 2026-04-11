@@ -5,6 +5,8 @@ export interface KnotesConfig {
   theme: "light" | "dark" | "system";
   /** Interval in seconds for the background embed task (default: 300). */
   embedInterval: number;
+  /** When true, CLI/MCP operate directly without requiring a running server. */
+  serverless: boolean;
 }
 
 export interface NoteMeta {

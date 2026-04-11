@@ -4,17 +4,18 @@ import {
   createLog,
   addEntry,
   listEntries,
+  getEntry,
   updateEntry,
   deleteEntry,
-} from "../../core/logs.ts";
+} from "../../core/router.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
 import { unlink } from "fs/promises";
 
-async function getContentFromEditor(): Promise<string | null> {
+async function getContentFromEditor(prefill?: string): Promise<string | null> {
   const tempFile = join(tmpdir(), `knotes-log-${Date.now()}.md`);
-  await Bun.write(tempFile, "");
+  await Bun.write(tempFile, prefill || "");
   const ok = await openInEditor(tempFile);
   if (!ok) {
     console.error("Editor exited with error");
@@ -95,22 +96,12 @@ export function registerLogCommands(program: Command): void {
       let content = opts.message as string | undefined;
 
       if (!content) {
-        // Pre-fill editor with existing content
-        const { getEntry } = await import("../../core/logs.ts");
         const existing = await getEntry(path, entryId);
         if (!existing) {
           console.error(`Entry not found: ${entryId}`);
           process.exit(1);
         }
-        const tempFile = join(tmpdir(), `knotes-log-${Date.now()}.md`);
-        await Bun.write(tempFile, existing.content);
-        const ok = await openInEditor(tempFile);
-        if (!ok) {
-          console.error("Editor exited with error");
-          process.exit(1);
-        }
-        content = (await Bun.file(tempFile).text()).trim();
-        await unlink(tempFile).catch(() => {});
+        content = (await getContentFromEditor(existing.content)) || undefined;
         if (!content) {
           console.log("Empty content, aborting.");
           return;

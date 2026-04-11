@@ -117,4 +117,15 @@ export const searchApi = {
     request<SearchResult[]>(
       `/search?q=${encodeURIComponent(query)}${opts?.limit ? `&limit=${opts.limit}` : ""}${opts?.mode ? `&mode=${opts.mode}` : ""}`
     ),
+
+  embed: (force?: boolean) =>
+    request<{ ok: boolean }>("/search/embed", {
+      method: "POST",
+      body: JSON.stringify({ force }),
+    }),
+
+  embedStatus: () =>
+    request<{ lastJob: { status: string; completed_at: string | null; duration_ms: number | null } | null }>(
+      "/search/embed/status"
+    ),
 };

@@ -6,6 +6,7 @@ interface Props {
   refreshTrigger: number;
   onNewNote: () => void;
   currentPath: () => string | undefined;
+  readOnly: boolean;
 }
 
 type CreateMode = null | "note" | "folder" | "log";
@@ -111,9 +112,9 @@ export default function Sidebar(props: Props) {
     return "root";
   };
 
-  const canCreateFolder = () => zone() !== "root";
-  const canCreateNote = () => zone() === "notes";
-  const canCreateLog = () => zone() === "logs";
+  const canCreateFolder = () => !props.readOnly && zone() !== "root";
+  const canCreateNote = () => !props.readOnly && zone() === "notes";
+  const canCreateLog = () => !props.readOnly && zone() === "logs";
 
   return (
     <aside

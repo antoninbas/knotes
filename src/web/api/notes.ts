@@ -8,6 +8,7 @@ import {
   deleteNote,
   listNotes,
 } from "../../core/notes.ts";
+import { importDocument, checkMarkitdown } from "../../core/importer.ts";
 import { basename } from "path";
 
 export const notesApi = new Hono();
@@ -91,6 +92,23 @@ notesApi.post("/folder", async (c) => {
   try {
     await createFolder(path);
     return c.json({ ok: true, path }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+// Import a document
+notesApi.post("/import", async (c) => {
+  const body = await c.req.json();
+  const { filePath, to } = body;
+  if (!filePath) return c.json({ error: "filePath is required" }, 400);
+  try {
+    const available = await checkMarkitdown();
+    if (!available) {
+      return c.json({ error: "markitdown is not installed. Install with: pip install 'markitdown[all]'" }, 400);
+    }
+    const result = await importDocument(filePath, { to });
+    return c.json(result, 201);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
   }

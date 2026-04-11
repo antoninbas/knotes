@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { search, updateIndex, embed } from "../../core/search.ts";
+import { search, updateIndex, embed } from "../../core/router.ts";
 
 export function registerSearchCommand(program: Command): void {
   program

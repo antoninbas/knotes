@@ -7,6 +7,13 @@ import { searchApi } from "./api/search.ts";
 import { embeddedAssets } from "./embedded-assets.ts";
 import { updateIndex, embed } from "../core/search.ts";
 import { getConfig } from "../core/config.ts";
+import {
+  writeServerHeartbeat,
+  updateHeartbeat,
+  clearServerInfo,
+  isServerAlive,
+  getServerInfo,
+} from "../core/db.ts";
 
 const MIME_TYPES: Record<string, string> = {
   html: "text/html",
@@ -23,6 +30,9 @@ export function createApp(): Hono {
 
   app.use("/api/*", cors());
 
+  // Health check
+  app.get("/api/health", (c) => c.json({ ok: true }));
+
   // API routes
   app.route("/api/notes", notesApi);
   app.route("/api/logs", logsApi);
@@ -32,8 +42,17 @@ export function createApp(): Hono {
 }
 
 export function createWebServer(port: number) {
-  const app = createApp();
+  // Check if another server is already running
+  if (isServerAlive()) {
+    const info = getServerInfo()!;
+    console.error(
+      `Error: Another server is already running (PID ${info.pid} on port ${info.port}, started ${info.started_at}).`
+    );
+    console.error("Stop the existing server first, or use a different KNOTES_HOME.");
+    process.exit(1);
+  }
 
+  const app = createApp();
   const hasEmbeddedAssets = Object.keys(embeddedAssets).length > 0;
 
   app.get("/*", async (c) => {
@@ -80,11 +99,21 @@ export function createWebServer(port: number) {
     return c.html(DEV_HTML);
   });
 
+  const hostname = "127.0.0.1";
+
   const server = Bun.serve({
     port,
-    hostname: "127.0.0.1",
+    hostname,
     fetch: app.fetch,
   });
+
+  // Register server in DB
+  writeServerHeartbeat(process.pid, port, hostname);
+
+  // Heartbeat every 30 seconds
+  const heartbeatInterval = setInterval(() => {
+    updateHeartbeat();
+  }, 30_000);
 
   // Background task: update index + embeddings periodically
   const config = getConfig();
@@ -101,7 +130,24 @@ export function createWebServer(port: number) {
 
   // Run immediately on startup, then on interval
   backgroundEmbed();
-  setInterval(backgroundEmbed, intervalMs);
+  const embedInterval = setInterval(backgroundEmbed, intervalMs);
+
+  // Graceful shutdown
+  function cleanup() {
+    clearInterval(heartbeatInterval);
+    clearInterval(embedInterval);
+    clearServerInfo();
+    server.stop();
+  }
+
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(0);
+  });
+  process.on("SIGTERM", () => {
+    cleanup();
+    process.exit(0);
+  });
 
   return server;
 }

@@ -3,8 +3,9 @@ import { registerNoteCommands } from "./commands/note.ts";
 import { registerLogCommands } from "./commands/log.ts";
 import { registerSearchCommand } from "./commands/search.ts";
 import { registerImportCommand } from "./commands/import.ts";
-import { registerWebCommand } from "./commands/web.ts";
+import { registerServerCommand } from "./commands/server.ts";
 import { registerMcpCommand } from "./commands/mcp.ts";
+import { registerConfigCommand } from "./commands/config.ts";
 
 export const program = new Command();
 
@@ -17,5 +18,6 @@ registerNoteCommands(program);
 registerLogCommands(program);
 registerSearchCommand(program);
 registerImportCommand(program);
-registerWebCommand(program);
+registerServerCommand(program);
 registerMcpCommand(program);
+registerConfigCommand(program);

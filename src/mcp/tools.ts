@@ -2,21 +2,21 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   createNote,
-  createFolder,
   getNote,
   updateNote,
   deleteNote,
   listNotes,
-} from "../core/notes.ts";
-import {
+  createFolder,
   createLog,
   addEntry,
   listEntries,
   updateEntry,
   deleteEntry,
-} from "../core/logs.ts";
-import { search, updateIndex, embed } from "../core/search.ts";
-import { importDocument, checkMarkitdown } from "../core/importer.ts";
+  search,
+  updateIndex,
+  embed,
+  importDocument,
+} from "../core/router.ts";
 
 function text(content: string) {
   return { content: [{ type: "text" as const, text: content }] };
@@ -285,12 +285,6 @@ export function registerTools(
         .describe("Target logical path for the imported note"),
     },
     async ({ filePath, to }) => {
-      const available = await checkMarkitdown();
-      if (!available) {
-        return text(
-          "Error: markitdown is not installed. Install with: pip install 'markitdown[all]'"
-        );
-      }
       const result = await importDocument(filePath, { to });
       return text(`Imported as: ${result.path} (${result.title})`);
     }

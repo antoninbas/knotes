@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { search } from "../../core/search.ts";
+import { search, updateIndex, embed } from "../../core/search.ts";
+import { getLastJob } from "../../core/db.ts";
 
 export const searchApi = new Hono();
 
@@ -16,6 +17,38 @@ searchApi.get("/", async (c) => {
       mode,
     });
     return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Trigger index update
+searchApi.post("/index", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    await updateIndex({ force: body.force });
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Trigger embedding
+searchApi.post("/embed", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    await embed({ force: body.force });
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Get last embed job status
+searchApi.get("/embed/status", async (c) => {
+  try {
+    const last = getLastJob("embed");
+    return c.json({ lastJob: last });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

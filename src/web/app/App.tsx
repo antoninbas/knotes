@@ -5,7 +5,7 @@ import Editor from "./components/Editor.tsx";
 import LogView from "./components/LogView.tsx";
 import SearchBar from "./components/SearchBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
-import type { NoteResult } from "./lib/api.ts";
+import { searchApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
 
@@ -14,6 +14,8 @@ export default function App() {
   const [viewMode, setViewMode] = createSignal<ViewMode>("view");
   const [showSearch, setShowSearch] = createSignal(false);
   const [sidebarRefresh, setSidebarRefresh] = createSignal(0);
+  const [readOnly, setReadOnly] = createSignal(false);
+  const [embedding, setEmbedding] = createSignal(false);
 
   function handleNoteSelect(note: NoteResult) {
     setCurrentNote(note);
@@ -22,6 +24,17 @@ export default function App() {
 
   function handleNoteSaved() {
     setSidebarRefresh((n) => n + 1);
+  }
+
+  async function triggerEmbed() {
+    setEmbedding(true);
+    try {
+      await searchApi.embed();
+    } catch (err) {
+      console.error("Embed failed:", err);
+    } finally {
+      setEmbedding(false);
+    }
   }
 
   const currentPath = () => currentNote()?.path;
@@ -46,6 +59,7 @@ export default function App() {
         refreshTrigger={sidebarRefresh()}
         onNewNote={handleNoteSaved}
         currentPath={currentPath}
+        readOnly={readOnly()}
       />
 
       {/* Main content */}
@@ -69,10 +83,15 @@ export default function App() {
                 </span>
               </Show>
             </Show>
+            <Show when={readOnly()}>
+              <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-danger)", color: "#fff" }}>
+                read-only
+              </span>
+            </Show>
           </div>
           <div class="flex items-center gap-2">
-            {/* Only show Edit button for notes, not logs */}
-            <Show when={currentNote() && !isLog()}>
+            {/* Only show Edit button for notes, not logs, and not in read-only mode */}
+            <Show when={currentNote() && !isLog() && !readOnly()}>
               <button
                 onClick={() => setViewMode(viewMode() === "view" ? "edit" : "view")}
                 class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
@@ -110,6 +129,32 @@ export default function App() {
             >
               Search
             </button>
+            <button
+              onClick={triggerEmbed}
+              disabled={embedding()}
+              class="px-3 py-1 text-sm rounded transition-colors cursor-pointer disabled:opacity-50"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-muted)",
+              }}
+              title="Update search embeddings"
+            >
+              {embedding() ? "..." : "Embed"}
+            </button>
+            <button
+              onClick={() => {
+                setReadOnly(!readOnly());
+                if (readOnly()) setViewMode("view");
+              }}
+              class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+              style={{
+                background: readOnly() ? "var(--color-danger)" : "var(--color-bg-surface)",
+                color: readOnly() ? "#fff" : "var(--color-text-muted)",
+              }}
+              title={readOnly() ? "Disable read-only mode" : "Enable read-only mode"}
+            >
+              {readOnly() ? "RO" : "RW"}
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -131,7 +176,7 @@ export default function App() {
               when={isLog()}
               fallback={
                 <Show
-                  when={viewMode() === "edit"}
+                  when={viewMode() === "edit" && !readOnly()}
                   fallback={<NoteView note={currentNote()!} />}
                 >
                   <Editor
@@ -145,7 +190,7 @@ export default function App() {
                 </Show>
               }
             >
-              <LogView note={currentNote()!} />
+              <LogView note={currentNote()!} readOnly={readOnly()} />
             </Show>
           </Show>
         </main>

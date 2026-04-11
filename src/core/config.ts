@@ -1,61 +1,59 @@
 import { join } from "path";
 import { homedir } from "os";
 import { mkdir } from "fs/promises";
+import { getConfigValue, setConfigValue, getAllConfig } from "./db.ts";
 import type { KnotesConfig } from "./types.ts";
 
 const DEFAULT_HOME = join(homedir(), ".knotes");
-
-let cachedConfig: KnotesConfig | null = null;
 
 export function getHome(): string {
   return process.env["KNOTES_HOME"] || DEFAULT_HOME;
 }
 
 export function getConfig(): KnotesConfig {
-  if (cachedConfig) return cachedConfig;
-
   const home = getHome();
-  const settingsPath = join(home, ".config", "settings.json");
 
-  let saved: Partial<KnotesConfig> = {};
-  try {
-    const file = Bun.file(settingsPath);
-    // Synchronous check — settings file is tiny
-    saved = JSON.parse(
-      require("fs").readFileSync(settingsPath, "utf-8")
-    ) as Partial<KnotesConfig>;
-  } catch {
-    // No settings file yet — use defaults
-  }
-
-  cachedConfig = {
+  return {
     home,
-    editor: process.env["EDITOR"] || saved.editor || "vi",
-    webPort: saved.webPort || 3000,
-    theme: saved.theme || "system",
-    embedInterval: saved.embedInterval || 300,
+    editor: process.env["EDITOR"] || getConfigValue("editor") || "vi",
+    webPort: parseInt(getConfigValue("webPort") || "3000", 10),
+    theme: (getConfigValue("theme") as KnotesConfig["theme"]) || "system",
+    embedInterval: parseInt(getConfigValue("embedInterval") || "300", 10),
+    serverless: getConfigValue("serverless") === "true",
   };
-
-  return cachedConfig;
 }
 
 export function resetConfigCache(): void {
-  cachedConfig = null;
+  // No-op — config is read fresh from DB each time now.
+  // Kept for test compatibility. Resets the DB connection instead.
+  const { resetDb } = require("./db.ts");
+  resetDb();
 }
 
 export async function saveConfig(
   updates: Partial<Omit<KnotesConfig, "home">>
 ): Promise<void> {
-  const config = getConfig();
-  const settingsDir = join(config.home, ".config");
-  await mkdir(settingsDir, { recursive: true });
+  if (updates.editor !== undefined) setConfigValue("editor", updates.editor);
+  if (updates.webPort !== undefined) setConfigValue("webPort", String(updates.webPort));
+  if (updates.theme !== undefined) setConfigValue("theme", updates.theme);
+  if (updates.embedInterval !== undefined) setConfigValue("embedInterval", String(updates.embedInterval));
+  if (updates.serverless !== undefined) setConfigValue("serverless", String(updates.serverless));
+}
 
-  const settingsPath = join(settingsDir, "settings.json");
-  const merged = { ...config, ...updates };
-  // Don't persist `home` — it comes from env
-  const { home: _, ...toSave } = merged;
-  await Bun.write(settingsPath, JSON.stringify(toSave, null, 2) + "\n");
-  cachedConfig = null;
+/**
+ * Get config as a plain JSON object for export/editing.
+ */
+export function getConfigAsJson(): Record<string, any> {
+  const config = getConfig();
+  const { home, ...rest } = config;
+  return rest;
+}
+
+/**
+ * Apply config from a JSON object (as returned by getConfigAsJson).
+ */
+export async function applyConfigFromJson(json: Record<string, any>): Promise<void> {
+  await saveConfig(json as Partial<Omit<KnotesConfig, "home">>);
 }
 
 /** Ensure KNOTES_HOME directory structure exists. */

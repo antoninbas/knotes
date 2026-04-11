@@ -1,10 +1,10 @@
 import type { Command } from "commander";
 import { ensureHome, getConfig } from "../../core/config.ts";
 
-export function registerWebCommand(program: Command): void {
+export function registerServerCommand(program: Command): void {
   program
-    .command("web")
-    .description("Start the web interface")
+    .command("server")
+    .description("Start the Knotes server (web UI + API)")
     .option("-p, --port <port>", "Port number")
     .action(async (opts) => {
       await ensureHome();
@@ -13,6 +13,6 @@ export function registerWebCommand(program: Command): void {
 
       const { createWebServer } = await import("../../web/server.ts");
       const server = createWebServer(port);
-      console.log(`Knotes web UI running at http://localhost:${port}`);
+      console.log(`Knotes server running at http://localhost:${port}`);
     });
 }

@@ -3,6 +3,7 @@ import { logs, type LogEntry, type NoteResult } from "../lib/api.ts";
 
 interface Props {
   note: NoteResult;
+  readOnly?: boolean;
 }
 
 export default function LogView(props: Props) {
@@ -81,6 +82,7 @@ export default function LogView(props: Props) {
       </h2>
 
       {/* Add entry form */}
+      <Show when={!props.readOnly}>
       <div class="space-y-2">
         <textarea
           value={newContent()}
@@ -109,6 +111,7 @@ export default function LogView(props: Props) {
           {adding() ? "Adding..." : "Add Entry (Ctrl+Enter)"}
         </button>
       </div>
+      </Show>
 
       {/* Entries list */}
       <div class="space-y-4">
@@ -130,6 +133,7 @@ export default function LogView(props: Props) {
                     {new Date(entry.timestamp).toLocaleString()}
                   </span>
                 </div>
+                <Show when={!props.readOnly}>
                 <div class="flex items-center gap-2">
                   <Show when={editingId() !== entry.id}>
                     <button
@@ -148,6 +152,7 @@ export default function LogView(props: Props) {
                     Delete
                   </button>
                 </div>
+                </Show>
               </div>
 
               <Show
