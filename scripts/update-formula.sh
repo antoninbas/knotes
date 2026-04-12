@@ -52,6 +52,29 @@ FORMULA='class Knotes < Formula
     end
   end
 
+  service do
+    run [opt_bin/"knotes", "server"]
+    keep_alive true
+    log_path var/"log/knotes.log"
+    error_log_path var/"log/knotes.log"
+  end
+
+  def caveats
+    <<~EOS
+      To start knotes as a background service:
+        brew services start knotes
+
+      Or use the built-in service manager:
+        knotes service install
+
+      The server runs on port 7713 by default (configurable with \`knotes config set webPort <port>\`).
+
+      Data is stored in ~/.knotes by default. To use a custom directory,
+      set KNOTES_HOME in your shell profile:
+        export KNOTES_HOME=/path/to/data
+    EOS
+  end
+
   test do
     assert_match "knotes", shell_output("#{bin}/knotes --help")
   end

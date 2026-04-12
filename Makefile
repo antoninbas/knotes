@@ -57,7 +57,7 @@ clean:
 
 # --- Release ---
 
-release: build-all
+release: clean build-all
 	@echo "Creating release v$(VERSION)..."
 	@cd dist && for f in knotes-*; do \
 		tar czf "$${f}.tar.gz" "$$f" && echo "  Packaged $$f.tar.gz"; \
