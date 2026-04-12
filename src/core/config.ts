@@ -16,7 +16,7 @@ export function getConfig(): KnotesConfig {
   return {
     home,
     editor: process.env["EDITOR"] || getConfigValue("editor") || "vi",
-    webPort: parseInt(getConfigValue("webPort") || "3000", 10),
+    webPort: parseInt(getConfigValue("webPort") || "7713", 10),
     theme: (getConfigValue("theme") as KnotesConfig["theme"]) || "system",
     embedInterval: parseInt(getConfigValue("embedInterval") || "300", 10),
     serverless: getConfigValue("serverless") === "true",

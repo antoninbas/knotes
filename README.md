@@ -36,7 +36,7 @@ make install   # installs to ~/.local/bin/knotes
 Knotes uses a **server-centric architecture**: the server (`knotes server`) is the central hub, and CLI commands route through its HTTP API by default. Start the server first, then use the CLI or web UI.
 
 ```bash
-# Start the server (web UI + API on http://localhost:3000)
+# Start the server (web UI + API on http://localhost:7713)
 bun run src/main.ts server
 
 # In another terminal, use the CLI
@@ -103,7 +103,7 @@ Requires [markitdown](https://github.com/microsoft/markitdown) (`pip install mar
 ### Server
 
 ```bash
-knotes server [-p <port>]    # start server (web UI + API, default port 3000)
+knotes server [-p <port>]    # start server (web UI + API, default port 7713)
 ```
 
 The web server binds to `127.0.0.1` only. For remote access, use [Tailscale](https://tailscale.com) or SSH port forwarding (see [docs/tailscale-setup.md](docs/tailscale-setup.md)).
@@ -142,7 +142,7 @@ Configuration keys:
 | Key | Default | Description |
 |-----|---------|-------------|
 | `editor` | `$EDITOR` or `vi` | Editor for `note edit` and `log add` |
-| `webPort` | `3000` | Server port |
+| `webPort` | `7713` | Server port |
 | `theme` | `system` | Web UI theme (`light`, `dark`, `system`) |
 | `embedInterval` | `300` | Background embed interval in seconds |
 | `serverless` | `false` | Skip server, access files directly |
@@ -183,7 +183,7 @@ Older entry. Newest first.
 
 ```bash
 make dev          # install deps, type-check, build frontend, start server
-make dev-web      # Vite dev server with HMR (proxies /api to :3000)
+make dev-web      # Vite dev server with HMR (proxies /api to :7713)
 make test         # run tests
 make check        # type-check all code
 make fmt          # format with Prettier

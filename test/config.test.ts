@@ -29,7 +29,7 @@ test("getConfig returns defaults", async () => {
   const config = getConfig();
   expect(config.home).toBe(testHome);
   expect(config.editor).toBe(process.env["EDITOR"] || "vi");
-  expect(config.webPort).toBe(3000);
+  expect(config.webPort).toBe(7713);
   expect(config.theme).toBe("system");
 });
 

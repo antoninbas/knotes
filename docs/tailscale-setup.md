@@ -22,19 +22,19 @@ tailscale ip -4
 ### 2. Start Knotes and expose it via Tailscale Serve
 
 ```sh
-# Start the web app (binds to 127.0.0.1:3000)
+# Start the web app (binds to 127.0.0.1:7713)
 knotes web &
 
-# Expose port 3000 to your tailnet on port 3000
-sudo tailscale serve --bg 3000
+# Expose port 7713 to your tailnet on port 7713
+sudo tailscale serve --bg 7713
 ```
 
-This makes `http://<server-tailscale-hostname>:3000` accessible to any device on your tailnet.
+This makes `http://<server-tailscale-hostname>:7713` accessible to any device on your tailnet.
 
 To stop serving:
 
 ```sh
-sudo tailscale serve --bg off 3000
+sudo tailscale serve --bg off 7713
 ```
 
 ### 3. Install Tailscale on the Windows desktop
@@ -42,7 +42,7 @@ sudo tailscale serve --bg off 3000
 1. Download the installer from https://tailscale.com/download/windows
 2. Run the installer and follow the prompts
 3. Sign in with the same account/tailnet used on the Linux server
-4. Open a browser and navigate to `http://<server-tailscale-hostname>:3000`
+4. Open a browser and navigate to `http://<server-tailscale-hostname>:7713`
 
 You can find the server's Tailscale hostname in the Tailscale admin console or by running `tailscale status` on either machine.
 
@@ -79,12 +79,12 @@ knotes web
 Open PowerShell or Windows Terminal:
 
 ```powershell
-ssh -L 3000:127.0.0.1:3000 user@<server-tailscale-hostname>
+ssh -L 7713:127.0.0.1:7713 user@<server-tailscale-hostname>
 ```
 
 Replace `user` with your Linux username. If using Tailscale SSH, the username is your tailnet identity.
 
-Then open a browser on the Windows machine and go to `http://localhost:3000`.
+Then open a browser on the Windows machine and go to `http://localhost:7713`.
 
 The tunnel stays open as long as the SSH session is active.
 

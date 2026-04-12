@@ -144,13 +144,13 @@ test("config show --json outputs JSON", async () => {
   const { code, stdout } = await run("config", "show", "--json");
   expect(code).toBe(0);
   const parsed = JSON.parse(stdout);
-  expect(parsed.webPort).toBe(3000);
+  expect(parsed.webPort).toBe(7713);
 });
 
 test("config get returns a value", async () => {
   const { code, stdout } = await run("config", "get", "webPort");
   expect(code).toBe(0);
-  expect(stdout.trim()).toBe("3000");
+  expect(stdout.trim()).toBe("7713");
 });
 
 test("config set updates a value", async () => {
