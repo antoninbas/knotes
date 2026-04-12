@@ -14,6 +14,12 @@
     "build": "bun run build.ts",
     "test": "bun test"
   },
+  "bun": {
+    "test": {
+      "preload": ["./test/preload.ts"],
+      "timeout": 30000
+    }
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
