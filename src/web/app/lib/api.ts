@@ -129,3 +129,14 @@ export const searchApi = {
       "/search/embed/status"
     ),
 };
+
+// Version API
+export interface VersionInfo {
+  version: string;
+  homepage: string;
+  author: string;
+}
+
+export const versionApi = {
+  get: () => request<VersionInfo>("/version"),
+};

@@ -5,6 +5,7 @@ import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
 import { updateIndex, embed } from "../core/search.ts";
+import { getVersion } from "../core/version.ts";
 import { getConfig } from "../core/config.ts";
 import {
   writeServerHeartbeat,
@@ -31,6 +32,15 @@ export function createApp(): Hono {
 
   // Health check
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  // Version info
+  app.get("/api/version", (c) =>
+    c.json({
+      version: getVersion(),
+      homepage: "https://github.com/antoninbas/knotes",
+      author: "Antonin Bas",
+    })
+  );
 
   // API routes
   app.route("/api/notes", notesApi);

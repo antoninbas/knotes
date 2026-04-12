@@ -44,6 +44,7 @@ install: deps web-build
 	install -d $(LIBDIR)
 	cp -r src package.json bun.lock node_modules $(LIBDIR)/
 	cp -r src/web/app/node_modules $(LIBDIR)/src/web/app/ 2>/dev/null || true
+	git describe --tags --always > $(LIBDIR)/VERSION
 	install -d $(PREFIX)/bin
 	@printf '#!/bin/sh\nexec "$(shell which bun)" run "$(LIBDIR)/src/main.ts" "$$@"\n' > $(PREFIX)/bin/knotes
 	chmod +x $(PREFIX)/bin/knotes
