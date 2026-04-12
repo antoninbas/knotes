@@ -329,23 +329,29 @@ test("GET /api/jobs returns empty list initially", async () => {
   expect(body.pageSize).toBe(20);
 });
 
-test("GET /api/jobs returns jobs after indexing", async () => {
-  await post("/api/search/index", {});
+test("GET /api/jobs returns recorded jobs", async () => {
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  const id = recordJobStart("embed:on-demand");
+  recordJobComplete(id, 123, { docsProcessed: 5, totalEmbedded: 50 });
+
   const res = await api("/api/jobs");
   expect(res.status).toBe(200);
   const body = await json(res);
-  expect(body.jobs.length).toBeGreaterThan(0);
-  const indexJob = body.jobs.find((j: any) => j.type.startsWith("index:"));
-  expect(indexJob).toBeTruthy();
-  expect(indexJob.status).toBe("completed");
-  expect(indexJob.duration_ms).toBeGreaterThanOrEqual(0);
-}, 30_000);
+  expect(body.jobs.length).toBe(1);
+  expect(body.jobs[0].type).toBe("embed:on-demand");
+  expect(body.jobs[0].status).toBe("completed");
+  expect(body.jobs[0].duration_ms).toBe(123);
+  const meta = JSON.parse(body.jobs[0].metadata);
+  expect(meta.docsProcessed).toBe(5);
+  expect(meta.totalEmbedded).toBe(50);
+});
 
 test("GET /api/jobs supports pagination", async () => {
-  // Trigger a few jobs
-  await post("/api/search/index", {});
-  await post("/api/search/index", {});
-  await post("/api/search/index", {});
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  for (let i = 0; i < 5; i++) {
+    const id = recordJobStart("embed:background");
+    recordJobComplete(id, i * 10);
+  }
 
   const res = await api("/api/jobs?page=1&pageSize=2");
   expect(res.status).toBe(200);
@@ -353,27 +359,31 @@ test("GET /api/jobs supports pagination", async () => {
   expect(body.jobs.length).toBe(2);
   expect(body.page).toBe(1);
   expect(body.pageSize).toBe(2);
-  expect(body.total).toBeGreaterThanOrEqual(3);
+  expect(body.total).toBe(5);
 
   // Page 2
   const res2 = await api("/api/jobs?page=2&pageSize=2");
   const body2 = await json(res2);
-  expect(body2.jobs.length).toBeGreaterThanOrEqual(1);
+  expect(body2.jobs.length).toBe(2);
   expect(body2.page).toBe(2);
-}, 30_000);
+});
 
 test("GET /api/jobs supports type filter", async () => {
-  await post("/api/search/index", {});
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  const id1 = recordJobStart("embed:background");
+  recordJobComplete(id1, 10);
+  const id2 = recordJobStart("embed:on-demand");
+  recordJobComplete(id2, 20);
 
-  const res = await api("/api/jobs?type=index");
+  const res = await api("/api/jobs?type=embed:background");
   expect(res.status).toBe(200);
   const body = await json(res);
-  expect(body.jobs.length).toBeGreaterThan(0);
-  expect(body.jobs.every((j: any) => j.type.startsWith("index"))).toBe(true);
+  expect(body.jobs.length).toBe(1);
+  expect(body.jobs[0].type).toBe("embed:background");
 
   // Filter for a type that doesn't exist
   const res2 = await api("/api/jobs?type=nonexistent");
   const body2 = await json(res2);
   expect(body2.jobs).toEqual([]);
   expect(body2.total).toBe(0);
-}, 30_000);
+});

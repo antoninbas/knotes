@@ -108,7 +108,7 @@ export function createWebServer(port: number) {
 
   async function backgroundEmbed() {
     try {
-      await updateIndex({ trigger: "background" });
+      await updateIndex();
       await embed({ trigger: "background" });
     } catch (err) {
       console.error("Background embed task failed:", err);

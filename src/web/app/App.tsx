@@ -203,7 +203,7 @@ export default function App() {
             <ThemeToggle />
             <DropdownMenu
               items={[
-                { label: embedding() ? "Embedding..." : "Run Embed", onClick: triggerEmbed, disabled: embedding() },
+                { label: embedding() ? "Embedding..." : "Run Embed Job", onClick: triggerEmbed, disabled: embedding() },
                 { label: "View Embed Jobs", onClick: () => setShowJobs(true) },
                 { label: "About", onClick: openAbout },
               ]}

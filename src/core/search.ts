@@ -47,23 +47,9 @@ async function getStore() {
 }
 
 /** Update the search index for changed files (incremental by default). */
-export async function updateIndex(options?: { force?: boolean; trigger?: JobTrigger }): Promise<void> {
-  const trigger = options?.trigger ?? "on-demand";
-  const jobId = recordJobStart(`index:${trigger}`);
-  const start = Date.now();
-  try {
-    const store = await getStore();
-    const result = await store.update({ force: options?.force });
-    recordJobComplete(jobId, Date.now() - start, {
-      indexed: result.indexed,
-      updated: result.updated,
-      unchanged: result.unchanged,
-      removed: result.removed,
-    });
-  } catch (err: any) {
-    recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);
-    throw err;
-  }
+export async function updateIndex(options?: { force?: boolean }): Promise<void> {
+  const store = await getStore();
+  await store.update({ force: options?.force });
 }
 
 // In-memory mutex for embed — prevents concurrent embed() calls within the
