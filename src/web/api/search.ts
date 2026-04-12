@@ -26,7 +26,7 @@ searchApi.get("/", async (c) => {
 searchApi.post("/index", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   try {
-    await updateIndex({ force: body.force });
+    await updateIndex({ force: body.force, trigger: "on-demand" });
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -37,7 +37,7 @@ searchApi.post("/index", async (c) => {
 searchApi.post("/embed", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   try {
-    await embed({ force: body.force });
+    await embed({ force: body.force, trigger: "on-demand" });
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);

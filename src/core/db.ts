@@ -249,3 +249,31 @@ export function getRecentJobs(type: string, limit = 10): JobRecord[] {
     "SELECT * FROM jobs WHERE type = ? ORDER BY id DESC LIMIT ?"
   ).all(type, limit) as JobRecord[];
 }
+
+export interface PaginatedJobs {
+  jobs: JobRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function getJobs(options?: { page?: number; pageSize?: number; type?: string }): PaginatedJobs {
+  const db = getDb();
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 20;
+  const offset = (page - 1) * pageSize;
+
+  if (options?.type) {
+    const total = (db.query("SELECT COUNT(*) as count FROM jobs WHERE type LIKE ?").get(`${options.type}%`) as { count: number }).count;
+    const jobs = db.query(
+      "SELECT * FROM jobs WHERE type LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
+    ).all(`${options.type}%`, pageSize, offset) as JobRecord[];
+    return { jobs, total, page, pageSize };
+  }
+
+  const total = (db.query("SELECT COUNT(*) as count FROM jobs").get() as { count: number }).count;
+  const jobs = db.query(
+    "SELECT * FROM jobs ORDER BY id DESC LIMIT ? OFFSET ?"
+  ).all(pageSize, offset) as JobRecord[];
+  return { jobs, total, page, pageSize };
+}

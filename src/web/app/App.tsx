@@ -5,6 +5,8 @@ import Editor from "./components/Editor.tsx";
 import LogView from "./components/LogView.tsx";
 import SearchBar from "./components/SearchBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
+import DropdownMenu from "./components/DropdownMenu.tsx";
+import JobsList from "./components/JobsList.tsx";
 import { searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
@@ -18,6 +20,7 @@ export default function App() {
   const [embedding, setEmbedding] = createSignal(false);
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
   const [showAbout, setShowAbout] = createSignal(false);
+  const [showJobs, setShowJobs] = createSignal(false);
   const [version, setVersion] = createSignal<string | null>(null);
 
   function handleNoteSelect(note: NoteResult) {
@@ -184,18 +187,6 @@ export default function App() {
               Search
             </button>
             <button
-              onClick={triggerEmbed}
-              disabled={embedding()}
-              class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer disabled:opacity-50 hidden sm:inline-block"
-              style={{
-                background: "var(--color-bg-surface)",
-                color: "var(--color-text-muted)",
-              }}
-              title="Update search embeddings"
-            >
-              {embedding() ? "..." : "Embed"}
-            </button>
-            <button
               onClick={() => {
                 setReadOnly(!readOnly());
                 if (readOnly()) setViewMode("view");
@@ -209,18 +200,14 @@ export default function App() {
             >
               {readOnly() ? "RO" : "RW"}
             </button>
-            <button
-              onClick={openAbout}
-              class="w-7 h-7 text-sm rounded-full transition-colors cursor-pointer flex items-center justify-center font-serif italic font-bold"
-              style={{
-                background: "var(--color-bg-surface)",
-                color: "var(--color-text-muted)",
-              }}
-              title="About Knotes"
-            >
-              i
-            </button>
             <ThemeToggle />
+            <DropdownMenu
+              items={[
+                { label: embedding() ? "Embedding..." : "Run Embed", onClick: triggerEmbed, disabled: embedding() },
+                { label: "Jobs", onClick: () => setShowJobs(true) },
+                { label: "About", onClick: openAbout },
+              ]}
+            />
           </div>
         </header>
 
@@ -273,6 +260,11 @@ export default function App() {
             setShowSearch(false);
           }}
         />
+      </Show>
+
+      {/* Jobs modal */}
+      <Show when={showJobs()}>
+        <JobsList onClose={() => setShowJobs(false)} />
       </Show>
 
       {/* About modal */}

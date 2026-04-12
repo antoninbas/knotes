@@ -4,6 +4,7 @@ import { join } from "path";
 import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
+import { jobsApi } from "./api/jobs.ts";
 import { updateIndex, embed } from "../core/search.ts";
 import { getVersion } from "../core/version.ts";
 import { getConfig } from "../core/config.ts";
@@ -40,6 +41,7 @@ export function createApp(): Hono {
   app.route("/api/notes", notesApi);
   app.route("/api/logs", logsApi);
   app.route("/api/search", searchApi);
+  app.route("/api/jobs", jobsApi);
 
   return app;
 }
@@ -106,8 +108,8 @@ export function createWebServer(port: number) {
 
   async function backgroundEmbed() {
     try {
-      await updateIndex();
-      await embed();
+      await updateIndex({ trigger: "background" });
+      await embed({ trigger: "background" });
     } catch (err) {
       console.error("Background embed task failed:", err);
     }

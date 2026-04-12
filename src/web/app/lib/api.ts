@@ -130,6 +130,31 @@ export const searchApi = {
     ),
 };
 
+// Jobs API
+export interface JobRecord {
+  id: number;
+  type: string;
+  status: "running" | "completed" | "failed";
+  started_at: string;
+  completed_at: string | null;
+  duration_ms: number | null;
+  error: string | null;
+}
+
+export interface PaginatedJobs {
+  jobs: JobRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export const jobsApi = {
+  list: (opts?: { page?: number; pageSize?: number; type?: string }) =>
+    request<PaginatedJobs>(
+      `/jobs?page=${opts?.page ?? 1}&pageSize=${opts?.pageSize ?? 20}${opts?.type ? `&type=${encodeURIComponent(opts.type)}` : ""}`
+    ),
+};
+
 // Version API
 export const versionApi = {
   get: async (): Promise<string> => {

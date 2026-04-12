@@ -316,3 +316,64 @@ test("search finds created notes after indexing", async () => {
   const match = results.find((r: any) => r.title?.includes("Searchable") || r.path?.includes("searchable"));
   expect(match).toBeTruthy();
 }, 30_000);
+
+// ─── Jobs API ───────────────────────────────────────────────────
+
+test("GET /api/jobs returns empty list initially", async () => {
+  const res = await api("/api/jobs");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs).toEqual([]);
+  expect(body.total).toBe(0);
+  expect(body.page).toBe(1);
+  expect(body.pageSize).toBe(20);
+});
+
+test("GET /api/jobs returns jobs after indexing", async () => {
+  await post("/api/search/index", {});
+  const res = await api("/api/jobs");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBeGreaterThan(0);
+  const indexJob = body.jobs.find((j: any) => j.type.startsWith("index:"));
+  expect(indexJob).toBeTruthy();
+  expect(indexJob.status).toBe("completed");
+  expect(indexJob.duration_ms).toBeGreaterThanOrEqual(0);
+}, 30_000);
+
+test("GET /api/jobs supports pagination", async () => {
+  // Trigger a few jobs
+  await post("/api/search/index", {});
+  await post("/api/search/index", {});
+  await post("/api/search/index", {});
+
+  const res = await api("/api/jobs?page=1&pageSize=2");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBe(2);
+  expect(body.page).toBe(1);
+  expect(body.pageSize).toBe(2);
+  expect(body.total).toBeGreaterThanOrEqual(3);
+
+  // Page 2
+  const res2 = await api("/api/jobs?page=2&pageSize=2");
+  const body2 = await json(res2);
+  expect(body2.jobs.length).toBeGreaterThanOrEqual(1);
+  expect(body2.page).toBe(2);
+}, 30_000);
+
+test("GET /api/jobs supports type filter", async () => {
+  await post("/api/search/index", {});
+
+  const res = await api("/api/jobs?type=index");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBeGreaterThan(0);
+  expect(body.jobs.every((j: any) => j.type.startsWith("index"))).toBe(true);
+
+  // Filter for a type that doesn't exist
+  const res2 = await api("/api/jobs?type=nonexistent");
+  const body2 = await json(res2);
+  expect(body2.jobs).toEqual([]);
+  expect(body2.total).toBe(0);
+}, 30_000);

@@ -1,5 +1,8 @@
 import { getHome } from "./config.ts";
+import { recordJobStart, recordJobComplete, recordJobFailed } from "./db.ts";
 import type { SearchResult } from "./types.ts";
+
+export type JobTrigger = "background" | "on-demand";
 
 // qmd is imported lazily to keep startup fast for non-search commands.
 let storeInstance: any = null;
@@ -44,9 +47,18 @@ async function getStore() {
 }
 
 /** Update the search index for changed files (incremental by default). */
-export async function updateIndex(options?: { force?: boolean }): Promise<void> {
-  const store = await getStore();
-  await store.update({ force: options?.force });
+export async function updateIndex(options?: { force?: boolean; trigger?: JobTrigger }): Promise<void> {
+  const trigger = options?.trigger ?? "on-demand";
+  const jobId = recordJobStart(`index:${trigger}`);
+  const start = Date.now();
+  try {
+    const store = await getStore();
+    await store.update({ force: options?.force });
+    recordJobComplete(jobId, Date.now() - start);
+  } catch (err: any) {
+    recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);
+    throw err;
+  }
 }
 
 // In-memory mutex for embed — prevents concurrent embed() calls within the
@@ -54,16 +66,26 @@ export async function updateIndex(options?: { force?: boolean }): Promise<void> 
 let embedRunning: Promise<void> | null = null;
 
 /** Generate embeddings for vector search (incremental by default). */
-export async function embed(options?: { force?: boolean }): Promise<void> {
+export async function embed(options?: { force?: boolean; trigger?: JobTrigger }): Promise<void> {
   if (embedRunning) {
     await embedRunning;
     return;
   }
-  const store = await getStore();
-  embedRunning = store.embed({ force: options?.force }).finally(() => {
+  const trigger = options?.trigger ?? "on-demand";
+  const jobId = recordJobStart(`embed:${trigger}`);
+  const start = Date.now();
+  try {
+    const store = await getStore();
+    embedRunning = store.embed({ force: options?.force }).finally(() => {
+      embedRunning = null;
+    });
+    await embedRunning;
+    recordJobComplete(jobId, Date.now() - start);
+  } catch (err: any) {
     embedRunning = null;
-  });
-  await embedRunning;
+    recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);
+    throw err;
+  }
 }
 
 /** Search through notes and logs. Always updates the index first. */
