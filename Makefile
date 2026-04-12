@@ -1,9 +1,10 @@
 PREFIX ?= $(HOME)/.local
 VERSION := $(shell grep '"version"' package.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
+LIBDIR := $(PREFIX)/lib/knotes
 
-.PHONY: all build build-all install uninstall clean test fmt check dev dev-web deps run web-build release
+.PHONY: all install uninstall clean test fmt check dev dev-web deps run web-build release deploy
 
-all: check test build
+all: check test
 
 # --- Dependencies ---
 
@@ -37,32 +38,34 @@ check:
 	bun run tsc --noEmit
 	cd src/web/app && bunx tsc --noEmit
 
-# --- Build & Install ---
+# --- Install ---
 
-build:
-	bun run build.ts
-
-build-all:
-	bun run build.ts --all
-
-install: build
+install: deps web-build
+	install -d $(LIBDIR)
+	cp -r src package.json bun.lock node_modules $(LIBDIR)/
+	cp -r src/web/app/node_modules $(LIBDIR)/src/web/app/ 2>/dev/null || true
 	install -d $(PREFIX)/bin
-	install -m 755 dist/knotes $(PREFIX)/bin/knotes
+	@printf '#!/bin/sh\nexec "$(shell which bun)" run "$(LIBDIR)/src/main.ts" "$$@"\n' > $(PREFIX)/bin/knotes
+	chmod +x $(PREFIX)/bin/knotes
+	@echo "Installed knotes v$(VERSION) to $(PREFIX)/bin/knotes"
 
 uninstall:
 	rm -f $(PREFIX)/bin/knotes
+	rm -rf $(LIBDIR)
 
 clean:
 	rm -rf dist src/web/app/dist
 
+# --- Deploy (local machine) ---
+
+deploy:
+	./scripts/deploy-local.sh
+
 # --- Release ---
 
-release: clean build-all
+release:
 	@echo "Creating release v$(VERSION)..."
-	@cd dist && for f in knotes-*; do \
-		tar czf "$${f}.tar.gz" "$$f" && echo "  Packaged $$f.tar.gz"; \
-	done
-	gh release create "v$(VERSION)" dist/knotes-*.tar.gz \
+	gh release create "v$(VERSION)" \
 		--title "v$(VERSION)" \
 		--generate-notes
 	@echo "Released v$(VERSION)"

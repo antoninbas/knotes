@@ -16,20 +16,21 @@ A local-first note and activity log manager with hybrid search. Built with [Bun]
 
 ## Installation
 
+### Homebrew (macOS / Linux)
+
+```bash
+brew tap antoninbas/tap
+brew install knotes
+```
+
+### From source
+
 ```bash
 git clone <repo-url> && cd knotes
-
-# Install dependencies
-bun install
-cd src/web/app && bun install && cd ../../..
-
-# Build the frontend
-cd src/web/app && bun run build && cd ../../..
-
-# (Optional) Build a standalone binary
-make build
 make install   # installs to ~/.local/bin/knotes
 ```
+
+Requires [Bun](https://bun.sh) v1.1+. `make install` fetches dependencies, builds the frontend, and creates a wrapper script.
 
 ## Quick start
 
@@ -208,7 +209,7 @@ make dev-web      # Vite dev server with HMR (proxies /api to :7713)
 make test         # run tests
 make check        # type-check all code
 make fmt          # format with Prettier
-make build        # build standalone binary
+make deploy       # deploy current checkout locally (install + restart service)
 ```
 
 ## Architecture

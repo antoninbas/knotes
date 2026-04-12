@@ -4,7 +4,6 @@ import { join } from "path";
 import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
-import { embeddedAssets } from "./embedded-assets.ts";
 import { updateIndex, embed } from "../core/search.ts";
 import { getConfig } from "../core/config.ts";
 import {
@@ -53,30 +52,12 @@ export function createWebServer(port: number) {
   }
 
   const app = createApp();
-  const hasEmbeddedAssets = Object.keys(embeddedAssets).length > 0;
 
   app.get("/*", async (c) => {
     const url = new URL(c.req.url);
     const urlPath = url.pathname === "/" ? "/index.html" : url.pathname;
 
-    // 1. Try embedded assets (compiled binary)
-    if (hasEmbeddedAssets) {
-      const asset = embeddedAssets[urlPath];
-      if (asset) {
-        return new Response(asset.content, {
-          headers: { "Content-Type": asset.mime },
-        });
-      }
-      // SPA fallback: serve index.html for unknown routes
-      const index = embeddedAssets["/index.html"];
-      if (index) {
-        return new Response(index.content, {
-          headers: { "Content-Type": "text/html" },
-        });
-      }
-    }
-
-    // 2. Try files on disk (development)
+    // Try files on disk
     const distPath = join(import.meta.dir, "app", "dist", urlPath);
     const file = Bun.file(distPath);
     if (await file.exists()) {
@@ -86,7 +67,7 @@ export function createWebServer(port: number) {
       });
     }
 
-    // SPA fallback from disk
+    // SPA fallback
     const indexPath = join(import.meta.dir, "app", "dist", "index.html");
     const indexFile = Bun.file(indexPath);
     if (await indexFile.exists()) {
@@ -95,7 +76,7 @@ export function createWebServer(port: number) {
       });
     }
 
-    // Development fallback
+    // Frontend not built
     return c.html(DEV_HTML);
   });
 

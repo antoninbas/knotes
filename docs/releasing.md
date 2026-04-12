@@ -9,7 +9,7 @@
 
 1. Bump the `version` field in `package.json`
 2. Commit the version bump
-3. Run `make release` — builds binaries for all platforms, creates a GitHub release with tarballs
+3. Run `make release` — creates a GitHub release from the current tag
 4. Update the Homebrew formula:
    ```bash
    ./scripts/update-formula.sh v<version> ~/homebrew-tap
@@ -21,20 +21,24 @@
 
 ## What `make release` does
 
-1. Builds the frontend (`src/web/app`)
-2. Embeds frontend assets into the binary
-3. Cross-compiles standalone binaries for:
-   - `linux-x64`
-   - `darwin-arm64` (Apple Silicon)
-   - `darwin-x64` (Intel Mac)
-4. Packages each binary as a `.tar.gz`
-5. Creates a GitHub release with auto-generated notes and uploads the tarballs
+1. Creates a GitHub release with auto-generated notes
+2. GitHub automatically attaches the source archive (`.tar.gz`)
 
 ## What `update-formula.sh` does
 
-1. Downloads each tarball from the GitHub release
-2. Computes SHA256 checksums
-3. Writes `Formula/knotes.rb` in the tap repo with the correct URLs and checksums
+1. Downloads the source archive from the GitHub release
+2. Computes the SHA256 checksum
+3. Writes `Formula/knotes.rb` in the tap repo with the correct URL and checksum
+
+## How the formula works
+
+The Homebrew formula installs knotes from source:
+
+1. `depends_on "oven-sh/bun/bun"` — ensures Bun is installed
+2. Runs `bun install` to fetch dependencies
+3. Builds the frontend (`bun run build` in `src/web/app`)
+4. Copies source + `node_modules` to `libexec/`
+5. Creates a wrapper script in `bin/knotes` that runs `bun run libexec/src/main.ts`
 
 ## Installation (end user)
 
@@ -42,3 +46,13 @@
 brew tap antoninbas/tap
 brew install knotes
 ```
+
+## Local deployment
+
+To deploy the currently checked-out version on this machine:
+
+```bash
+make deploy
+```
+
+This runs `make install` (builds frontend, copies source to `~/.local/lib/knotes`, creates wrapper script) and restarts the systemd service.

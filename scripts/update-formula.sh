@@ -9,51 +9,40 @@ VERSION_NUM="${VERSION#v}"
 TAP_DIR="${2:-}"
 REPO="antoninbas/knotes"
 
-BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
+ARCHIVE_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
 
-echo "Fetching checksums for ${TAG}..."
-
-sha_darwin_arm64=$(curl -sL "${BASE_URL}/knotes-darwin-arm64.tar.gz" | shasum -a 256 | cut -d' ' -f1)
-sha_darwin_x64=$(curl -sL "${BASE_URL}/knotes-darwin-x64.tar.gz" | shasum -a 256 | cut -d' ' -f1)
-sha_linux_x64=$(curl -sL "${BASE_URL}/knotes-linux-x64.tar.gz" | shasum -a 256 | cut -d' ' -f1)
-
-echo "  darwin-arm64: ${sha_darwin_arm64}"
-echo "  darwin-x64:   ${sha_darwin_x64}"
-echo "  linux-x64:    ${sha_linux_x64}"
+echo "Fetching checksum for ${TAG}..."
+sha=$(curl -sL "${ARCHIVE_URL}" | shasum -a 256 | cut -d' ' -f1)
+echo "  sha256: ${sha}"
 
 FORMULA='class Knotes < Formula
   desc "Local-first note and activity log manager with hybrid search"
   homepage "https://github.com/'"${REPO}"'"
-  version "'"${VERSION_NUM}"'"
+  url "'"${ARCHIVE_URL}"'"
+  sha256 "'"${sha}"'"
   license "MIT"
 
-  on_macos do
-    if Hardware::CPU.arm?
-      url "'"${BASE_URL}"'/knotes-darwin-arm64.tar.gz"
-      sha256 "'"${sha_darwin_arm64}"'"
-    else
-      url "'"${BASE_URL}"'/knotes-darwin-x64.tar.gz"
-      sha256 "'"${sha_darwin_x64}"'"
-    end
-  end
-
-  on_linux do
-    url "'"${BASE_URL}"'/knotes-linux-x64.tar.gz"
-    sha256 "'"${sha_linux_x64}"'"
-  end
+  depends_on "oven-sh/bun/bun"
 
   def install
-    if Hardware::CPU.arm? && OS.mac?
-      bin.install "knotes-darwin-arm64" => "knotes"
-    elsif OS.mac?
-      bin.install "knotes-darwin-x64" => "knotes"
-    else
-      bin.install "knotes-linux-x64" => "knotes"
+    system "bun", "install"
+    cd "src/web/app" do
+      system "bun", "install"
+      system "bun", "run", "build"
     end
+
+    libexec.install Dir["src", "package.json", "bun.lock", "node_modules"]
+    # Frontend node_modules needed for the built assets path resolution
+    (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
+
+    (bin/"knotes").write <<~SH
+      #!/bin/sh
+      exec "#{Formula["oven-sh/bun/bun"].opt_bin}/bun" run "#{libexec}/src/main.ts" "$@"
+    SH
   end
 
   service do
-    run [opt_bin/"knotes", "server"]
+    run [bin/"knotes", "server"]
     keep_alive true
     log_path var/"log/knotes.log"
     error_log_path var/"log/knotes.log"
@@ -67,7 +56,7 @@ FORMULA='class Knotes < Formula
       Or use the built-in service manager:
         knotes service install
 
-      The server runs on port 7713 by default (configurable with \`knotes config set webPort <port>\`).
+      The server runs on port 7713 by default (configurable with `knotes config set webPort <port>`).
 
       Data is stored in ~/.knotes by default. To use a custom directory,
       set KNOTES_HOME in your shell profile:
