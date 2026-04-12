@@ -6,6 +6,7 @@ import { registerImportCommand } from "./commands/import.ts";
 import { registerServerCommand } from "./commands/server.ts";
 import { registerMcpCommand } from "./commands/mcp.ts";
 import { registerConfigCommand } from "./commands/config.ts";
+import { registerServiceCommand } from "./commands/service.ts";
 
 export const program = new Command();
 
@@ -21,3 +22,4 @@ registerImportCommand(program);
 registerServerCommand(program);
 registerMcpCommand(program);
 registerConfigCommand(program);
+registerServiceCommand(program);

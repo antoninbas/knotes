@@ -108,6 +108,27 @@ knotes server [-p <port>]    # start server (web UI + API, default port 7713)
 
 The web server binds to `127.0.0.1` only. For remote access, use [Tailscale](https://tailscale.com) or SSH port forwarding (see [docs/tailscale-setup.md](docs/tailscale-setup.md)).
 
+### Service management
+
+Run the server as a background service that starts automatically on boot:
+
+```bash
+knotes service install                        # install and start
+knotes service install --port 8080            # custom port
+knotes service install --home /data/knotes    # custom KNOTES_HOME
+knotes service status                         # check if running
+knotes service logs [-f]                      # view logs (optionally follow)
+knotes service uninstall                      # stop and remove
+```
+
+On macOS this creates a launchd agent (`~/Library/LaunchAgents/com.knotes.server.plist`). On Linux it creates a systemd user service (`~/.config/systemd/user/knotes.service`).
+
+If you set a custom `--home`, you must also export `KNOTES_HOME` in your shell profile for the CLI to access the same data:
+
+```bash
+echo 'export KNOTES_HOME=/data/knotes' >> ~/.bashrc
+```
+
 ### MCP server
 
 ```bash
