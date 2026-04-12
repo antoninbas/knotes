@@ -33,14 +33,8 @@ export function createApp(): Hono {
   // Health check
   app.get("/api/health", (c) => c.json({ ok: true }));
 
-  // Version info
-  app.get("/api/version", (c) =>
-    c.json({
-      version: getVersion(),
-      homepage: "https://github.com/antoninbas/knotes",
-      author: "Antonin Bas",
-    })
-  );
+  // Version
+  app.get("/api/version", (c) => c.text(getVersion()));
 
   // API routes
   app.route("/api/notes", notesApi);

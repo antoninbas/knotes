@@ -131,12 +131,10 @@ export const searchApi = {
 };
 
 // Version API
-export interface VersionInfo {
-  version: string;
-  homepage: string;
-  author: string;
-}
-
 export const versionApi = {
-  get: () => request<VersionInfo>("/version"),
+  get: async (): Promise<string> => {
+    const res = await fetch(`${BASE}/version`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  },
 };

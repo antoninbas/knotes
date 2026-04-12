@@ -5,7 +5,7 @@ import Editor from "./components/Editor.tsx";
 import LogView from "./components/LogView.tsx";
 import SearchBar from "./components/SearchBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
-import { searchApi, versionApi, type NoteResult, type VersionInfo } from "./lib/api.ts";
+import { searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
 
@@ -18,7 +18,7 @@ export default function App() {
   const [embedding, setEmbedding] = createSignal(false);
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
   const [showAbout, setShowAbout] = createSignal(false);
-  const [versionInfo, setVersionInfo] = createSignal<VersionInfo | null>(null);
+  const [version, setVersion] = createSignal<string | null>(null);
 
   function handleNoteSelect(note: NoteResult) {
     setCurrentNote(note);
@@ -42,9 +42,9 @@ export default function App() {
   }
 
   async function openAbout() {
-    if (!versionInfo()) {
+    if (!version()) {
       try {
-        setVersionInfo(await versionApi.get());
+        setVersion(await versionApi.get());
       } catch (err) {
         console.error("Failed to fetch version:", err);
       }
@@ -289,31 +289,29 @@ export default function App() {
           >
             <h2 class="text-xl font-bold mb-4">Knotes</h2>
             <div class="space-y-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
-              <Show when={versionInfo()}>
-                <p>
-                  <span style={{ color: "var(--color-text-muted)" }}>Version</span>{" "}
-                  <code
-                    class="px-1.5 py-0.5 rounded text-xs"
-                    style={{ background: "var(--color-bg-surface)" }}
-                  >
-                    {versionInfo()!.version}
-                  </code>
-                </p>
-                <p>
-                  <span style={{ color: "var(--color-text-muted)" }}>Author</span>{" "}
-                  {versionInfo()!.author}
-                </p>
-                <p>
-                  <a
-                    href={versionInfo()!.homepage}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--color-accent)" }}
-                  >
-                    GitHub
-                  </a>
-                </p>
-              </Show>
+              <p>
+                <span style={{ color: "var(--color-text-muted)" }}>Version</span>{" "}
+                <code
+                  class="px-1.5 py-0.5 rounded text-xs"
+                  style={{ background: "var(--color-bg-surface)" }}
+                >
+                  {version() ?? "..."}
+                </code>
+              </p>
+              <p>
+                <span style={{ color: "var(--color-text-muted)" }}>Author</span>{" "}
+                Antonin Bas
+              </p>
+              <p>
+                <a
+                  href="https://github.com/antoninbas/knotes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  GitHub
+                </a>
+              </p>
             </div>
             <button
               onClick={() => setShowAbout(false)}
