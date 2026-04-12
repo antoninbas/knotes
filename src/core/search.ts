@@ -1,8 +1,7 @@
 import { getHome } from "./config.ts";
 import type { SearchResult } from "./types.ts";
 
-// qmd (and its node-llama-cpp dep) is imported lazily to avoid issues
-// with bun build --compile and to keep startup fast for non-search commands.
+// qmd is imported lazily to keep startup fast for non-search commands.
 let storeInstance: any = null;
 
 /** Reset the store singleton (for tests). */

@@ -15,23 +15,17 @@ function getSystemdPath(): string {
 }
 
 function findBinary(): string {
-  // Prefer the binary in PATH (e.g. from Homebrew)
-  const execPath = process.execPath;
-  // If running via bun, try to find a compiled knotes binary
-  if (execPath.endsWith("bun") || execPath.endsWith("bun.exe")) {
-    // Check common locations
-    const candidates = [
-      "/usr/local/bin/knotes",
-      "/opt/homebrew/bin/knotes",
-      join(homedir(), ".local", "bin", "knotes"),
-    ];
-    for (const c of candidates) {
-      if (Bun.file(c).size > 0) return c;
-    }
-    // Fall back to bun run
-    return `${execPath} run ${join(import.meta.dir, "../../main.ts")}`;
+  // Check for a wrapper script in common locations (e.g. from Homebrew or make install)
+  const candidates = [
+    "/usr/local/bin/knotes",
+    "/opt/homebrew/bin/knotes",
+    join(homedir(), ".local", "bin", "knotes"),
+  ];
+  for (const c of candidates) {
+    if (Bun.file(c).size > 0) return c;
   }
-  return execPath;
+  // Fall back to bun run with the source tree
+  return `${process.execPath} run ${join(import.meta.dir, "../../main.ts")}`;
 }
 
 function generatePlist(opts: { port?: number; home?: string }): string {
