@@ -53,8 +53,13 @@ export async function updateIndex(options?: { force?: boolean; trigger?: JobTrig
   const start = Date.now();
   try {
     const store = await getStore();
-    await store.update({ force: options?.force });
-    recordJobComplete(jobId, Date.now() - start);
+    const result = await store.update({ force: options?.force });
+    recordJobComplete(jobId, Date.now() - start, {
+      indexed: result.indexed,
+      updated: result.updated,
+      unchanged: result.unchanged,
+      removed: result.removed,
+    });
   } catch (err: any) {
     recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);
     throw err;
@@ -76,11 +81,20 @@ export async function embed(options?: { force?: boolean; trigger?: JobTrigger })
   const start = Date.now();
   try {
     const store = await getStore();
-    embedRunning = store.embed({ force: options?.force }).finally(() => {
+    let embedResult: any;
+    embedRunning = store.embed({ force: options?.force }).then((r: any) => { embedResult = r; }).finally(() => {
       embedRunning = null;
     });
     await embedRunning;
-    recordJobComplete(jobId, Date.now() - start);
+    const status = await store.getStatus();
+    const totalEmbedded = status.totalDocuments - status.needsEmbedding;
+    recordJobComplete(jobId, Date.now() - start, {
+      docsProcessed: embedResult?.docsProcessed ?? 0,
+      chunksEmbedded: embedResult?.chunksEmbedded ?? 0,
+      errors: embedResult?.errors ?? 0,
+      totalDocuments: status.totalDocuments,
+      totalEmbedded,
+    });
   } catch (err: any) {
     embedRunning = null;
     recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);

@@ -204,7 +204,7 @@ export default function App() {
             <DropdownMenu
               items={[
                 { label: embedding() ? "Embedding..." : "Run Embed", onClick: triggerEmbed, disabled: embedding() },
-                { label: "Jobs", onClick: () => setShowJobs(true) },
+                { label: "View Embed Jobs", onClick: () => setShowJobs(true) },
                 { label: "About", onClick: openAbout },
               ]}
             />

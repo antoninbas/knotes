@@ -139,6 +139,7 @@ export interface JobRecord {
   completed_at: string | null;
   duration_ms: number | null;
   error: string | null;
+  metadata: string | null;
 }
 
 export interface PaginatedJobs {

@@ -38,6 +38,10 @@ const migrations: Migration[] = [
     `);
     db.exec(`CREATE INDEX idx_jobs_type_status ON jobs(type, status)`);
   },
+  // Migration 2: add metadata column to jobs
+  (db) => {
+    db.exec(`ALTER TABLE jobs ADD COLUMN metadata TEXT`);
+  },
 ];
 
 function runMigrations(db: Database): void {
@@ -209,6 +213,7 @@ export interface JobRecord {
   completed_at: string | null;
   duration_ms: number | null;
   error: string | null;
+  metadata: string | null;
 }
 
 export function recordJobStart(type: string): number {
@@ -220,11 +225,11 @@ export function recordJobStart(type: string): number {
   return Number(result.lastInsertRowid);
 }
 
-export function recordJobComplete(id: number, durationMs: number): void {
+export function recordJobComplete(id: number, durationMs: number, metadata?: Record<string, unknown>): void {
   const db = getDb();
   db.run(
-    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ? WHERE id = ?",
-    [new Date().toISOString(), durationMs, id]
+    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ?, metadata = ? WHERE id = ?",
+    [new Date().toISOString(), durationMs, metadata ? JSON.stringify(metadata) : null, id]
   );
 }
 

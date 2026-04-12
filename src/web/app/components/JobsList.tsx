@@ -5,6 +5,54 @@ interface Props {
   onClose: () => void;
 }
 
+function StatusIcon(props: { status: string }) {
+  return (
+    <Show when={props.status === "running"} fallback={
+      <Show when={props.status === "completed"} fallback={
+        <Show when={props.status === "failed"} fallback={
+          <span style={{ color: "var(--color-text-muted)" }}>?</span>
+        }>
+          <span style={{ color: "var(--color-danger)", "font-size": "1.1em" }} title="Failed">&#10007;</span>
+        </Show>
+      }>
+        <span style={{ color: "var(--color-accent)", "font-size": "1.1em" }} title="Completed">&#10003;</span>
+      </Show>
+    }>
+      <span class="inline-block animate-spin" style={{ color: "#f59e0b", "font-size": "1.1em" }} title="Running">&#9696;</span>
+    </Show>
+  );
+}
+
+function parseMetadata(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function formatEmbedStats(meta: Record<string, unknown> | null): string | null {
+  if (!meta) return null;
+  const processed = meta.docsProcessed as number | undefined;
+  const totalEmbedded = meta.totalEmbedded as number | undefined;
+  if (processed !== undefined && totalEmbedded !== undefined) {
+    return `${processed} / ${totalEmbedded}`;
+  }
+  return null;
+}
+
+function formatIndexStats(meta: Record<string, unknown> | null): string | null {
+  if (!meta) return null;
+  const indexed = meta.indexed as number | undefined;
+  const updated = meta.updated as number | undefined;
+  if (indexed !== undefined && updated !== undefined) {
+    const total = indexed + updated;
+    if (total === 0) return "no changes";
+    const parts: string[] = [];
+    if (indexed > 0) parts.push(`${indexed} new`);
+    if (updated > 0) parts.push(`${updated} updated`);
+    return parts.join(", ");
+  }
+  return null;
+}
+
 export default function JobsList(props: Props) {
   const [data, setData] = createSignal<PaginatedJobs | null>(null);
   const [page, setPage] = createSignal(1);
@@ -66,15 +114,6 @@ export default function JobsList(props: Props) {
     return { name: name ?? type, trigger: trigger ?? "unknown" };
   }
 
-  function statusColor(status: string): string {
-    switch (status) {
-      case "completed": return "var(--color-accent)";
-      case "failed": return "var(--color-danger)";
-      case "running": return "#f59e0b";
-      default: return "var(--color-text-muted)";
-    }
-  }
-
   return (
     <div
       class="fixed inset-0 flex items-center justify-center z-50 px-4"
@@ -88,7 +127,7 @@ export default function JobsList(props: Props) {
       >
         {/* Header */}
         <div class="flex items-center justify-between px-5 py-4 border-b" style={{ "border-color": "var(--color-border)" }}>
-          <h2 class="text-lg font-bold">Jobs</h2>
+          <h2 class="text-lg font-bold">Embed Jobs</h2>
           <div class="flex items-center gap-3">
             <select
               value={typeFilter()}
@@ -127,12 +166,12 @@ export default function JobsList(props: Props) {
                 class="text-left text-xs uppercase"
                 style={{ color: "var(--color-text-muted)", background: "var(--color-bg-surface)" }}
               >
+                <th class="px-4 py-2 w-8"></th>
                 <th class="px-4 py-2">Type</th>
                 <th class="px-4 py-2">Trigger</th>
-                <th class="px-4 py-2">Status</th>
                 <th class="px-4 py-2">Started</th>
                 <th class="px-4 py-2">Duration</th>
-                <th class="px-4 py-2">Error</th>
+                <th class="px-4 py-2">Details</th>
               </tr>
             </thead>
             <tbody>
@@ -155,12 +194,18 @@ export default function JobsList(props: Props) {
                   {(job) => {
                     const label = jobLabel(job.type);
                     const isExpanded = () => expandedError() === job.id;
+                    const meta = () => parseMetadata(job.metadata);
+                    const isEmbed = () => label.name === "embed";
+                    const isIndex = () => label.name === "index";
                     return (
                       <>
                         <tr
                           class="border-t"
                           style={{ "border-color": "var(--color-border)" }}
                         >
+                          <td class="px-4 py-2 text-center">
+                            <StatusIcon status={job.status} />
+                          </td>
                           <td class="px-4 py-2 font-medium">{label.name}</td>
                           <td class="px-4 py-2">
                             <span
@@ -173,15 +218,10 @@ export default function JobsList(props: Props) {
                               {label.trigger}
                             </span>
                           </td>
-                          <td class="px-4 py-2">
-                            <span style={{ color: statusColor(job.status) }}>
-                              {job.status}
-                            </span>
-                          </td>
                           <td class="px-4 py-2">{formatTime(job.started_at)}</td>
                           <td class="px-4 py-2">{formatDuration(job.duration_ms)}</td>
                           <td class="px-4 py-2">
-                            <Show when={job.error}>
+                            <Show when={job.status === "failed" && job.error}>
                               <button
                                 onClick={() => setExpandedError(isExpanded() ? null : job.id)}
                                 class="text-xs px-1.5 py-0.5 rounded cursor-pointer"
@@ -191,11 +231,31 @@ export default function JobsList(props: Props) {
                                   opacity: 0.9,
                                 }}
                               >
-                                {isExpanded() ? "hide" : "show"}
+                                {isExpanded() ? "hide error" : "show error"}
                               </button>
                             </Show>
-                            <Show when={!job.error}>
-                              <span style={{ color: "var(--color-text-muted)" }}>-</span>
+                            <Show when={job.status === "completed" && isEmbed()}>
+                              {(() => {
+                                const stats = formatEmbedStats(meta());
+                                return stats ? (
+                                  <span class="text-xs" style={{ color: "var(--color-text-muted)" }} title="docs processed / total embedded">
+                                    {stats} docs
+                                  </span>
+                                ) : null;
+                              })()}
+                            </Show>
+                            <Show when={job.status === "completed" && isIndex()}>
+                              {(() => {
+                                const stats = formatIndexStats(meta());
+                                return stats ? (
+                                  <span class="text-xs" style={{ color: "var(--color-text-muted)" }}>
+                                    {stats}
+                                  </span>
+                                ) : null;
+                              })()}
+                            </Show>
+                            <Show when={job.status === "running"}>
+                              <span class="text-xs" style={{ color: "var(--color-text-muted)" }}>in progress</span>
                             </Show>
                           </td>
                         </tr>
