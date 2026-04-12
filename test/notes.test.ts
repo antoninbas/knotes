@@ -10,6 +10,8 @@ beforeEach(async () => {
   process.env["KNOTES_HOME"] = testHome;
   const { resetConfigCache } = await import("../src/core/config.ts");
   resetConfigCache();
+  const { resetStore } = await import("../src/core/search.ts");
+  resetStore();
   const { ensureHome } = await import("../src/core/config.ts");
   await ensureHome();
 });

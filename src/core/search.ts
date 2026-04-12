@@ -5,6 +5,11 @@ import type { SearchResult } from "./types.ts";
 // with bun build --compile and to keep startup fast for non-search commands.
 let storeInstance: any = null;
 
+/** Reset the store singleton (for tests). */
+export function resetStore() {
+  storeInstance = null;
+}
+
 async function getStore() {
   if (storeInstance) return storeInstance;
 
@@ -87,9 +92,9 @@ export async function search(
   }
 
   return results.map((r: any) => ({
-    path: r.path || r.id || "",
+    path: r.displayPath?.replace(/\.md$/, "") || r.path || r.id || "",
     title: r.title || r.metadata?.title || "",
-    snippet: r.content?.slice(0, 200) || r.snippet || "",
+    snippet: r.bestChunk?.slice(0, 200) || r.content?.slice(0, 200) || r.snippet || "",
     score: r.score || 0,
   }));
 }
