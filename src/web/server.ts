@@ -5,6 +5,7 @@ import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
 import { updateIndex, embed } from "../core/search.ts";
+import { getVersion } from "../core/version.ts";
 import { getConfig } from "../core/config.ts";
 import {
   writeServerHeartbeat,
@@ -31,6 +32,9 @@ export function createApp(): Hono {
 
   // Health check
   app.get("/api/health", (c) => c.json({ ok: true }));
+
+  // Version
+  app.get("/api/version", (c) => c.text(getVersion()));
 
   // API routes
   app.route("/api/notes", notesApi);

@@ -5,7 +5,7 @@ import Editor from "./components/Editor.tsx";
 import LogView from "./components/LogView.tsx";
 import SearchBar from "./components/SearchBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
-import { searchApi, type NoteResult } from "./lib/api.ts";
+import { searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
 
@@ -17,6 +17,8 @@ export default function App() {
   const [readOnly, setReadOnly] = createSignal(false);
   const [embedding, setEmbedding] = createSignal(false);
   const [sidebarOpen, setSidebarOpen] = createSignal(false);
+  const [showAbout, setShowAbout] = createSignal(false);
+  const [version, setVersion] = createSignal<string | null>(null);
 
   function handleNoteSelect(note: NoteResult) {
     setCurrentNote(note);
@@ -37,6 +39,17 @@ export default function App() {
     } finally {
       setEmbedding(false);
     }
+  }
+
+  async function openAbout() {
+    if (!version()) {
+      try {
+        setVersion(await versionApi.get());
+      } catch (err) {
+        console.error("Failed to fetch version:", err);
+      }
+    }
+    setShowAbout(true);
   }
 
   const currentPath = () => currentNote()?.path;
@@ -196,6 +209,17 @@ export default function App() {
             >
               {readOnly() ? "RO" : "RW"}
             </button>
+            <button
+              onClick={openAbout}
+              class="w-7 h-7 text-sm rounded-full transition-colors cursor-pointer flex items-center justify-center font-serif italic font-bold"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-muted)",
+              }}
+              title="About Knotes"
+            >
+              i
+            </button>
             <ThemeToggle />
           </div>
         </header>
@@ -249,6 +273,55 @@ export default function App() {
             setShowSearch(false);
           }}
         />
+      </Show>
+
+      {/* About modal */}
+      <Show when={showAbout()}>
+        <div
+          class="fixed inset-0 flex items-center justify-center z-50 px-4"
+          style={{ background: "rgba(0,0,0,0.4)" }}
+          onClick={() => setShowAbout(false)}
+        >
+          <div
+            class="rounded-lg shadow-xl p-6 max-w-sm w-full"
+            style={{ background: "var(--color-bg-secondary)", color: "var(--color-text-primary)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 class="text-xl font-bold mb-4">Knotes</h2>
+            <div class="space-y-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              <p>
+                <span style={{ color: "var(--color-text-muted)" }}>Version</span>{" "}
+                <code
+                  class="px-1.5 py-0.5 rounded text-xs"
+                  style={{ background: "var(--color-bg-surface)" }}
+                >
+                  {version() ?? "..."}
+                </code>
+              </p>
+              <p>
+                <span style={{ color: "var(--color-text-muted)" }}>Author</span>{" "}
+                Antonin Bas
+              </p>
+              <p>
+                <a
+                  href="https://github.com/antoninbas/knotes"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "var(--color-accent)" }}
+                >
+                  GitHub
+                </a>
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAbout(false)}
+              class="mt-4 px-4 py-1.5 text-sm rounded cursor-pointer w-full"
+              style={{ background: "var(--color-bg-surface)", color: "var(--color-text-secondary)" }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       </Show>
     </div>
   );

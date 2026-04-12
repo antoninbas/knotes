@@ -129,3 +129,12 @@ export const searchApi = {
       "/search/embed/status"
     ),
 };
+
+// Version API
+export const versionApi = {
+  get: async (): Promise<string> => {
+    const res = await fetch(`${BASE}/version`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.text();
+  },
+};
