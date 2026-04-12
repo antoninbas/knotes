@@ -1,6 +1,7 @@
 PREFIX ?= $(HOME)/.local
+VERSION := $(shell grep '"version"' package.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
 
-.PHONY: all build install uninstall clean test fmt check dev dev-web deps run web-build
+.PHONY: all build build-all install uninstall clean test fmt check dev dev-web deps run web-build release
 
 all: check test build
 
@@ -41,6 +42,9 @@ check:
 build:
 	bun run build.ts
 
+build-all:
+	bun run build.ts --all
+
 install: build
 	install -d $(PREFIX)/bin
 	install -m 755 dist/knotes $(PREFIX)/bin/knotes
@@ -50,3 +54,15 @@ uninstall:
 
 clean:
 	rm -rf dist src/web/app/dist
+
+# --- Release ---
+
+release: build-all
+	@echo "Creating release v$(VERSION)..."
+	@cd dist && for f in knotes-*; do \
+		tar czf "$${f}.tar.gz" "$$f" && echo "  Packaged $$f.tar.gz"; \
+	done
+	gh release create "v$(VERSION)" dist/knotes-*.tar.gz \
+		--title "v$(VERSION)" \
+		--generate-notes
+	@echo "Released v$(VERSION)"

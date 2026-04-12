@@ -2,16 +2,53 @@
 
 import { $ } from "bun";
 import { join } from "path";
-import { readdir } from "fs/promises";
+import { readdir, mkdir } from "fs/promises";
 
 const ROOT = import.meta.dir;
+const VERSION = (await Bun.file(join(ROOT, "package.json")).json()).version;
 
-console.log("Building Knotes...\n");
+// Cross-compilation targets for `bun build --compile`
+const TARGETS: Record<string, string> = {
+  "linux-x64": "bun-linux-x64",
+  "darwin-arm64": "bun-darwin-arm64",
+  "darwin-x64": "bun-darwin-x64",
+};
+
+// Parse CLI args
+const args = process.argv.slice(2);
+const requestedTargets = args.filter((a) => !a.startsWith("-"));
+const allPlatforms = args.includes("--all");
+const skipFrontend = args.includes("--skip-frontend");
+
+// Determine which targets to build
+let targetEntries: [string, string][];
+if (allPlatforms) {
+  targetEntries = Object.entries(TARGETS);
+} else if (requestedTargets.length > 0) {
+  targetEntries = requestedTargets.map((t) => {
+    const target = TARGETS[t];
+    if (!target) {
+      console.error(`Unknown target: ${t}`);
+      console.error(`Valid targets: ${Object.keys(TARGETS).join(", ")}`);
+      process.exit(1);
+    }
+    return [t, target] as [string, string];
+  });
+} else {
+  // Default: build for current platform only (no cross-compile target flag)
+  targetEntries = [["native", ""]];
+}
+
+console.log(`Building Knotes v${VERSION}...\n`);
 
 // Step 1: Build frontend
-console.log("1. Building frontend...");
-await $`cd ${join(ROOT, "src/web/app")} && bun run build`.quiet();
-console.log("   Frontend built.\n");
+if (!skipFrontend) {
+  console.log("1. Building frontend...");
+  await $`cd ${join(ROOT, "src/web/app")} && bun run build`.quiet();
+  console.log("   Frontend built.\n");
+} else {
+  console.log("1. Skipping frontend build.\n");
+}
 
 // Step 2: Generate embedded assets module
 console.log("2. Embedding frontend assets...");
@@ -53,11 +90,7 @@ export const embeddedAssets: Record<string, { content: string; mime: string }> =
 await Bun.write(join(ROOT, "src/web/embedded-assets.ts"), assetsModule);
 console.log(`   Embedded ${Object.keys(assets).length} files.\n`);
 
-// Step 3: Compile standalone binary
-console.log("3. Compiling standalone binary...");
 // node-llama-cpp has platform-specific optional deps that can't all resolve.
-// Mark them as external — they're dynamically imported and only the right
-// platform's package is needed at runtime.
 const externalPkgs = [
   "@node-llama-cpp/mac-arm64-metal",
   "@node-llama-cpp/mac-x64",
@@ -68,12 +101,25 @@ const externalPkgs = [
   "@node-llama-cpp/win-arm64",
 ];
 const externalArgs = externalPkgs.flatMap((pkg) => ["--external", pkg]);
-await $`bun build --compile ${join(ROOT, "src/main.ts")} --outfile ${join(ROOT, "dist/knotes")} --minify ${externalArgs}`.quiet();
-console.log("   Binary compiled to dist/knotes\n");
+
+// Step 3: Compile binaries
+await mkdir(join(ROOT, "dist"), { recursive: true });
+
+for (const [name, target] of targetEntries) {
+  const outfile = name === "native"
+    ? join(ROOT, "dist/knotes")
+    : join(ROOT, `dist/knotes-${name}`);
+
+  const targetArgs = target ? ["--target", target] : [];
+
+  console.log(`3. Compiling ${name}...`);
+  await $`bun build --compile ${join(ROOT, "src/main.ts")} --outfile ${outfile} --minify ${targetArgs} ${externalArgs}`.quiet();
+  console.log(`   -> ${outfile}\n`);
+}
 
 // Step 4: Clean up generated assets module
 await Bun.write(join(ROOT, "src/web/embedded-assets.ts"), `// Generated at build time — run build.ts to populate
 export const embeddedAssets: Record<string, { content: string; mime: string }> = {};
 `);
 
-console.log("Done! Run: ./dist/knotes --help");
+console.log("Done!");
