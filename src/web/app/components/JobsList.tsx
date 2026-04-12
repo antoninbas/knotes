@@ -32,10 +32,10 @@ function formatEmbedStats(meta: Record<string, unknown> | null): string | null {
   if (!meta) return null;
   const processed = meta.docsProcessed as number | undefined;
   const totalEmbedded = meta.totalEmbedded as number | undefined;
-  if (processed !== undefined && totalEmbedded !== undefined) {
-    return `${processed} / ${totalEmbedded}`;
-  }
-  return null;
+  if (processed === undefined || totalEmbedded === undefined) return null;
+  if (processed === 0 && totalEmbedded === 0) return "no documents";
+  if (processed === 0) return `${totalEmbedded} embedded, no changes`;
+  return `${processed} / ${totalEmbedded}`;
 }
 
 function formatIndexStats(meta: Record<string, unknown> | null): string | null {
@@ -238,8 +238,8 @@ export default function JobsList(props: Props) {
                               {(() => {
                                 const stats = formatEmbedStats(meta());
                                 return stats ? (
-                                  <span class="text-xs" style={{ color: "var(--color-text-muted)" }} title="docs processed / total embedded">
-                                    {stats} docs
+                                  <span class="text-xs" style={{ color: "var(--color-text-muted)" }} title="docs recomputed / total with embeddings">
+                                    {stats}
                                   </span>
                                 ) : null;
                               })()}
