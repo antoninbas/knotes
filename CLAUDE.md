@@ -41,7 +41,7 @@ bun run src/main.ts embed              # Generate embeddings
 ## Frontend Development
 
 ```sh
-cd src/web/app && bun install && bun run dev    # Vite dev server (proxies /api to :3000)
+cd src/web/app && bun install && bun run dev    # Vite dev server (proxies /api to :7713)
 cd src/web/app && bun run build                 # Production build
 ```
 
