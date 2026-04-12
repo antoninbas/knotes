@@ -16,10 +16,12 @@ export default function App() {
   const [sidebarRefresh, setSidebarRefresh] = createSignal(0);
   const [readOnly, setReadOnly] = createSignal(false);
   const [embedding, setEmbedding] = createSignal(false);
+  const [sidebarOpen, setSidebarOpen] = createSignal(false);
 
   function handleNoteSelect(note: NoteResult) {
     setCurrentNote(note);
     setViewMode("view");
+    setSidebarOpen(false);
   }
 
   function handleNoteSaved() {
@@ -48,53 +50,92 @@ export default function App() {
     }
     if (e.key === "Escape") {
       setShowSearch(false);
+      setSidebarOpen(false);
     }
   });
 
   return (
     <div class="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        onSelect={handleNoteSelect}
-        refreshTrigger={sidebarRefresh()}
-        onNewNote={handleNoteSaved}
-        currentPath={currentPath}
-        readOnly={readOnly()}
-      />
+      {/* Sidebar - always visible on desktop, overlay on mobile */}
+      <div
+        class="hidden md:block shrink-0"
+      >
+        <Sidebar
+          onSelect={handleNoteSelect}
+          refreshTrigger={sidebarRefresh()}
+          onNewNote={handleNoteSaved}
+          currentPath={currentPath}
+          readOnly={readOnly()}
+        />
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      <Show when={sidebarOpen()}>
+        <div
+          class="fixed inset-0 z-40 flex md:hidden"
+        >
+          <div class="shrink-0">
+            <Sidebar
+              onSelect={handleNoteSelect}
+              refreshTrigger={sidebarRefresh()}
+              onNewNote={handleNoteSaved}
+              currentPath={currentPath}
+              readOnly={readOnly()}
+            />
+          </div>
+          <div
+            class="flex-1"
+            style={{ background: "rgba(0,0,0,0.4)" }}
+            onClick={() => setSidebarOpen(false)}
+          />
+        </div>
+      </Show>
 
       {/* Main content */}
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Toolbar */}
         <header
-          class="flex items-center justify-between px-4 py-2 border-b"
+          class="flex items-center justify-between px-2 sm:px-4 py-2 border-b gap-2"
           style={{ "border-color": "var(--color-border)", "background-color": "var(--color-bg-secondary)" }}
         >
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 min-w-0">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen())}
+              class="md:hidden px-2 py-1 text-sm rounded cursor-pointer shrink-0"
+              style={{
+                background: "var(--color-bg-surface)",
+                color: "var(--color-text-secondary)",
+              }}
+              title="Toggle sidebar"
+            >
+              &#9776;
+            </button>
             <Show when={currentNote()}>
-              <h2 class="text-lg font-medium" style={{ color: "var(--color-text-primary)" }}>
+              <h2 class="text-base sm:text-lg font-medium truncate" style={{ color: "var(--color-text-primary)" }}>
                 {currentNote()!.title}
               </h2>
-              <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-bg-surface)", color: "var(--color-text-muted)" }}>
+              <span class="text-xs px-2 py-0.5 rounded hidden sm:inline-block shrink-0" style={{ background: "var(--color-bg-surface)", color: "var(--color-text-muted)" }}>
                 {currentNote()!.path}
               </span>
               <Show when={isLog()}>
-                <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-bg-surface)", color: "var(--color-accent)" }}>
+                <span class="text-xs px-2 py-0.5 rounded shrink-0" style={{ background: "var(--color-bg-surface)", color: "var(--color-accent)" }}>
                   log
                 </span>
               </Show>
             </Show>
             <Show when={readOnly()}>
-              <span class="text-xs px-2 py-0.5 rounded" style={{ background: "var(--color-danger)", color: "#fff" }}>
+              <span class="text-xs px-2 py-0.5 rounded shrink-0" style={{ background: "var(--color-danger)", color: "#fff" }}>
                 read-only
               </span>
             </Show>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Only show Edit button for notes, not logs, and not in read-only mode */}
             <Show when={currentNote() && !isLog() && !readOnly()}>
               <button
                 onClick={() => setViewMode(viewMode() === "view" ? "edit" : "view")}
-                class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+                class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
                 style={{
                   background: "var(--color-bg-surface)",
                   color: "var(--color-text-secondary)",
@@ -107,7 +148,7 @@ export default function App() {
               <a
                 href={`/api/notes/download?path=${encodeURIComponent(currentNote()!.path)}`}
                 download=""
-                class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+                class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer hidden sm:inline-block"
                 style={{
                   background: "var(--color-bg-surface)",
                   color: "var(--color-text-secondary)",
@@ -120,7 +161,7 @@ export default function App() {
             </Show>
             <button
               onClick={() => setShowSearch(true)}
-              class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+              class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
               style={{
                 background: "var(--color-bg-surface)",
                 color: "var(--color-text-secondary)",
@@ -132,7 +173,7 @@ export default function App() {
             <button
               onClick={triggerEmbed}
               disabled={embedding()}
-              class="px-3 py-1 text-sm rounded transition-colors cursor-pointer disabled:opacity-50"
+              class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer disabled:opacity-50 hidden sm:inline-block"
               style={{
                 background: "var(--color-bg-surface)",
                 color: "var(--color-text-muted)",
@@ -146,7 +187,7 @@ export default function App() {
                 setReadOnly(!readOnly());
                 if (readOnly()) setViewMode("view");
               }}
-              class="px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+              class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
               style={{
                 background: readOnly() ? "var(--color-danger)" : "var(--color-bg-surface)",
                 color: readOnly() ? "#fff" : "var(--color-text-muted)",
@@ -160,14 +201,17 @@ export default function App() {
         </header>
 
         {/* Content area */}
-        <main class="flex-1 overflow-auto p-6" style={{ "background-color": "var(--color-bg-primary)" }}>
+        <main class="flex-1 overflow-auto p-3 sm:p-6" style={{ "background-color": "var(--color-bg-primary)" }}>
           <Show
             when={currentNote()}
             fallback={
               <div class="flex items-center justify-center h-full">
-                <div class="text-center" style={{ color: "var(--color-text-muted)" }}>
+                <div class="text-center px-4" style={{ color: "var(--color-text-muted)" }}>
                   <p class="text-xl mb-2">Welcome to Knotes</p>
-                  <p class="text-sm">Select a note from the sidebar or press Ctrl+K to search</p>
+                  <p class="text-sm">
+                    <span class="hidden sm:inline">Select a note from the sidebar or press Ctrl+K to search</span>
+                    <span class="sm:hidden">Tap &#9776; to browse or Search to find notes</span>
+                  </p>
                 </div>
               </div>
             }

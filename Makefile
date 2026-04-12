@@ -1,6 +1,6 @@
 PREFIX ?= $(HOME)/.local
 
-.PHONY: all build install uninstall clean test fmt check dev dev-web deps
+.PHONY: all build install uninstall clean test fmt check dev dev-web deps run web-build
 
 all: check test build
 
@@ -12,11 +12,17 @@ deps:
 
 # --- Development ---
 
-dev:
+dev: deps check web-build
+	bun run src/main.ts server
+
+run:
 	bun run src/main.ts $(ARGS)
 
 dev-web:
 	cd src/web/app && bun run dev
+
+web-build: deps
+	cd src/web/app && bun run build
 
 # --- Quality ---
 

@@ -118,7 +118,7 @@ export default function Sidebar(props: Props) {
 
   return (
     <aside
-      class="w-64 flex flex-col border-r overflow-hidden shrink-0"
+      class="w-64 h-screen flex flex-col border-r overflow-hidden shrink-0"
       style={{
         "background-color": "var(--color-bg-secondary)",
         "border-color": "var(--color-border)",

@@ -43,7 +43,7 @@ export default function SearchBar(props: Props) {
 
   return (
     <div
-      class="fixed inset-0 flex items-start justify-center pt-24 z-50"
+      class="fixed inset-0 flex items-start justify-center pt-12 sm:pt-24 px-4 z-50"
       style={{ background: "rgba(0,0,0,0.5)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) props.onClose();
