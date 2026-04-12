@@ -309,10 +309,6 @@ test("search finds created notes after indexing", async () => {
   await post("/api/search/index", { force: true });
 
   const res = await api("/api/search?q=searchable&mode=bm25");
-  if (res.status !== 200) {
-    const body = await res.json().catch(() => res.text());
-    console.error("Search failed:", res.status, body);
-  }
   expect(res.status).toBe(200);
   const results = await json(res);
   expect(results.length).toBeGreaterThan(0);

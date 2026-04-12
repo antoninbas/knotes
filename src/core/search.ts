@@ -84,9 +84,9 @@ export async function search(
   let results: any[];
 
   if (options?.mode === "bm25") {
-    results = await store.search({ query, limit, mode: "bm25" });
+    results = await store.searchLex(query, { limit });
   } else if (options?.mode === "vector") {
-    results = await store.search({ query, limit, mode: "vector" });
+    results = await store.searchVector(query, { limit });
   } else {
     results = await store.search({ query, limit });
   }
@@ -94,7 +94,7 @@ export async function search(
   return results.map((r: any) => ({
     path: r.displayPath?.replace(/\.md$/, "") || r.path || r.id || "",
     title: r.title || r.metadata?.title || "",
-    snippet: r.bestChunk?.slice(0, 200) || r.content?.slice(0, 200) || r.snippet || "",
+    snippet: r.bestChunk?.slice(0, 200) || r.body?.slice(0, 200) || r.content?.slice(0, 200) || r.snippet || "",
     score: r.score || 0,
   }));
 }

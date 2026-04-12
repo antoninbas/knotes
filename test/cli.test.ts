@@ -171,9 +171,6 @@ test("config set rejects invalid key", async () => {
 test("search returns results or empty", async () => {
   await run("note", "create", "notes/find-me", "--title", "Findable Note");
   const result = await run("search", "findable", "--mode", "bm25");
-  if (result.code !== 0) {
-    console.error("Search CLI failed:", result.code, result.stderr, result.stdout);
-  }
   expect(result.code).toBe(0);
 }, 60_000);
 
