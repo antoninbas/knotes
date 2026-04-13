@@ -1,5 +1,5 @@
-import { getHome, getConfig } from "./config.ts";
-import { recordJobStart, recordJobComplete, recordJobFailed } from "./db.ts";
+import { getHome, getConfig, getModelDefaults } from "./config.ts";
+import { recordJobStart, recordJobComplete, recordJobFailed, getConfigValue, setConfigValue } from "./db.ts";
 import type { SearchResult } from "./types.ts";
 
 export type JobTrigger = "background" | "on-demand";
@@ -58,6 +58,31 @@ export async function updateIndex(options?: { force?: boolean }): Promise<void> 
   await store.update({ force: options?.force });
 }
 
+/**
+ * Build a fingerprint string from the effective embed model URI.
+ * Only the embed model matters — query expansion and reranker don't affect
+ * stored vectors.
+ */
+async function getEffectiveEmbedModelUri(): Promise<string> {
+  const config = getConfig();
+  if (config.embedModel) return config.embedModel;
+  const defaults = await getModelDefaults();
+  return defaults.embedModel;
+}
+
+/** Check if the embed model has changed since embeddings were last computed. */
+export async function hasEmbedModelChanged(): Promise<boolean> {
+  const current = await getEffectiveEmbedModelUri();
+  const stored = getConfigValue("_embedModelFingerprint");
+  return stored !== null && stored !== current;
+}
+
+/** Record the current embed model so future changes can be detected. */
+async function saveEmbedModelFingerprint(): Promise<void> {
+  const current = await getEffectiveEmbedModelUri();
+  setConfigValue("_embedModelFingerprint", current);
+}
+
 // In-memory mutex for embed — prevents concurrent embed() calls within the
 // same process (e.g. background job + manual trigger via API).
 let embedRunning: Promise<void> | null = null;
@@ -68,16 +93,26 @@ export async function embed(options?: { force?: boolean; trigger?: JobTrigger })
     await embedRunning;
     return;
   }
+
+  // Detect embed model change — force full re-embed and reset the store
+  // so it picks up the new env vars.
+  let force = options?.force ?? false;
+  if (await hasEmbedModelChanged()) {
+    force = true;
+    resetStore();
+  }
+
   const trigger = options?.trigger ?? "on-demand";
   const jobId = recordJobStart(`embed:${trigger}`);
   const start = Date.now();
   try {
     const store = await getStore();
     let embedResult: any;
-    embedRunning = store.embed({ force: options?.force }).then((r: any) => { embedResult = r; }).finally(() => {
+    embedRunning = store.embed({ force }).then((r: any) => { embedResult = r; }).finally(() => {
       embedRunning = null;
     });
     await embedRunning;
+    await saveEmbedModelFingerprint();
     const status = await store.getStatus();
     const totalEmbedded = status.totalDocuments - status.needsEmbedding;
     recordJobComplete(jobId, Date.now() - start, {

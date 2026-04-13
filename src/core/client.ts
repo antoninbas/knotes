@@ -148,6 +148,10 @@ export async function embed(opts?: { force?: boolean }): Promise<{ started: bool
   });
 }
 
+export async function notifyConfigChanged(): Promise<{ actions: string[] }> {
+  return request("/config/notify", { method: "POST" });
+}
+
 // --- Import ---
 
 export async function importDocument(filePath: string, opts?: { to?: string }): Promise<NoteResult> {
