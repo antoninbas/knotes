@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { search, updateIndex, embed } from "../../core/search.ts";
+import { search, updateIndex, embed, hasEmbedModelChanged } from "../../core/search.ts";
 import { getLastJob } from "../../core/db.ts";
 
 export const searchApi = new Hono();
@@ -39,6 +39,23 @@ searchApi.post("/embed", async (c) => {
   try {
     await embed({ force: body.force, trigger: "on-demand" });
     return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Notify server that the embed model config may have changed.
+// Checks for actual change and triggers a force re-embed if needed.
+searchApi.post("/embed/model-changed", async (c) => {
+  try {
+    if (await hasEmbedModelChanged()) {
+      // Fire-and-forget — don't block the CLI waiting for a full re-embed
+      embed({ force: true, trigger: "on-demand" }).catch((err) => {
+        console.error("Re-embed after model change failed:", err);
+      });
+      return c.json({ ok: true, reembedTriggered: true });
+    }
+    return c.json({ ok: true, reembedTriggered: false });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
