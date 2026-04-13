@@ -1,5 +1,8 @@
 import { getHome } from "./config.ts";
+import { recordJobStart, recordJobComplete, recordJobFailed } from "./db.ts";
 import type { SearchResult } from "./types.ts";
+
+export type JobTrigger = "background" | "on-demand";
 
 // qmd is imported lazily to keep startup fast for non-search commands.
 let storeInstance: any = null;
@@ -54,16 +57,35 @@ export async function updateIndex(options?: { force?: boolean }): Promise<void> 
 let embedRunning: Promise<void> | null = null;
 
 /** Generate embeddings for vector search (incremental by default). */
-export async function embed(options?: { force?: boolean }): Promise<void> {
+export async function embed(options?: { force?: boolean; trigger?: JobTrigger }): Promise<void> {
   if (embedRunning) {
     await embedRunning;
     return;
   }
-  const store = await getStore();
-  embedRunning = store.embed({ force: options?.force }).finally(() => {
+  const trigger = options?.trigger ?? "on-demand";
+  const jobId = recordJobStart(`embed:${trigger}`);
+  const start = Date.now();
+  try {
+    const store = await getStore();
+    let embedResult: any;
+    embedRunning = store.embed({ force: options?.force }).then((r: any) => { embedResult = r; }).finally(() => {
+      embedRunning = null;
+    });
+    await embedRunning;
+    const status = await store.getStatus();
+    const totalEmbedded = status.totalDocuments - status.needsEmbedding;
+    recordJobComplete(jobId, Date.now() - start, {
+      docsProcessed: embedResult?.docsProcessed ?? 0,
+      chunksEmbedded: embedResult?.chunksEmbedded ?? 0,
+      errors: embedResult?.errors ?? 0,
+      totalDocuments: status.totalDocuments,
+      totalEmbedded,
+    });
+  } catch (err: any) {
     embedRunning = null;
-  });
-  await embedRunning;
+    recordJobFailed(jobId, err.message ?? String(err), Date.now() - start);
+    throw err;
+  }
 }
 
 /** Search through notes and logs. Always updates the index first. */

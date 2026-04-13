@@ -316,3 +316,74 @@ test("search finds created notes after indexing", async () => {
   const match = results.find((r: any) => r.title?.includes("Searchable") || r.path?.includes("searchable"));
   expect(match).toBeTruthy();
 }, 30_000);
+
+// ─── Jobs API ───────────────────────────────────────────────────
+
+test("GET /api/jobs returns empty list initially", async () => {
+  const res = await api("/api/jobs");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs).toEqual([]);
+  expect(body.total).toBe(0);
+  expect(body.page).toBe(1);
+  expect(body.pageSize).toBe(20);
+});
+
+test("GET /api/jobs returns recorded jobs", async () => {
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  const id = recordJobStart("embed:on-demand");
+  recordJobComplete(id, 123, { docsProcessed: 5, totalEmbedded: 50 });
+
+  const res = await api("/api/jobs");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBe(1);
+  expect(body.jobs[0].type).toBe("embed:on-demand");
+  expect(body.jobs[0].status).toBe("completed");
+  expect(body.jobs[0].duration_ms).toBe(123);
+  const meta = JSON.parse(body.jobs[0].metadata);
+  expect(meta.docsProcessed).toBe(5);
+  expect(meta.totalEmbedded).toBe(50);
+});
+
+test("GET /api/jobs supports pagination", async () => {
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  for (let i = 0; i < 5; i++) {
+    const id = recordJobStart("embed:background");
+    recordJobComplete(id, i * 10);
+  }
+
+  const res = await api("/api/jobs?page=1&pageSize=2");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBe(2);
+  expect(body.page).toBe(1);
+  expect(body.pageSize).toBe(2);
+  expect(body.total).toBe(5);
+
+  // Page 2
+  const res2 = await api("/api/jobs?page=2&pageSize=2");
+  const body2 = await json(res2);
+  expect(body2.jobs.length).toBe(2);
+  expect(body2.page).toBe(2);
+});
+
+test("GET /api/jobs supports type filter", async () => {
+  const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
+  const id1 = recordJobStart("embed:background");
+  recordJobComplete(id1, 10);
+  const id2 = recordJobStart("embed:on-demand");
+  recordJobComplete(id2, 20);
+
+  const res = await api("/api/jobs?type=embed:background");
+  expect(res.status).toBe(200);
+  const body = await json(res);
+  expect(body.jobs.length).toBe(1);
+  expect(body.jobs[0].type).toBe("embed:background");
+
+  // Filter for a type that doesn't exist
+  const res2 = await api("/api/jobs?type=nonexistent");
+  const body2 = await json(res2);
+  expect(body2.jobs).toEqual([]);
+  expect(body2.total).toBe(0);
+});

@@ -38,6 +38,10 @@ const migrations: Migration[] = [
     `);
     db.exec(`CREATE INDEX idx_jobs_type_status ON jobs(type, status)`);
   },
+  // Migration 2: add metadata column to jobs
+  (db) => {
+    db.exec(`ALTER TABLE jobs ADD COLUMN metadata TEXT`);
+  },
 ];
 
 function runMigrations(db: Database): void {
@@ -209,6 +213,7 @@ export interface JobRecord {
   completed_at: string | null;
   duration_ms: number | null;
   error: string | null;
+  metadata: string | null;
 }
 
 export function recordJobStart(type: string): number {
@@ -220,11 +225,11 @@ export function recordJobStart(type: string): number {
   return Number(result.lastInsertRowid);
 }
 
-export function recordJobComplete(id: number, durationMs: number): void {
+export function recordJobComplete(id: number, durationMs: number, metadata?: Record<string, unknown>): void {
   const db = getDb();
   db.run(
-    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ? WHERE id = ?",
-    [new Date().toISOString(), durationMs, id]
+    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ?, metadata = ? WHERE id = ?",
+    [new Date().toISOString(), durationMs, metadata ? JSON.stringify(metadata) : null, id]
   );
 }
 
@@ -248,4 +253,32 @@ export function getRecentJobs(type: string, limit = 10): JobRecord[] {
   return db.query(
     "SELECT * FROM jobs WHERE type = ? ORDER BY id DESC LIMIT ?"
   ).all(type, limit) as JobRecord[];
+}
+
+export interface PaginatedJobs {
+  jobs: JobRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function getJobs(options?: { page?: number; pageSize?: number; type?: string }): PaginatedJobs {
+  const db = getDb();
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 20;
+  const offset = (page - 1) * pageSize;
+
+  if (options?.type) {
+    const total = (db.query("SELECT COUNT(*) as count FROM jobs WHERE type LIKE ?").get(`${options.type}%`) as { count: number }).count;
+    const jobs = db.query(
+      "SELECT * FROM jobs WHERE type LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
+    ).all(`${options.type}%`, pageSize, offset) as JobRecord[];
+    return { jobs, total, page, pageSize };
+  }
+
+  const total = (db.query("SELECT COUNT(*) as count FROM jobs").get() as { count: number }).count;
+  const jobs = db.query(
+    "SELECT * FROM jobs ORDER BY id DESC LIMIT ? OFFSET ?"
+  ).all(pageSize, offset) as JobRecord[];
+  return { jobs, total, page, pageSize };
 }

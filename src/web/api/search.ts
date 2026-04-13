@@ -37,7 +37,7 @@ searchApi.post("/index", async (c) => {
 searchApi.post("/embed", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   try {
-    await embed({ force: body.force });
+    await embed({ force: body.force, trigger: "on-demand" });
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
