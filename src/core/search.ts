@@ -1,4 +1,3 @@
-import { join } from "path";
 import { getHome, getConfig } from "./config.ts";
 import { recordJobStart, recordJobComplete, recordJobFailed } from "./db.ts";
 import type { SearchResult } from "./types.ts";
@@ -20,17 +19,11 @@ async function getStore() {
     const { createStore } = await import("@tobilu/qmd");
     const home = getHome();
 
-    // Configure custom models if set
+    // Configure custom models via env vars that qmd reads natively
     const config = getConfig();
-    if (config.embedModel || config.queryExpansionModel || config.rerankModel) {
-      const llmPath = join(import.meta.dir, "../../node_modules/@tobilu/qmd/dist/llm.js");
-      const { LlamaCpp, setDefaultLlamaCpp } = await import(llmPath);
-      const llamaConfig: Record<string, string> = {};
-      if (config.embedModel) llamaConfig.embedModel = config.embedModel;
-      if (config.queryExpansionModel) llamaConfig.generateModel = config.queryExpansionModel;
-      if (config.rerankModel) llamaConfig.rerankModel = config.rerankModel;
-      setDefaultLlamaCpp(new LlamaCpp(llamaConfig));
-    }
+    if (config.embedModel) process.env["QMD_EMBED_MODEL"] = config.embedModel;
+    if (config.queryExpansionModel) process.env["QMD_GENERATE_MODEL"] = config.queryExpansionModel;
+    if (config.rerankModel) process.env["QMD_RERANK_MODEL"] = config.rerankModel;
 
     storeInstance = await createStore({
       dbPath: `${home}/.data/index.sqlite`,

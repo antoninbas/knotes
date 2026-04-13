@@ -55,23 +55,15 @@ export function getConfigAsJson(): Record<string, any> {
   return rest;
 }
 
-/** Resolve the qmd internal llm module path. */
-function qmdLlmPath(): string {
-  return join(import.meta.dir, "../../node_modules/@tobilu/qmd/dist/llm.js");
-}
-
 /** Get model defaults from qmd for display purposes. */
 export async function getModelDefaults(): Promise<{ embedModel: string; queryExpansionModel: string; rerankModel: string }> {
-  try {
-    const llm = await import(qmdLlmPath());
-    return {
-      embedModel: llm.DEFAULT_EMBED_MODEL_URI,
-      queryExpansionModel: llm.DEFAULT_GENERATE_MODEL_URI,
-      rerankModel: llm.DEFAULT_RERANK_MODEL_URI,
-    };
-  } catch {
-    return { embedModel: "unknown", queryExpansionModel: "unknown", rerankModel: "unknown" };
-  }
+  // qmd reads these env vars in its LlamaCpp constructor, so we surface the
+  // same defaults here for `config show` without importing internal modules.
+  return {
+    embedModel: "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf",
+    queryExpansionModel: "hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf",
+    rerankModel: "hf:ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/qwen3-reranker-0.6b-q8_0.gguf",
+  };
 }
 
 /**
