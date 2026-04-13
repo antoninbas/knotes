@@ -1,18 +1,17 @@
 import type { Command } from "commander";
 import { ensureHome, getConfig, getConfigAsJson, applyConfigFromJson, getModelDefaults } from "../../core/config.ts";
 import { isServerAlive } from "../../core/db.ts";
-import { notifyEmbedModelChanged } from "../../core/client.ts";
+import { notifyConfigChanged } from "../../core/client.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
 import { unlink } from "fs/promises";
 
-async function notifyServerIfModelChanged(changedKeys: string[]): Promise<void> {
-  if (!changedKeys.includes("embedModel")) return;
+async function notifyServerOfConfigChange(): Promise<void> {
   if (!isServerAlive()) return;
   try {
-    const result = await notifyEmbedModelChanged();
-    if (result.reembedTriggered) {
+    const result = await notifyConfigChanged();
+    if (result.actions.includes("reembed")) {
       console.log("Embed model changed — re-embedding triggered on the server.");
     }
   } catch {
@@ -71,7 +70,7 @@ export function registerConfigCommand(program: Command): void {
         const newCfg = JSON.parse(content);
         await applyConfigFromJson(newCfg);
         console.log("Configuration updated.");
-        await notifyServerIfModelChanged(Object.keys(newCfg));
+        await notifyServerOfConfigChange();
       } catch (err: any) {
         console.error(`Invalid JSON: ${err.message}`);
         process.exit(1);
@@ -111,7 +110,7 @@ export function registerConfigCommand(program: Command): void {
 
       await applyConfigFromJson({ [key]: key === "serverless" ? value === "true" : value });
       console.log(`${key} = ${value}`);
-      await notifyServerIfModelChanged([key]);
+      await notifyServerOfConfigChange();
     });
 
   config

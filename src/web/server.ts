@@ -5,6 +5,7 @@ import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
 import { jobsApi } from "./api/jobs.ts";
+import { configApi } from "./api/config.ts";
 import { updateIndex, embed } from "../core/search.ts";
 import { getVersion } from "../core/version.ts";
 import { getConfig } from "../core/config.ts";
@@ -42,6 +43,7 @@ export function createApp(): Hono {
   app.route("/api/logs", logsApi);
   app.route("/api/search", searchApi);
   app.route("/api/jobs", jobsApi);
+  app.route("/api/config", configApi);
 
   return app;
 }

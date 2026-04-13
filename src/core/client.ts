@@ -148,8 +148,8 @@ export async function embed(opts?: { force?: boolean }): Promise<{ started: bool
   });
 }
 
-export async function notifyEmbedModelChanged(): Promise<{ reembedTriggered: boolean }> {
-  return request("/search/embed/model-changed", { method: "POST" });
+export async function notifyConfigChanged(): Promise<{ actions: string[] }> {
+  return request("/config/notify", { method: "POST" });
 }
 
 // --- Import ---

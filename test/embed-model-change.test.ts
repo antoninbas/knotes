@@ -103,19 +103,19 @@ test("hasEmbedModelChanged returns true when custom embedModel is cleared (rever
   expect(await hasEmbedModelChanged()).toBe(true);
 });
 
-test("API: POST /api/search/embed/model-changed returns reembedTriggered false when no change", async () => {
+test("API: POST /api/config/notify returns no actions when no change", async () => {
   const { createApp } = await import("../src/web/server.ts");
   const app = createApp();
 
   // No fingerprint stored — hasEmbedModelChanged returns false
-  const res = await app.request("/api/search/embed/model-changed", { method: "POST" });
+  const res = await app.request("/api/config/notify", { method: "POST" });
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body.ok).toBe(true);
-  expect(body.reembedTriggered).toBe(false);
+  expect(body.actions).toEqual([]);
 });
 
-test("API: POST /api/search/embed/model-changed returns reembedTriggered true when model changed", async () => {
+test("API: POST /api/config/notify triggers reembed when embed model changed", async () => {
   const { createApp } = await import("../src/web/server.ts");
   const { setConfigValue } = await import("../src/core/db.ts");
   const { getModelDefaults } = await import("../src/core/config.ts");
@@ -126,9 +126,9 @@ test("API: POST /api/search/embed/model-changed returns reembedTriggered true wh
   setConfigValue("_embedModelFingerprint", defaults.embedModel);
   setConfigValue("embedModel", "hf:org/different-model-GGUF/different.gguf");
 
-  const res = await app.request("/api/search/embed/model-changed", { method: "POST" });
+  const res = await app.request("/api/config/notify", { method: "POST" });
   expect(res.status).toBe(200);
   const body = await res.json();
   expect(body.ok).toBe(true);
-  expect(body.reembedTriggered).toBe(true);
+  expect(body.actions).toContain("reembed");
 });
