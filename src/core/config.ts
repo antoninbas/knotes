@@ -20,6 +20,9 @@ export function getConfig(): KnotesConfig {
     theme: (getConfigValue("theme") as KnotesConfig["theme"]) || "system",
     embedInterval: parseInt(getConfigValue("embedInterval") || "300", 10),
     serverless: getConfigValue("serverless") === "true",
+    embedModel: getConfigValue("embedModel") || "",
+    queryExpansionModel: getConfigValue("queryExpansionModel") || "",
+    rerankModel: getConfigValue("rerankModel") || "",
   };
 }
 
@@ -38,6 +41,9 @@ export async function saveConfig(
   if (updates.theme !== undefined) setConfigValue("theme", updates.theme);
   if (updates.embedInterval !== undefined) setConfigValue("embedInterval", String(updates.embedInterval));
   if (updates.serverless !== undefined) setConfigValue("serverless", String(updates.serverless));
+  if (updates.embedModel !== undefined) setConfigValue("embedModel", updates.embedModel);
+  if (updates.queryExpansionModel !== undefined) setConfigValue("queryExpansionModel", updates.queryExpansionModel);
+  if (updates.rerankModel !== undefined) setConfigValue("rerankModel", updates.rerankModel);
 }
 
 /**
@@ -47,6 +53,25 @@ export function getConfigAsJson(): Record<string, any> {
   const config = getConfig();
   const { home, ...rest } = config;
   return rest;
+}
+
+/** Resolve the qmd internal llm module path. */
+function qmdLlmPath(): string {
+  return join(import.meta.dir, "../../node_modules/@tobilu/qmd/dist/llm.js");
+}
+
+/** Get model defaults from qmd for display purposes. */
+export async function getModelDefaults(): Promise<{ embedModel: string; queryExpansionModel: string; rerankModel: string }> {
+  try {
+    const llm = await import(qmdLlmPath());
+    return {
+      embedModel: llm.DEFAULT_EMBED_MODEL_URI,
+      queryExpansionModel: llm.DEFAULT_GENERATE_MODEL_URI,
+      rerankModel: llm.DEFAULT_RERANK_MODEL_URI,
+    };
+  } catch {
+    return { embedModel: "unknown", queryExpansionModel: "unknown", rerankModel: "unknown" };
+  }
 }
 
 /**

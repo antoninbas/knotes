@@ -1,4 +1,5 @@
-import { getHome } from "./config.ts";
+import { join } from "path";
+import { getHome, getConfig } from "./config.ts";
 import { recordJobStart, recordJobComplete, recordJobFailed } from "./db.ts";
 import type { SearchResult } from "./types.ts";
 
@@ -18,6 +19,18 @@ async function getStore() {
   try {
     const { createStore } = await import("@tobilu/qmd");
     const home = getHome();
+
+    // Configure custom models if set
+    const config = getConfig();
+    if (config.embedModel || config.queryExpansionModel || config.rerankModel) {
+      const llmPath = join(import.meta.dir, "../../node_modules/@tobilu/qmd/dist/llm.js");
+      const { LlamaCpp, setDefaultLlamaCpp } = await import(llmPath);
+      const llamaConfig: Record<string, string> = {};
+      if (config.embedModel) llamaConfig.embedModel = config.embedModel;
+      if (config.queryExpansionModel) llamaConfig.generateModel = config.queryExpansionModel;
+      if (config.rerankModel) llamaConfig.rerankModel = config.rerankModel;
+      setDefaultLlamaCpp(new LlamaCpp(llamaConfig));
+    }
 
     storeInstance = await createStore({
       dbPath: `${home}/.data/index.sqlite`,
