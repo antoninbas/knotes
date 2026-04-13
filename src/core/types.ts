@@ -7,6 +7,12 @@ export interface KnotesConfig {
   embedInterval: number;
   /** When true, CLI/MCP operate directly without requiring a running server. */
   serverless: boolean;
+  /** Custom embedding model URI (HuggingFace GGUF). Empty string = qmd default. */
+  embedModel: string;
+  /** Custom query expansion model URI (HuggingFace GGUF). Empty string = qmd default. */
+  queryExpansionModel: string;
+  /** Custom reranker model URI (HuggingFace GGUF). Empty string = qmd default. */
+  rerankModel: string;
 }
 
 export interface NoteMeta {

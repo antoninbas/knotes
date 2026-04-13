@@ -1,5 +1,5 @@
 import type { Command } from "commander";
-import { ensureHome, getConfig, getConfigAsJson, applyConfigFromJson } from "../../core/config.ts";
+import { ensureHome, getConfig, getConfigAsJson, applyConfigFromJson, getModelDefaults } from "../../core/config.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -20,8 +20,15 @@ export function registerConfigCommand(program: Command): void {
       if (opts.json) {
         console.log(JSON.stringify(cfg, null, 2));
       } else {
+        const modelKeys = ["embedModel", "queryExpansionModel", "rerankModel"];
+        const defaults = await getModelDefaults();
         for (const [key, value] of Object.entries(cfg)) {
-          console.log(`${key}: ${value}`);
+          if (modelKeys.includes(key) && !value) {
+            const defaultVal = defaults[key as keyof typeof defaults];
+            console.log(`${key}: (default) ${defaultVal}`);
+          } else {
+            console.log(`${key}: ${value}`);
+          }
         }
       }
     });
@@ -62,7 +69,7 @@ export function registerConfigCommand(program: Command): void {
     .argument("<value>", "Configuration value")
     .action(async (key: string, value: string) => {
       await ensureHome();
-      const validKeys = ["editor", "webPort", "theme", "embedInterval", "serverless"];
+      const validKeys = ["editor", "webPort", "theme", "embedInterval", "serverless", "embedModel", "queryExpansionModel", "rerankModel"];
       if (!validKeys.includes(key)) {
         console.error(`Unknown config key: ${key}`);
         console.error(`Valid keys: ${validKeys.join(", ")}`);

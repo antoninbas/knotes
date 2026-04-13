@@ -20,6 +20,9 @@ export function getConfig(): KnotesConfig {
     theme: (getConfigValue("theme") as KnotesConfig["theme"]) || "system",
     embedInterval: parseInt(getConfigValue("embedInterval") || "300", 10),
     serverless: getConfigValue("serverless") === "true",
+    embedModel: getConfigValue("embedModel") || "",
+    queryExpansionModel: getConfigValue("queryExpansionModel") || "",
+    rerankModel: getConfigValue("rerankModel") || "",
   };
 }
 
@@ -38,6 +41,9 @@ export async function saveConfig(
   if (updates.theme !== undefined) setConfigValue("theme", updates.theme);
   if (updates.embedInterval !== undefined) setConfigValue("embedInterval", String(updates.embedInterval));
   if (updates.serverless !== undefined) setConfigValue("serverless", String(updates.serverless));
+  if (updates.embedModel !== undefined) setConfigValue("embedModel", updates.embedModel);
+  if (updates.queryExpansionModel !== undefined) setConfigValue("queryExpansionModel", updates.queryExpansionModel);
+  if (updates.rerankModel !== undefined) setConfigValue("rerankModel", updates.rerankModel);
 }
 
 /**
@@ -47,6 +53,17 @@ export function getConfigAsJson(): Record<string, any> {
   const config = getConfig();
   const { home, ...rest } = config;
   return rest;
+}
+
+/** Get model defaults from qmd for display purposes. */
+export async function getModelDefaults(): Promise<{ embedModel: string; queryExpansionModel: string; rerankModel: string }> {
+  // qmd reads these env vars in its LlamaCpp constructor, so we surface the
+  // same defaults here for `config show` without importing internal modules.
+  return {
+    embedModel: "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf",
+    queryExpansionModel: "hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf",
+    rerankModel: "hf:ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/qwen3-reranker-0.6b-q8_0.gguf",
+  };
 }
 
 /**
