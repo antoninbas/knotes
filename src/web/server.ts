@@ -35,7 +35,23 @@ const MIME_TYPES: Record<string, string> = {
 export function createApp(): Hono {
   const app = new Hono();
 
-  app.use("/api/*", cors());
+  app.use(
+    "/api/*",
+    cors({
+      origin: (origin) => {
+        if (!origin) return null;
+        try {
+          const { hostname } = new URL(origin);
+          if (hostname === "localhost" || hostname === "127.0.0.1") {
+            return origin;
+          }
+        } catch {
+          // invalid origin
+        }
+        return null;
+      },
+    })
+  );
 
   // Health check
   app.get("/api/health", (c) => c.json({ ok: true }));
