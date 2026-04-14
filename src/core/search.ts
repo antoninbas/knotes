@@ -1,3 +1,5 @@
+import { readdir, stat } from "node:fs/promises";
+import { join } from "node:path";
 import { getHome, getConfig, getModelDefaults } from "./config.ts";
 import { recordJobStart, recordJobComplete, recordJobFailed, getConfigValue, setConfigValue } from "./db.ts";
 import type { SearchResult } from "./types.ts";
@@ -7,9 +9,16 @@ export type JobTrigger = "background" | "on-demand";
 // qmd is imported lazily to keep startup fast for non-search commands.
 let storeInstance: any = null;
 
+/**
+ * Timestamp (ms since epoch) of the last successful updateIndex() call
+ * triggered from within search(). Reset to 0 whenever the store is reset.
+ */
+let lastIndexedAt: number = 0;
+
 /** Reset the store singleton (for tests). */
 export function resetStore() {
   storeInstance = null;
+  lastIndexedAt = 0;
 }
 
 async function getStore() {
@@ -50,6 +59,42 @@ async function getStore() {
   } catch (err) {
     throw new Error(`Failed to initialize search index: ${err}`);
   }
+}
+
+/**
+ * Return the newest mtime (ms) of any .md file under the given directories.
+ * Returns 0 if no files exist or directories can't be read.
+ */
+async function newestMdMtime(dirs: string[]): Promise<number> {
+  let newest = 0;
+
+  async function walk(dir: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    await Promise.all(
+      entries.map(async (entry) => {
+        const fullPath = join(dir, entry.name);
+        if (entry.isDirectory()) {
+          await walk(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".md")) {
+          try {
+            const s = await stat(fullPath);
+            const mtimeMs = s.mtimeMs;
+            if (mtimeMs > newest) newest = mtimeMs;
+          } catch {
+            // ignore stat errors
+          }
+        }
+      })
+    );
+  }
+
+  await Promise.all(dirs.map(walk));
+  return newest;
 }
 
 /** Update the search index for changed files (incremental by default). */
@@ -129,7 +174,7 @@ export async function embed(options?: { force?: boolean; trigger?: JobTrigger })
   }
 }
 
-/** Search through notes and logs. Always updates the index first. */
+/** Search through notes and logs. Updates the index only when files have changed. */
 export async function search(
   query: string,
   options?: {
@@ -138,7 +183,13 @@ export async function search(
     mode?: "hybrid" | "bm25" | "vector";
   }
 ): Promise<SearchResult[]> {
-  await updateIndex();
+  const home = getHome();
+  const dirs = [join(home, "notes"), join(home, "logs")];
+  const newest = await newestMdMtime(dirs);
+  if (newest > lastIndexedAt) {
+    await updateIndex();
+    lastIndexedAt = Date.now();
+  }
 
   const store = await getStore();
   const limit = options?.limit ?? 10;
