@@ -1,6 +1,7 @@
 import { dirname } from "path";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
+import { randomBytes } from "node:crypto";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath } from "./config.ts";
 import { writeMarkdownFile, getNote } from "./notes.ts";
@@ -10,7 +11,7 @@ import type { LogEntry } from "./types.ts";
 const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
 
 function generateId(): string {
-  const hex = Math.random().toString(16).slice(2, 6);
+  const hex = randomBytes(8).toString("hex");
   return `e-${hex}`;
 }
 

@@ -45,7 +45,7 @@ test("addEntry adds an entry to a log", async () => {
   const { createLog, addEntry, listEntries } = await import("../src/core/logs.ts");
   await createLog("logs/test");
   const entry = await addEntry("logs/test", "First entry");
-  expect(entry.id).toMatch(/^e-[a-f0-9]{4}$/);
+  expect(entry.id).toMatch(/^e-[a-f0-9]{16}$/);
   expect(entry.content).toBe("First entry");
   expect(entry.timestamp).toBeTruthy();
 
@@ -152,7 +152,7 @@ test("log file format is valid markdown", async () => {
   // Should have frontmatter
   expect(raw).toMatch(/^---\n/);
   // Should have H2 headings with timestamps and IDs
-  expect(raw).toMatch(/## \d{4}-\d{2}-\d{2}T.+? \{#e-[a-f0-9]{4}\}/);
+  expect(raw).toMatch(/## \d{4}-\d{2}-\d{2}T.+? \{#e-[a-f0-9]{16}\}/);
   // Newest first
   const lines = raw.split("\n");
   const headings = lines.filter((l) => l.startsWith("## "));
