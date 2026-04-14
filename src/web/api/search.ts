@@ -1,6 +1,15 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { search, updateIndex, embed } from "../../core/search.ts";
 import { getLastJob } from "../../core/db.ts";
+
+const IndexSchema = z.object({
+  force: z.boolean().optional(),
+});
+
+const EmbedSchema = z.object({
+  force: z.boolean().optional(),
+});
 
 export const searchApi = new Hono();
 
@@ -24,9 +33,13 @@ searchApi.get("/", async (c) => {
 
 // Trigger index update
 searchApi.post("/index", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = IndexSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
   try {
-    await updateIndex({ force: body.force });
+    await updateIndex({ force: parsed.data.force });
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -35,8 +48,12 @@ searchApi.post("/index", async (c) => {
 
 // Trigger embedding (fire-and-forget — job status trackable via GET /api/jobs)
 searchApi.post("/embed", async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  embed({ force: body.force, trigger: "on-demand" }).catch(() => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = EmbedSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  embed({ force: parsed.data.force, trigger: "on-demand" }).catch(() => {
     // errors are recorded in the jobs table via recordJobFailed
   });
   return c.json({ ok: true });

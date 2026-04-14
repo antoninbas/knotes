@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { ensureHome, resolvePath } from "../../core/config.ts";
 import {
   createNote,
@@ -12,6 +13,29 @@ import { importDocument, checkMarkitdown } from "../../core/importer.ts";
 import { basename } from "path";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+
+const CreateNoteSchema = z.object({
+  path: z.string().min(1, "path is required"),
+  title: z.string().optional(),
+  content: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+const UpdateNoteSchema = z.object({
+  path: z.string().min(1, "path is required"),
+  title: z.string().optional(),
+  content: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+const CreateFolderSchema = z.object({
+  path: z.string().min(1, "path is required"),
+});
+
+const ImportDocumentSchema = z.object({
+  filePath: z.string().min(1, "filePath is required"),
+  to: z.string().optional(),
+});
 
 export const notesApi = new Hono();
 
@@ -60,9 +84,12 @@ notesApi.get("/download", async (c) => {
 // Create a note
 notesApi.post("/", async (c) => {
   await ensureHome();
-  const body = await c.req.json();
-  const { path, title, content, tags } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = CreateNoteSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, title, content, tags } = parsed.data;
   try {
     const note = await createNote(path, { title, content, tags });
     return c.json(note, 201);
@@ -73,9 +100,12 @@ notesApi.post("/", async (c) => {
 
 // Update a note
 notesApi.put("/", async (c) => {
-  const body = await c.req.json();
-  const { path, title, content, tags } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = UpdateNoteSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, title, content, tags } = parsed.data;
   try {
     const note = await updateNote(path, { title, content, tags });
     return c.json(note);
@@ -87,9 +117,12 @@ notesApi.put("/", async (c) => {
 // Create a folder
 notesApi.post("/folder", async (c) => {
   await ensureHome();
-  const body = await c.req.json();
-  const { path } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = CreateFolderSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path } = parsed.data;
   try {
     await createFolder(path);
     return c.json({ ok: true, path }, 201);
@@ -100,9 +133,12 @@ notesApi.post("/folder", async (c) => {
 
 // Import a document
 notesApi.post("/import", async (c) => {
-  const body = await c.req.json();
-  const { filePath, to } = body;
-  if (!filePath) return c.json({ error: "filePath is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = ImportDocumentSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { filePath, to } = parsed.data;
   try {
     const available = await checkMarkitdown();
     if (!available) {
