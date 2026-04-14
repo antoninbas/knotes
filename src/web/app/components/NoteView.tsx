@@ -1,33 +1,15 @@
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import type { NoteResult } from "../lib/api.ts";
 
 interface Props {
   note: NoteResult;
 }
 
-/** Simple markdown rendering — converts basic markdown to HTML. */
+/** Render markdown to sanitized HTML using marked + DOMPurify. */
 function renderMarkdown(md: string): string {
-  let html = md
-    // Headers
-    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
-    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
-    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
-    // Bold and italic
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Inline code
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    // Code blocks
-    .replace(/```(\w*)\n([\s\S]*?)```/g, "<pre><code>$2</code></pre>")
-    // Links
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    // Horizontal rules
-    .replace(/^---$/gm, "<hr>")
-    // Line breaks to paragraphs
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br>");
-
-  return `<p>${html}</p>`;
+  const raw = marked.parse(md, { async: false }) as string;
+  return DOMPurify.sanitize(raw);
 }
 
 export default function NoteView(props: Props) {
