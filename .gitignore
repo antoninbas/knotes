@@ -4,6 +4,8 @@ node_modules
 # output
 out
 dist
+
+# npm pack tarballs (e.g. antoninbas-knotes-*.tgz)
 *.tgz
 
 # code coverage
