@@ -1,4 +1,4 @@
-import { join } from "path";
+import { join, resolve } from "path";
 import { homedir } from "os";
 import { mkdir } from "fs/promises";
 import { getConfigValue, setConfigValue, getAllConfig } from "./db.ts";
@@ -87,8 +87,13 @@ export async function ensureHome(): Promise<void> {
 /** Resolve a logical path (e.g. "notes/foo/bar") to an absolute .md file path. */
 export function resolvePath(logicalPath: string): string {
   const home = getHome();
+  const resolvedHome = resolve(home);
   const cleaned = logicalPath.replace(/\.md$/, "");
-  return join(home, cleaned + ".md");
+  const fullPath = resolve(join(home, cleaned + ".md"));
+  if (!fullPath.startsWith(resolvedHome + "/") && fullPath !== resolvedHome) {
+    throw new Error(`Path traversal detected: "${logicalPath}" escapes KNOTES_HOME`);
+  }
+  return fullPath;
 }
 
 /** Convert an absolute file path back to a logical path. */

@@ -60,6 +60,19 @@ test("resolvePath strips .md extension if already present", async () => {
   expect(resolvePath("notes/foo")).toBe(join(testHome, "notes/foo.md"));
 });
 
+test("resolvePath rejects path traversal with ..", async () => {
+  const { resolvePath } = await import("../src/core/config.ts");
+  expect(() => resolvePath("../../etc/shadow")).toThrow("Path traversal detected");
+  expect(() => resolvePath("notes/../../etc/passwd")).toThrow("Path traversal detected");
+});
+
+test("resolvePath allows valid paths inside KNOTES_HOME", async () => {
+  const { resolvePath } = await import("../src/core/config.ts");
+  const { join } = await import("path");
+  expect(resolvePath("notes/foo/bar")).toBe(join(testHome, "notes/foo/bar.md"));
+  expect(resolvePath("logs/2024/entry")).toBe(join(testHome, "logs/2024/entry.md"));
+});
+
 test("saveConfig persists and reloads", async () => {
   const { ensureHome, saveConfig, getConfig, resetConfigCache } = await import("../src/core/config.ts");
   await ensureHome();
