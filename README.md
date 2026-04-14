@@ -11,15 +11,17 @@ A local-first note and activity log manager with hybrid search.
 
 ## Requirements
 
-- [Node.js](https://nodejs.org) v20+
+- [Node.js](https://nodejs.org) v20+ or [Bun](https://bun.sh)
 - [markitdown](https://github.com/microsoft/markitdown) (optional, for document import): `pip install markitdown`
 
 ## Installation
 
-### npm (recommended)
+### npm or bun (recommended)
 
 ```bash
 npm install -g @antoninbas/knotes
+# or
+bun add -g @antoninbas/knotes
 ```
 
 ### Install script
@@ -27,6 +29,8 @@ npm install -g @antoninbas/knotes
 ```bash
 curl -fsSL https://raw.githubusercontent.com/antoninbas/knotes/main/scripts/install.sh | bash
 ```
+
+The install script auto-detects bun or npm, and installs a runtime if neither is available. Use `--npm` to force npm, `--prefix DIR` to set the install location.
 
 ### Homebrew (macOS / Linux)
 
