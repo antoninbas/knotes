@@ -98,25 +98,50 @@ jobs:
       - run: knotes --help
 
   install-homebrew:
-    name: Test Homebrew-style install
+    name: Test Homebrew formula
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Simulate Homebrew formula install
+      - name: Create source tarball
         run: |
-          # Reproduce what the Homebrew formula does
-          npm install --production
-          cd src/web/app && npm install && npx vite build && cd ../../..
-          LIBDIR=/tmp/knotes-brew/libexec
-          BINDIR=/tmp/knotes-brew/bin
-          mkdir -p "$LIBDIR" "$BINDIR"
-          cp -r src package.json package-lock.json node_modules "$LIBDIR/"
-          printf '#!/bin/sh\nexec npx tsx "%s/src/main.ts" "$@"\n' "$LIBDIR" > "$BINDIR/knotes"
-          chmod +x "$BINDIR/knotes"
+          VERSION="0.0.0-ci"
+          git archive --format=tar.gz --prefix="knotes-${VERSION}/" HEAD > "/tmp/knotes-${VERSION}.tar.gz"
+          SHA256=$(shasum -a 256 "/tmp/knotes-${VERSION}.tar.gz" | cut -d' ' -f1)
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          echo "SHA256=${SHA256}" >> "$GITHUB_ENV"
+      - name: Generate and install formula
+        run: |
+          cat > /tmp/knotes.rb <<RUBY
+          class Knotes < Formula
+            desc "Local-first note and activity log manager with hybrid search"
+            homepage "https://github.com/antoninbas/knotes"
+            url "file:///tmp/knotes-${VERSION}.tar.gz"
+            sha256 "${SHA256}"
+            license "MIT"
+
+            depends_on "node"
+
+            def install
+              system "npm", "install", "--production"
+              cd "src/web/app" do
+                system "npm", "install"
+                system "npx", "vite", "build"
+              end
+
+              libexec.install Dir["src", "package.json", "package-lock.json", "node_modules"]
+              (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
+
+              (bin/"knotes").write <<~SH
+                #!/bin/sh
+                exec npx tsx "#{libexec}/src/main.ts" "$@"
+              SH
+            end
+
+            test do
+              assert_match "knotes", shell_output("#{bin}/knotes --help")
+            end
+          end
+          RUBY
+          brew install --formula /tmp/knotes.rb
       - name: Verify install
-        run: |
-          export PATH="/tmp/knotes-brew/bin:$PATH"
-          knotes --help
+        run: knotes --help

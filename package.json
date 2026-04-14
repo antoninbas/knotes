@@ -4,7 +4,7 @@
   "description": "A local-first note and activity log manager with hybrid search",
   "type": "module",
   "bin": {
-    "knotes": "bin/knotes.mjs"
+    "knotes": "bin/knotes"
   },
   "scripts": {
     "dev": "npx tsx src/main.ts",
