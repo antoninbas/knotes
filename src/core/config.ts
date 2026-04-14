@@ -1,7 +1,7 @@
 import { join } from "path";
 import { homedir } from "os";
 import { mkdir } from "fs/promises";
-import { getConfigValue, setConfigValue, getAllConfig } from "./db.ts";
+import { getConfigValue, setConfigValue } from "./db.ts";
 import type { KnotesConfig } from "./types.ts";
 
 const DEFAULT_HOME = join(homedir(), ".knotes");
