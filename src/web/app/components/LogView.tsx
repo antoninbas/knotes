@@ -10,8 +10,11 @@ export default function LogView(props: Props) {
   const [entries, setEntries] = createSignal<LogEntry[]>([]);
   const [newContent, setNewContent] = createSignal("");
   const [adding, setAdding] = createSignal(false);
+  const [addError, setAddError] = createSignal<string | null>(null);
   const [editingId, setEditingId] = createSignal<string | null>(null);
   const [editContent, setEditContent] = createSignal("");
+  const [editError, setEditError] = createSignal<string | null>(null);
+  const [deleteError, setDeleteError] = createSignal<string | null>(null);
 
   async function loadEntries() {
     try {
@@ -31,12 +34,14 @@ export default function LogView(props: Props) {
     const content = newContent().trim();
     if (!content) return;
     setAdding(true);
+    setAddError(null);
     try {
       await logs.addEntry(props.note.path, content);
       setNewContent("");
       await loadEntries();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add entry:", err);
+      setAddError(err.message || "Failed to add entry. Please try again.");
     } finally {
       setAdding(false);
     }
@@ -50,28 +55,33 @@ export default function LogView(props: Props) {
   function cancelEdit() {
     setEditingId(null);
     setEditContent("");
+    setEditError(null);
   }
 
   async function handleUpdate(entryId: string) {
     const content = editContent().trim();
     if (!content) return;
+    setEditError(null);
     try {
       await logs.updateEntry(props.note.path, entryId, content);
       setEditingId(null);
       setEditContent("");
       await loadEntries();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update entry:", err);
+      setEditError(err.message || "Failed to update entry. Please try again.");
     }
   }
 
   async function handleDelete(entryId: string) {
     if (!confirm("Delete this entry?")) return;
+    setDeleteError(null);
     try {
       await logs.deleteEntry(props.note.path, entryId);
       await loadEntries();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete entry:", err);
+      setDeleteError(err.message || "Failed to delete entry. Please try again.");
     }
   }
 
@@ -110,11 +120,17 @@ export default function LogView(props: Props) {
         >
           {adding() ? "Adding..." : "Add Entry (Ctrl+Enter)"}
         </button>
+        <Show when={addError()}>
+          <p class="text-sm text-red-500">{addError()}</p>
+        </Show>
       </div>
       </Show>
 
       {/* Entries list */}
       <div class="space-y-4">
+        <Show when={deleteError()}>
+          <p class="text-sm text-red-500">{deleteError()}</p>
+        </Show>
         <For each={entries()}>
           {(entry) => (
             <div
@@ -184,6 +200,9 @@ export default function LogView(props: Props) {
                     if (e.key === "Escape") cancelEdit();
                   }}
                 />
+                <Show when={editError()}>
+                  <p class="text-xs text-red-500 mb-2">{editError()}</p>
+                </Show>
                 <div class="flex gap-2">
                   <button
                     onClick={() => handleUpdate(entry.id)}

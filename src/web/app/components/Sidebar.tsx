@@ -18,6 +18,7 @@ export default function Sidebar(props: Props) {
   const [createMode, setCreateMode] = createSignal<CreateMode>(null);
   const [inputName, setInputName] = createSignal("");
   const [inputTitle, setInputTitle] = createSignal("");
+  const [createError, setCreateError] = createSignal<string | null>(null);
 
   async function loadEntries(prefix?: string) {
     try {
@@ -66,12 +67,14 @@ export default function Sidebar(props: Props) {
     setCreateMode(mode);
     setInputName("");
     setInputTitle("");
+    setCreateError(null);
   }
 
   async function handleCreate() {
     const name = inputName().trim();
     if (!name) return;
 
+    setCreateError(null);
     const prefix = browsePath();
     const fullPath = prefix ? `${prefix}/${name}` : name;
 
@@ -94,7 +97,7 @@ export default function Sidebar(props: Props) {
       }
       setCreateMode(null);
     } catch (err: any) {
-      alert(err.message);
+      setCreateError(err.message || "Failed to create. Please try again.");
     }
   }
 
@@ -229,6 +232,9 @@ export default function Sidebar(props: Props) {
                 color: "var(--color-text-primary)",
               }}
             />
+          </Show>
+          <Show when={createError()}>
+            <p class="text-xs text-red-500">{createError()}</p>
           </Show>
           <div class="flex gap-2">
             <button
