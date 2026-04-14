@@ -1,8 +1,12 @@
 {
   "name": "@antoninbas/knotes",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "A local-first note and activity log manager with hybrid search",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/antoninbas/knotes"
+  },
   "type": "module",
   "bin": {
     "knotes": "bin/knotes"
