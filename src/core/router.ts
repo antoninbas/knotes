@@ -107,7 +107,7 @@ export async function updateIndex(opts?: { force?: boolean }): Promise<void> {
   return directSearch.updateIndex(opts);
 }
 
-export async function embed(opts?: { force?: boolean }): Promise<any> {
+export async function embed(opts?: { force?: boolean }): Promise<void> {
   if (useServer()) return client.embed(opts);
   return directSearch.embed(opts);
 }
