@@ -4,7 +4,7 @@
  */
 
 import { getServerInfo, isServerAlive } from "./db.ts";
-import type { NoteResult, LogEntry, SearchResult, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
+import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
 import type { ListEntry } from "./notes.ts";
 
 function getBaseUrl(): string {
@@ -127,7 +127,7 @@ export async function deleteEntry(path: string, entryId: string): Promise<void> 
 
 export async function search(
   query: string,
-  opts?: { limit?: number; mode?: string }
+  opts?: { limit?: number; mode?: SearchMode }
 ): Promise<SearchResult[]> {
   return request<SearchResult[]>(
     `/search?q=${encodeURIComponent(query)}${opts?.limit ? `&limit=${opts.limit}` : ""}${opts?.mode ? `&mode=${opts.mode}` : ""}`

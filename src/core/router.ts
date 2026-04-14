@@ -10,7 +10,7 @@ import * as directNotes from "./notes.ts";
 import * as directLogs from "./logs.ts";
 import * as directSearch from "./search.ts";
 import * as directImporter from "./importer.ts";
-import type { NoteResult, LogEntry, SearchResult, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
+import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
 import type { ListEntry } from "./notes.ts";
 
 function useServer(): boolean {
@@ -96,10 +96,10 @@ export async function deleteEntry(path: string, entryId: string): Promise<void> 
 
 export async function search(
   query: string,
-  opts?: { limit?: number; mode?: string }
+  opts?: { limit?: number; mode?: SearchMode }
 ): Promise<SearchResult[]> {
   if (useServer()) return client.search(query, opts);
-  return directSearch.search(query, opts as any);
+  return directSearch.search(query, opts);
 }
 
 export async function updateIndex(opts?: { force?: boolean }): Promise<void> {

@@ -42,6 +42,8 @@ export interface LogEntry {
   content: string;
 }
 
+export type SearchMode = "hybrid" | "bm25" | "vector";
+
 export interface SearchResult {
   path: string;
   title: string;
