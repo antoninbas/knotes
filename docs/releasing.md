@@ -46,15 +46,15 @@ The Homebrew formula installs knotes from source:
 ## Installation (end user)
 
 ```bash
-# Homebrew
-brew tap antoninbas/tap
-brew install knotes
-
 # npm
 npm install -g @antoninbas/knotes
 
-# Install script
-curl -fsSL https://raw.githubusercontent.com/antoninbas/knotes/main/scripts/install.sh | bash
+# bun
+bun install -g @antoninbas/knotes
+
+# Homebrew
+brew tap antoninbas/tap
+brew install knotes
 ```
 
 ## Local deployment
