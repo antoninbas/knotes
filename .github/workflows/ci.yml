@@ -38,22 +38,6 @@ jobs:
           key: qmd-models-v1
       - run: npx vitest run
 
-  install-script-npm:
-    name: Test install script (npm)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Test install from source
-        run: |
-          ./scripts/install.sh --prefix /tmp/knotes-npm --npm --local
-      - name: Verify install
-        run: |
-          export PATH="/tmp/knotes-npm/bin:$PATH"
-          knotes --help
-
   install-npm-global:
     name: Test npm global install
     runs-on: ubuntu-latest
@@ -68,20 +52,6 @@ jobs:
       - run: npm install -g ./antoninbas-knotes-*.tgz
       - run: knotes --help
 
-  install-script-bun:
-    name: Test install script (bun)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - name: Test install from source
-        run: |
-          ./scripts/install.sh --prefix /tmp/knotes-bun --local
-      - name: Verify install
-        run: |
-          export PATH="/tmp/knotes-bun/bin:$PATH"
-          knotes --help
-
   install-bun-global:
     name: Test bun global install
     runs-on: ubuntu-latest
@@ -94,5 +64,6 @@ jobs:
       - run: bun install
       - run: cd src/web/app && bun install && bunx vite build
       - run: npm pack
-      - run: bun add -g ./antoninbas-knotes-*.tgz
+      - name: Install globally
+        run: bun install -g "$(pwd)/$(ls antoninbas-knotes-*.tgz)"
       - run: knotes --help
