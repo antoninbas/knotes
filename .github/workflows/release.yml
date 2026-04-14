@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write  # Required for npm trusted publishing (OIDC)
 
 jobs:
   release:
@@ -35,10 +36,11 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Upgrade npm for trusted publishing (requires >= 11.5.1)
+        run: npm install -g npm@latest
+
       - run: npm install
       - run: cd src/web/app && npm install && npx vite build
 
       - name: Publish to npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
