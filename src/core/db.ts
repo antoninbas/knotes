@@ -1,10 +1,13 @@
-import Database from "bun:sqlite";
 import { join } from "path";
 import { homedir } from "os";
+import { mkdirSync } from "node:fs";
+import Database from "better-sqlite3";
 
-let db: Database | null = null;
+type DatabaseInstance = InstanceType<typeof Database>;
 
-type Migration = (db: Database) => void;
+let db: DatabaseInstance | null = null;
+
+type Migration = (db: DatabaseInstance) => void;
 
 const migrations: Migration[] = [
   // Migration 1: initial schema
@@ -44,25 +47,25 @@ const migrations: Migration[] = [
   },
 ];
 
-function runMigrations(db: Database): void {
+function runMigrations(db: DatabaseInstance): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS schema_version (
       version INTEGER NOT NULL
     )
   `);
 
-  const row = db.query("SELECT version FROM schema_version").get() as
+  const row = db.prepare("SELECT version FROM schema_version").get() as
     | { version: number }
-    | null;
+    | undefined;
   let currentVersion = row?.version ?? 0;
 
   if (currentVersion === 0 && !row) {
-    db.run("INSERT INTO schema_version (version) VALUES (0)");
+    db.prepare("INSERT INTO schema_version (version) VALUES (0)").run();
   }
 
   for (let i = currentVersion; i < migrations.length; i++) {
     migrations[i]!(db);
-    db.run("UPDATE schema_version SET version = ?", [i + 1]);
+    db.prepare("UPDATE schema_version SET version = ?").run(i + 1);
   }
 }
 
@@ -70,18 +73,13 @@ function resolveHome(): string {
   return process.env["KNOTES_HOME"] || join(homedir(), ".knotes");
 }
 
-export function getDb(): Database {
+export function getDb(): DatabaseInstance {
   if (db) return db;
 
   const home = resolveHome();
   const dataDir = join(home, ".data");
 
-  // Ensure .data directory exists (sync for simplicity — called early in startup)
-  try {
-    require("fs").mkdirSync(dataDir, { recursive: true });
-  } catch {
-    // Already exists
-  }
+  mkdirSync(dataDir, { recursive: true });
 
   const dbPath = join(dataDir, "knotes.sqlite");
   db = new Database(dbPath);
@@ -105,23 +103,22 @@ export function resetDb(): void {
 
 export function getConfigValue(key: string): string | null {
   const db = getDb();
-  const row = db.query("SELECT value FROM config WHERE key = ?").get(key) as
+  const row = db.prepare("SELECT value FROM config WHERE key = ?").get(key) as
     | { value: string }
-    | null;
+    | undefined;
   return row?.value ?? null;
 }
 
 export function setConfigValue(key: string, value: string): void {
   const db = getDb();
-  db.run(
-    "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
-    [key, value, value]
-  );
+  db.prepare(
+    "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?"
+  ).run(key, value, value);
 }
 
 export function getAllConfig(): Record<string, string> {
   const db = getDb();
-  const rows = db.query("SELECT key, value FROM config").all() as {
+  const rows = db.prepare("SELECT key, value FROM config").all() as {
     key: string;
     value: string;
   }[];
@@ -134,7 +131,7 @@ export function getAllConfig(): Record<string, string> {
 
 export function deleteConfigValue(key: string): void {
   const db = getDb();
-  db.run("DELETE FROM config WHERE key = ?", [key]);
+  db.prepare("DELETE FROM config WHERE key = ?").run(key);
 }
 
 // --- Server heartbeat operations ---
@@ -149,31 +146,30 @@ export interface ServerInfo {
 
 export function getServerInfo(): ServerInfo | null {
   const db = getDb();
-  return db.query("SELECT * FROM server_heartbeat WHERE id = 1").get() as
+  return (db.prepare("SELECT * FROM server_heartbeat WHERE id = 1").get() as
     | ServerInfo
-    | null;
+    | undefined) ?? null;
 }
 
 export function writeServerHeartbeat(pid: number, port: number, hostname: string): void {
   const db = getDb();
   const now = new Date().toISOString();
-  db.run(
+  db.prepare(
     `INSERT INTO server_heartbeat (id, pid, port, hostname, started_at, last_heartbeat)
      VALUES (1, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET pid = ?, port = ?, hostname = ?, last_heartbeat = ?`,
-    [pid, port, hostname, now, now, pid, port, hostname, now]
-  );
+     ON CONFLICT(id) DO UPDATE SET pid = ?, port = ?, hostname = ?, last_heartbeat = ?`
+  ).run(pid, port, hostname, now, now, pid, port, hostname, now);
 }
 
 export function updateHeartbeat(): void {
   const db = getDb();
   const now = new Date().toISOString();
-  db.run("UPDATE server_heartbeat SET last_heartbeat = ? WHERE id = 1", [now]);
+  db.prepare("UPDATE server_heartbeat SET last_heartbeat = ? WHERE id = 1").run(now);
 }
 
 export function clearServerInfo(): void {
   const db = getDb();
-  db.run("DELETE FROM server_heartbeat WHERE id = 1");
+  db.prepare("DELETE FROM server_heartbeat WHERE id = 1").run();
 }
 
 /**
@@ -218,39 +214,36 @@ export interface JobRecord {
 
 export function recordJobStart(type: string): number {
   const db = getDb();
-  const result = db.run(
-    "INSERT INTO jobs (type, status, started_at) VALUES (?, 'running', ?)",
-    [type, new Date().toISOString()]
-  );
+  const result = db.prepare(
+    "INSERT INTO jobs (type, status, started_at) VALUES (?, 'running', ?)"
+  ).run(type, new Date().toISOString());
   return Number(result.lastInsertRowid);
 }
 
 export function recordJobComplete(id: number, durationMs: number, metadata?: Record<string, unknown>): void {
   const db = getDb();
-  db.run(
-    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ?, metadata = ? WHERE id = ?",
-    [new Date().toISOString(), durationMs, metadata ? JSON.stringify(metadata) : null, id]
-  );
+  db.prepare(
+    "UPDATE jobs SET status = 'completed', completed_at = ?, duration_ms = ?, metadata = ? WHERE id = ?"
+  ).run(new Date().toISOString(), durationMs, metadata ? JSON.stringify(metadata) : null, id);
 }
 
 export function recordJobFailed(id: number, error: string, durationMs: number): void {
   const db = getDb();
-  db.run(
-    "UPDATE jobs SET status = 'failed', completed_at = ?, duration_ms = ?, error = ? WHERE id = ?",
-    [new Date().toISOString(), durationMs, error, id]
-  );
+  db.prepare(
+    "UPDATE jobs SET status = 'failed', completed_at = ?, duration_ms = ?, error = ? WHERE id = ?"
+  ).run(new Date().toISOString(), durationMs, error, id);
 }
 
 export function getLastJob(type: string): JobRecord | null {
   const db = getDb();
-  return db.query(
+  return (db.prepare(
     "SELECT * FROM jobs WHERE type = ? ORDER BY id DESC LIMIT 1"
-  ).get(type) as JobRecord | null;
+  ).get(type) as JobRecord | undefined) ?? null;
 }
 
 export function getRecentJobs(type: string, limit = 10): JobRecord[] {
   const db = getDb();
-  return db.query(
+  return db.prepare(
     "SELECT * FROM jobs WHERE type = ? ORDER BY id DESC LIMIT ?"
   ).all(type, limit) as JobRecord[];
 }
@@ -269,15 +262,15 @@ export function getJobs(options?: { page?: number; pageSize?: number; type?: str
   const offset = (page - 1) * pageSize;
 
   if (options?.type) {
-    const total = (db.query("SELECT COUNT(*) as count FROM jobs WHERE type LIKE ?").get(`${options.type}%`) as { count: number }).count;
-    const jobs = db.query(
+    const total = (db.prepare("SELECT COUNT(*) as count FROM jobs WHERE type LIKE ?").get(`${options.type}%`) as { count: number }).count;
+    const jobs = db.prepare(
       "SELECT * FROM jobs WHERE type LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
     ).all(`${options.type}%`, pageSize, offset) as JobRecord[];
     return { jobs, total, page, pageSize };
   }
 
-  const total = (db.query("SELECT COUNT(*) as count FROM jobs").get() as { count: number }).count;
-  const jobs = db.query(
+  const total = (db.prepare("SELECT COUNT(*) as count FROM jobs").get() as { count: number }).count;
+  const jobs = db.prepare(
     "SELECT * FROM jobs ORDER BY id DESC LIMIT ? OFFSET ?"
   ).all(pageSize, offset) as JobRecord[];
   return { jobs, total, page, pageSize };

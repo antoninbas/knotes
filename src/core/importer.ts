@@ -1,19 +1,21 @@
 import { basename, extname } from "path";
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, readFile } from "fs/promises";
+import { spawn } from "node:child_process";
 import { createNote } from "./notes.ts";
 import type { NoteResult } from "./types.ts";
 
 /** Check if markitdown is available on the system. */
 export async function checkMarkitdown(): Promise<boolean> {
   try {
-    const proc = Bun.spawn(["markitdown", "--help"], {
-      stdout: "pipe",
-      stderr: "pipe",
+    const proc = spawn("markitdown", ["--help"], {
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    await proc.exited;
-    return proc.exitCode === 0;
+    const exitCode = await new Promise<number | null>((resolve) =>
+      proc.on("close", resolve)
+    );
+    return exitCode === 0;
   } catch {
     return false;
   }
@@ -32,20 +34,25 @@ export async function importDocument(
   const tempFile = join(tmpdir(), `knotes-import-${Date.now()}.md`);
 
   try {
-    const proc = Bun.spawn(["markitdown", filePath, "-o", tempFile], {
-      stdout: "pipe",
-      stderr: "pipe",
+    const proc = spawn("markitdown", [filePath, "-o", tempFile], {
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    const exitCode = await proc.exited;
+    // Collect stderr for error reporting
+    const stderrChunks: Buffer[] = [];
+    proc.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+
+    const exitCode = await new Promise<number | null>((resolve) =>
+      proc.on("close", resolve)
+    );
     if (exitCode !== 0) {
-      const stderr = await new Response(proc.stderr).text();
+      const stderr = Buffer.concat(stderrChunks).toString();
       throw new Error(
         `markitdown failed (exit ${exitCode}): ${stderr.trim() || "unknown error"}`
       );
     }
 
-    const content = await Bun.file(tempFile).text();
+    const content = await readFile(tempFile, "utf-8");
     if (!content.trim()) {
       throw new Error(
         `markitdown produced empty output for: ${filePath}`

@@ -1,5 +1,6 @@
 import { dirname } from "path";
-import { mkdir } from "fs/promises";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import { existsSync } from "fs";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath } from "./config.ts";
 import { writeMarkdownFile, getNote } from "./notes.ts";
@@ -74,11 +75,11 @@ export async function addEntry(
   content: string
 ): Promise<LogEntry> {
   const filePath = resolvePath(logicalPath);
-  if (!(await Bun.file(filePath).exists())) {
+  if (!existsSync(filePath)) {
     throw new Error(`Log not found: ${logicalPath}. Create it first.`);
   }
 
-  const raw = await Bun.file(filePath).text();
+  const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
 
   const entries = parseEntries(parsed.content);
@@ -95,7 +96,7 @@ export async function addEntry(
   parsed.data.modified = nowISO();
   const frontmatter = matter.stringify("", parsed.data).trim();
   const body = serializeEntries(entries);
-  await Bun.write(filePath, frontmatter + "\n\n" + body);
+  await writeFile(filePath, frontmatter + "\n\n" + body);
 
   await updateIndex();
   return entry;
@@ -129,7 +130,7 @@ export async function updateEntry(
   content: string
 ): Promise<LogEntry> {
   const filePath = resolvePath(logicalPath);
-  const raw = await Bun.file(filePath).text();
+  const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
 
   const entries = parseEntries(parsed.content);
@@ -144,7 +145,7 @@ export async function updateEntry(
   parsed.data.modified = nowISO();
   const frontmatter = matter.stringify("", parsed.data).trim();
   const body = serializeEntries(entries);
-  await Bun.write(filePath, frontmatter + "\n\n" + body);
+  await writeFile(filePath, frontmatter + "\n\n" + body);
 
   await updateIndex();
   return entry;
@@ -155,7 +156,7 @@ export async function deleteEntry(
   entryId: string
 ): Promise<void> {
   const filePath = resolvePath(logicalPath);
-  const raw = await Bun.file(filePath).text();
+  const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
 
   const entries = parseEntries(parsed.content);
@@ -168,7 +169,7 @@ export async function deleteEntry(
   parsed.data.modified = nowISO();
   const frontmatter = matter.stringify("", parsed.data).trim();
   const body = serializeEntries(filtered);
-  await Bun.write(filePath, frontmatter + "\n\n" + body);
+  await writeFile(filePath, frontmatter + "\n\n" + body);
 
   await updateIndex();
 }

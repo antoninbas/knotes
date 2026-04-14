@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { getConfig } from "../core/config.ts";
 
 /**
@@ -13,10 +14,12 @@ export async function openInEditor(filePath: string): Promise<boolean> {
   const cmd = parts[0]!;
   const args = [...parts.slice(1), filePath];
 
-  const proc = Bun.spawn([cmd, ...args], {
+  const proc = spawn(cmd, args, {
     stdio: ["inherit", "inherit", "inherit"],
   });
 
-  const exitCode = await proc.exited;
+  const exitCode = await new Promise<number | null>((resolve) =>
+    proc.on("close", resolve)
+  );
   return exitCode === 0;
 }

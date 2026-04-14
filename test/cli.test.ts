@@ -1,24 +1,35 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
+import { test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
-import { join } from "path";
+import { join, dirname } from "path";
 import { tmpdir } from "os";
+import { fileURLToPath } from "url";
+import { spawn } from "node:child_process";
 
-const ROOT_DIR = join(import.meta.dir, "..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = join(__dirname, "..");
 let testHome: string;
 
 async function run(...args: string[]): Promise<{ code: number; stdout: string; stderr: string }> {
-  const proc = Bun.spawn(["bun", "run", "src/main.ts", ...args], {
-    cwd: ROOT_DIR,
-    env: { ...process.env, KNOTES_HOME: testHome },
-    stdout: "pipe",
-    stderr: "pipe",
+  return new Promise((resolve) => {
+    const proc = spawn("npx", ["tsx", "src/main.ts", ...args], {
+      cwd: ROOT_DIR,
+      env: { ...process.env, KNOTES_HOME: testHome },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
+    proc.stdout?.on("data", (chunk: Buffer) => stdoutChunks.push(chunk));
+    proc.stderr?.on("data", (chunk: Buffer) => stderrChunks.push(chunk));
+
+    proc.on("close", (code) => {
+      resolve({
+        code: code ?? 1,
+        stdout: Buffer.concat(stdoutChunks).toString(),
+        stderr: Buffer.concat(stderrChunks).toString(),
+      });
+    });
   });
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ]);
-  const code = await proc.exited;
-  return { code, stdout, stderr };
 }
 
 beforeEach(async () => {
@@ -28,9 +39,13 @@ beforeEach(async () => {
   resetConfigCache();
   const { resetStore } = await import("../src/core/search.ts");
   resetStore();
+  const { resetDb } = await import("../src/core/db.ts");
+  resetDb();
   await ensureHome();
   // Enable serverless mode so CLI doesn't need a running server
   await saveConfig({ serverless: true });
+  // Close in-process DB so spawned subprocesses can access the SQLite file
+  resetDb();
 });
 
 afterEach(async () => {

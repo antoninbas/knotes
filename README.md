@@ -1,6 +1,6 @@
 # Knotes
 
-A local-first note and activity log manager with hybrid search. Built with [Bun](https://bun.sh).
+A local-first note and activity log manager with hybrid search.
 
 - **Notes** -- Markdown notes organized in a free-form hierarchy
 - **Activity logs** -- Timestamped journal entries in structured log files
@@ -11,10 +11,22 @@ A local-first note and activity log manager with hybrid search. Built with [Bun]
 
 ## Requirements
 
-- [Bun](https://bun.sh) v1.1+
+- [Node.js](https://nodejs.org) v20+
 - [markitdown](https://github.com/microsoft/markitdown) (optional, for document import): `pip install markitdown`
 
 ## Installation
+
+### npm (recommended)
+
+```bash
+npm install -g @antoninbas/knotes
+```
+
+### Install script
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/antoninbas/knotes/main/scripts/install.sh | bash
+```
 
 ### Homebrew (macOS / Linux)
 
@@ -30,7 +42,7 @@ git clone <repo-url> && cd knotes
 make install   # installs to ~/.local/bin/knotes
 ```
 
-Requires [Bun](https://bun.sh) v1.1+. `make install` fetches dependencies, builds the frontend, and creates a wrapper script.
+Requires Node.js v20+. `make install` fetches dependencies, builds the frontend, and creates a wrapper script.
 
 ## Quick start
 
@@ -38,24 +50,24 @@ Knotes uses a **server-centric architecture**: the server (`knotes server`) is t
 
 ```bash
 # Start the server (web UI + API on http://localhost:7713)
-bun run src/main.ts server
+npx tsx src/main.ts server
 
 # In another terminal, use the CLI
-bun run src/main.ts note create notes/hello --title "Hello World"
-bun run src/main.ts note show notes/hello
-bun run src/main.ts note edit notes/hello          # opens in $EDITOR
+npx tsx src/main.ts note create notes/hello --title "Hello World"
+npx tsx src/main.ts note show notes/hello
+npx tsx src/main.ts note edit notes/hello          # opens in $EDITOR
 
-bun run src/main.ts log create logs/daily --title "Daily Log"
-bun run src/main.ts log add logs/daily -m "Started using Knotes"
-bun run src/main.ts log list logs/daily
+npx tsx src/main.ts log create logs/daily --title "Daily Log"
+npx tsx src/main.ts log add logs/daily -m "Started using Knotes"
+npx tsx src/main.ts log list logs/daily
 
-bun run src/main.ts search "hello"
+npx tsx src/main.ts search "hello"
 ```
 
 If you prefer not to run a server, enable **serverless mode**:
 
 ```bash
-bun run src/main.ts config set serverless true
+npx tsx src/main.ts config set serverless true
 ```
 
 In serverless mode, CLI commands and the MCP server access the data files directly.
@@ -143,8 +155,8 @@ For use with Claude Desktop, Cursor, and other MCP-compatible clients. Example C
 {
   "mcpServers": {
     "knotes": {
-      "command": "bun",
-      "args": ["run", "/path/to/knotes/src/main.ts", "mcp"]
+      "command": "npx",
+      "args": ["tsx", "/path/to/knotes/src/main.ts", "mcp"]
     }
   }
 }

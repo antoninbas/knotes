@@ -11,7 +11,7 @@ import {
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, readFile, writeFile } from "fs/promises";
 
 export function registerNoteCommands(program: Command): void {
   const note = program
@@ -104,7 +104,7 @@ export function registerNoteCommands(program: Command): void {
 async function editNoteViaTemp(path: string): Promise<void> {
   const note = await getNote(path);
   const tempFile = join(tmpdir(), `knotes-edit-${Date.now()}.md`);
-  await Bun.write(tempFile, note.content);
+  await writeFile(tempFile, note.content);
 
   const ok = await openInEditor(tempFile);
   if (!ok) {
@@ -113,7 +113,7 @@ async function editNoteViaTemp(path: string): Promise<void> {
     process.exit(1);
   }
 
-  const newContent = await Bun.file(tempFile).text();
+  const newContent = await readFile(tempFile, "utf-8");
   await unlink(tempFile).catch(() => {});
 
   if (newContent === note.content) {

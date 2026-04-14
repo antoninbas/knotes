@@ -1,4 +1,9 @@
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { spawnSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 let cachedVersion: string | null = null;
 
@@ -23,13 +28,12 @@ export function getVersion(): string {
 
 function tryGitDescribe(): string | null {
   try {
-    const result = Bun.spawnSync(["git", "describe", "--tags", "--always"], {
-      cwd: join(import.meta.dir, "../.."),
-      stdout: "pipe",
-      stderr: "pipe",
+    const result = spawnSync("git", ["describe", "--tags", "--always"], {
+      cwd: join(__dirname, "../.."),
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    if (result.exitCode !== 0) return null;
-    const raw = new TextDecoder().decode(result.stdout).trim();
+    if (result.status !== 0) return null;
+    const raw = result.stdout.toString().trim();
     return formatVersion(raw);
   } catch {
     return null;
@@ -38,13 +42,9 @@ function tryGitDescribe(): string | null {
 
 function tryVersionFile(): string | null {
   try {
-    // VERSION file lives next to package.json in the install dir
-    const versionPath = join(import.meta.dir, "../../VERSION");
-    const file = Bun.file(versionPath);
-    // Use a sync check — Bun.file().text() is async but we need sync here
-    const result = Bun.spawnSync(["cat", versionPath], { stdout: "pipe", stderr: "pipe" });
-    if (result.exitCode !== 0) return null;
-    const raw = new TextDecoder().decode(result.stdout).trim();
+    const versionPath = join(__dirname, "../../VERSION");
+    if (!existsSync(versionPath)) return null;
+    const raw = readFileSync(versionPath, "utf-8").trim();
     return formatVersion(raw);
   } catch {
     return null;
@@ -53,10 +53,9 @@ function tryVersionFile(): string | null {
 
 function tryPackageJson(): string | null {
   try {
-    const pkgPath = join(import.meta.dir, "../../package.json");
-    const result = Bun.spawnSync(["cat", pkgPath], { stdout: "pipe", stderr: "pipe" });
-    if (result.exitCode !== 0) return null;
-    const pkg = JSON.parse(new TextDecoder().decode(result.stdout));
+    const pkgPath = join(__dirname, "../../package.json");
+    if (!existsSync(pkgPath)) return null;
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
     return pkg.version ?? null;
   } catch {
     return null;

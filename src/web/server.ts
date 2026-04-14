@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+import { existsSync, readFileSync } from "node:fs";
+import { serve } from "@hono/node-server";
 import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
 import { searchApi } from "./api/search.ts";
@@ -16,6 +19,8 @@ import {
   isServerAlive,
   getServerInfo,
 } from "../core/db.ts";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const MIME_TYPES: Record<string, string> = {
   html: "text/html",
@@ -66,20 +71,20 @@ export function createWebServer(port: number) {
     const urlPath = url.pathname === "/" ? "/index.html" : url.pathname;
 
     // Try files on disk
-    const distPath = join(import.meta.dir, "app", "dist", urlPath);
-    const file = Bun.file(distPath);
-    if (await file.exists()) {
+    const distPath = join(__dirname, "app", "dist", urlPath);
+    if (existsSync(distPath)) {
       const ext = urlPath.split(".").pop() || "";
-      return new Response(file, {
+      const content = readFileSync(distPath);
+      return new Response(content, {
         headers: { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" },
       });
     }
 
     // SPA fallback
-    const indexPath = join(import.meta.dir, "app", "dist", "index.html");
-    const indexFile = Bun.file(indexPath);
-    if (await indexFile.exists()) {
-      return new Response(indexFile, {
+    const indexPath = join(__dirname, "app", "dist", "index.html");
+    if (existsSync(indexPath)) {
+      const content = readFileSync(indexPath);
+      return new Response(content, {
         headers: { "Content-Type": "text/html" },
       });
     }
@@ -90,10 +95,10 @@ export function createWebServer(port: number) {
 
   const hostname = "127.0.0.1";
 
-  const server = Bun.serve({
+  const server = serve({
+    fetch: app.fetch,
     port,
     hostname,
-    fetch: app.fetch,
   });
 
   // Register server in DB
@@ -126,7 +131,7 @@ export function createWebServer(port: number) {
     clearInterval(heartbeatInterval);
     clearInterval(embedInterval);
     clearServerInfo();
-    server.stop();
+    server.close();
   }
 
   process.on("SIGINT", () => {
@@ -164,7 +169,7 @@ const DEV_HTML = `<!DOCTYPE html>
   <div class="container">
     <h1>Knotes</h1>
     <p>Web UI is in development. Build the frontend with:</p>
-    <p><code>cd src/web/app && bun install && bun run build</code></p>
+    <p><code>cd src/web/app && npm install && npx vite build</code></p>
     <p>The API is available at <code>/api</code></p>
   </div>
 </body>

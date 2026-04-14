@@ -7,13 +7,14 @@ import { registerServerCommand } from "./commands/server.ts";
 import { registerMcpCommand } from "./commands/mcp.ts";
 import { registerConfigCommand } from "./commands/config.ts";
 import { registerServiceCommand } from "./commands/service.ts";
+import { getVersion } from "../core/version.ts";
 
 export const program = new Command();
 
 program
   .name("knotes")
   .description("A local-first note and activity log manager with hybrid search")
-  .version("0.1.0");
+  .version(getVersion());
 
 registerNoteCommands(program);
 registerLogCommands(program);
