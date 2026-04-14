@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Generate/update the Homebrew formula after a release.
-# Usage: ./scripts/update-formula.sh v0.1.0 [/path/to/homebrew-tap]
+# Usage: ./scripts/update-formula.sh v0.4.0 [/path/to/homebrew-tap]
+#
+# Fetches per-platform release tarballs and generates the formula
+# with correct URLs and SHA256 checksums.
 set -euo pipefail
 
 VERSION="${1:?Usage: $0 <version> [tap-dir]}"
@@ -9,35 +12,61 @@ VERSION_NUM="${VERSION#v}"
 TAP_DIR="${2:-}"
 REPO="antoninbas/knotes"
 
-ARCHIVE_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
+BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
-echo "Fetching checksum for ${TAG}..."
-sha=$(curl -sL "${ARCHIVE_URL}" | shasum -a 256 | cut -d' ' -f1)
-echo "  sha256: ${sha}"
+fetch_sha() {
+  local url="$1"
+  local sha=""
+  for attempt in 1 2 3 4 5 6; do
+    sha=$(curl -fsSL "${url}" 2>/dev/null | shasum -a 256 | cut -d' ' -f1) && break
+    echo "  Asset not ready yet, waiting 30s... (attempt ${attempt}/6)" >&2
+    sleep 30
+  done
+  if [ -z "${sha}" ]; then
+    echo "ERROR: Failed to download ${url} after retries" >&2
+    exit 1
+  fi
+  echo "${sha}"
+}
+
+echo "Fetching checksums for ${TAG}..."
+
+SHA_DARWIN_ARM64=$(fetch_sha "${BASE_URL}/knotes-${TAG}-darwin-arm64.tar.gz")
+echo "  darwin-arm64: ${SHA_DARWIN_ARM64}"
+
+SHA_DARWIN_X64=$(fetch_sha "${BASE_URL}/knotes-${TAG}-darwin-x64.tar.gz")
+echo "  darwin-x64:   ${SHA_DARWIN_X64}"
+
+SHA_LINUX_X64=$(fetch_sha "${BASE_URL}/knotes-${TAG}-linux-x64.tar.gz")
+echo "  linux-x64:    ${SHA_LINUX_X64}"
 
 FORMULA='class Knotes < Formula
   desc "Local-first note and activity log manager with hybrid search"
   homepage "https://github.com/'"${REPO}"'"
-  url "'"${ARCHIVE_URL}"'"
-  sha256 "'"${sha}"'"
+  version "'"${VERSION_NUM}"'"
   license "MIT"
 
-  depends_on "oven-sh/bun/bun"
+  on_macos do
+    on_arm do
+      url "'"${BASE_URL}/knotes-${TAG}-darwin-arm64.tar.gz"'"
+      sha256 "'"${SHA_DARWIN_ARM64}"'"
+    end
+    on_intel do
+      url "'"${BASE_URL}/knotes-${TAG}-darwin-x64.tar.gz"'"
+      sha256 "'"${SHA_DARWIN_X64}"'"
+    end
+  end
+
+  on_linux do
+    url "'"${BASE_URL}/knotes-${TAG}-linux-x64.tar.gz"'"
+    sha256 "'"${SHA_LINUX_X64}"'"
+  end
 
   def install
-    system "bun", "install"
-    cd "src/web/app" do
-      system "bun", "install"
-      system "bun", "run", "build"
-    end
-
-    libexec.install Dir["src", "package.json", "bun.lock", "node_modules"]
-    # Frontend node_modules needed for the built assets path resolution
-    (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
-
+    libexec.install Dir["lib/knotes/*"]
     (bin/"knotes").write <<~SH
       #!/bin/sh
-      exec "#{Formula["oven-sh/bun/bun"].opt_bin}/bun" run "#{libexec}/src/main.ts" "$@"
+      exec "#{libexec}/bun" run "#{libexec}/src/main.ts" "$@"
     SH
   end
 
@@ -52,9 +81,6 @@ FORMULA='class Knotes < Formula
     <<~EOS
       To start knotes as a background service:
         brew services start knotes
-
-      Or use the built-in service manager:
-        knotes service install
 
       The server runs on port 7713 by default (configurable with `knotes config set webPort <port>`).
 

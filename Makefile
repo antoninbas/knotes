@@ -64,9 +64,9 @@ deploy:
 
 # --- Release ---
 
+# Tag and push — CI (release.yml) builds platform tarballs and creates the GitHub release.
 release:
-	@echo "Creating release v$(VERSION)..."
-	gh release create "v$(VERSION)" \
-		--title "v$(VERSION)" \
-		--generate-notes
-	@echo "Released v$(VERSION)"
+	@echo "Tagging v$(VERSION)..."
+	git tag "v$(VERSION)"
+	git push origin "v$(VERSION)"
+	@echo "Tag v$(VERSION) pushed. CI will build and publish the release."
