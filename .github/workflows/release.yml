@@ -41,3 +41,87 @@ jobs:
 
       - name: Publish to npm
         run: NODE_AUTH_TOKEN="" npm publish --access public --provenance
+
+  build-macos-arm64:
+    name: Build macOS tarball (arm64)
+    runs-on: macos-latest
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install production dependencies (compiles native modules)
+        run: npm install --omit=dev
+
+      - name: Build frontend
+        run: cd src/web/app && npm install && npx vite build
+
+      - name: Package tarball
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ARCH="arm64"
+          TARBALL="knotes-${VERSION}-darwin-${ARCH}.tar.gz"
+
+          mkdir _pkg
+          cp -r src package.json node_modules _pkg/
+
+          # Remove frontend source — only keep the built dist
+          rm -rf _pkg/src/web/app/node_modules
+          rm -rf _pkg/src/web/app/src
+          find _pkg/src/web/app -maxdepth 1 \( -name "*.ts" -o -name "*.html" -o -name "*.css" -o -name "*.json" \) -delete
+
+          tar -czf "${TARBALL}" -C _pkg .
+          rm -rf _pkg
+
+          echo "TARBALL=${TARBALL}" >> "$GITHUB_ENV"
+
+      - name: Upload tarball to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" "${TARBALL}"
+
+  build-macos-x64:
+    name: Build macOS tarball (x64)
+    runs-on: macos-13
+    needs: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install production dependencies (compiles native modules)
+        run: npm install --omit=dev
+
+      - name: Build frontend
+        run: cd src/web/app && npm install && npx vite build
+
+      - name: Package tarball
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          ARCH="x64"
+          TARBALL="knotes-${VERSION}-darwin-${ARCH}.tar.gz"
+
+          mkdir _pkg
+          cp -r src package.json node_modules _pkg/
+
+          # Remove frontend source — only keep the built dist
+          rm -rf _pkg/src/web/app/node_modules
+          rm -rf _pkg/src/web/app/src
+          find _pkg/src/web/app -maxdepth 1 \( -name "*.ts" -o -name "*.html" -o -name "*.css" -o -name "*.json" \) -delete
+
+          tar -czf "${TARBALL}" -C _pkg .
+          rm -rf _pkg
+
+          echo "TARBALL=${TARBALL}" >> "$GITHUB_ENV"
+
+      - name: Upload tarball to GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" "${TARBALL}"

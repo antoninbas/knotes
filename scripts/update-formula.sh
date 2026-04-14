@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Generate/update the Homebrew formula after a release.
+# Expects pre-packaged macOS tarballs built by CI to already exist on the release.
 # Usage: ./scripts/update-formula.sh v0.1.0 [/path/to/homebrew-tap]
 set -euo pipefail
 
@@ -9,35 +10,43 @@ VERSION_NUM="${VERSION#v}"
 TAP_DIR="${2:-}"
 REPO="antoninbas/knotes"
 
-ARCHIVE_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
+ARM64_URL="https://github.com/${REPO}/releases/download/${TAG}/knotes-${VERSION_NUM}-darwin-arm64.tar.gz"
+X64_URL="https://github.com/${REPO}/releases/download/${TAG}/knotes-${VERSION_NUM}-darwin-x64.tar.gz"
 
-echo "Fetching checksum for ${TAG}..."
-sha=$(curl -sL "${ARCHIVE_URL}" | shasum -a 256 | cut -d' ' -f1)
-echo "  sha256: ${sha}"
+echo "Fetching checksum for arm64 tarball..."
+sha_arm64=$(curl -sL "${ARM64_URL}" | shasum -a 256 | cut -d' ' -f1)
+echo "  sha256 (arm64): ${sha_arm64}"
+
+echo "Fetching checksum for x64 tarball..."
+sha_x64=$(curl -sL "${X64_URL}" | shasum -a 256 | cut -d' ' -f1)
+echo "  sha256 (x64):   ${sha_x64}"
 
 FORMULA='class Knotes < Formula
   desc "Local-first note and activity log manager with hybrid search"
   homepage "https://github.com/'"${REPO}"'"
-  url "'"${ARCHIVE_URL}"'"
-  sha256 "'"${sha}"'"
   license "MIT"
 
+  on_arm do
+    url "'"${ARM64_URL}"'"
+    sha256 "'"${sha_arm64}"'"
+  end
+
+  on_intel do
+    url "'"${X64_URL}"'"
+    sha256 "'"${sha_x64}"'"
+  end
+
+  # Node is still required because tsx (bundled in node_modules) runs on Node.js
   depends_on "node"
 
   def install
-    system "npm", "install", "--production"
-    cd "src/web/app" do
-      system "npm", "install"
-      system "npx", "vite", "build"
-    end
-
-    libexec.install Dir["src", "package.json", "package-lock.json", "node_modules"]
-    # Frontend node_modules needed for the built assets path resolution
-    (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
+    # Tarballs are pre-packaged by CI with native modules already compiled and
+    # the frontend already built. No npm install or compilation needed here.
+    libexec.install Dir["*"]
 
     (bin/"knotes").write <<~SH
       #!/bin/sh
-      exec npx tsx "#{libexec}/src/main.ts" "$@"
+      exec "#{libexec}/node_modules/.bin/tsx" "#{libexec}/src/main.ts" "$@"
     SH
   end
 
