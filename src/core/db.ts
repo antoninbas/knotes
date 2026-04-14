@@ -116,19 +116,6 @@ export function setConfigValue(key: string, value: string): void {
   ).run(key, value, value);
 }
 
-export function getAllConfig(): Record<string, string> {
-  const db = getDb();
-  const rows = db.prepare("SELECT key, value FROM config").all() as {
-    key: string;
-    value: string;
-  }[];
-  const result: Record<string, string> = {};
-  for (const row of rows) {
-    result[row.key] = row.value;
-  }
-  return result;
-}
-
 export function deleteConfigValue(key: string): void {
   const db = getDb();
   db.prepare("DELETE FROM config WHERE key = ?").run(key);
