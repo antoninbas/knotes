@@ -1,4 +1,5 @@
-import { mkdir, unlink, readdir, stat } from "fs/promises";
+import { mkdir, unlink, readdir, stat, readFile, writeFile } from "fs/promises";
+import { existsSync } from "fs";
 import { dirname, join, basename } from "path";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath, getHome } from "./config.ts";
@@ -52,7 +53,7 @@ export async function writeMarkdownFile(
 ): Promise<NoteResult> {
   const filePath = resolvePath(logicalPath);
 
-  if (await Bun.file(filePath).exists()) {
+  if (existsSync(filePath)) {
     throw new Error(`File already exists: ${logicalPath}`);
   }
 
@@ -69,7 +70,7 @@ export async function writeMarkdownFile(
 
   const content = options?.content || "";
   const fileContent = buildFrontmatter(meta) + "\n\n" + content + "\n";
-  await Bun.write(filePath, fileContent);
+  await writeFile(filePath, fileContent);
 
   return parseNote(filePath, fileContent);
 }
@@ -88,13 +89,12 @@ export async function createNote(
 
 export async function getNote(logicalPath: string): Promise<NoteResult> {
   const filePath = resolvePath(logicalPath);
-  const file = Bun.file(filePath);
 
-  if (!(await file.exists())) {
+  if (!existsSync(filePath)) {
     throw new Error(`Note not found: ${logicalPath}`);
   }
 
-  const raw = await file.text();
+  const raw = await readFile(filePath, "utf-8");
   return parseNote(filePath, raw);
 }
 
@@ -103,13 +103,12 @@ export async function updateNote(
   options: UpdateNoteOptions
 ): Promise<NoteResult> {
   const filePath = resolvePath(logicalPath);
-  const file = Bun.file(filePath);
 
-  if (!(await file.exists())) {
+  if (!existsSync(filePath)) {
     throw new Error(`Note not found: ${logicalPath}`);
   }
 
-  const raw = await file.text();
+  const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
   const data = parsed.data as Partial<NoteMeta>;
 
@@ -125,7 +124,7 @@ export async function updateNote(
   const content =
     options.content !== undefined ? options.content : parsed.content.trim();
   const fileContent = buildFrontmatter(meta) + "\n\n" + content + "\n";
-  await Bun.write(filePath, fileContent);
+  await writeFile(filePath, fileContent);
 
   const result = parseNote(filePath, fileContent);
   await updateIndex();
@@ -152,14 +151,14 @@ export async function createFolder(logicalPath: string): Promise<string> {
   }
 
   await mkdir(dirPath, { recursive: true });
-  await Bun.write(join(dirPath, ".keep"), "");
+  await writeFile(join(dirPath, ".keep"), "");
   return logicalPath;
 }
 
 export async function deleteNote(logicalPath: string): Promise<void> {
   const filePath = resolvePath(logicalPath);
 
-  if (!(await Bun.file(filePath).exists())) {
+  if (!existsSync(filePath)) {
     throw new Error(`Note not found: ${logicalPath}`);
   }
 
@@ -194,7 +193,7 @@ export async function listNotes(prefix?: string): Promise<ListEntry[]> {
       } else if (entry.name.endsWith(".md")) {
         const filePath = join(dir, entry.name);
         try {
-          const raw = await Bun.file(filePath).text();
+          const raw = await readFile(filePath, "utf-8");
           const parsed = matter(raw);
           const data = parsed.data as Partial<NoteMeta>;
           const logicalName = entry.name.replace(/\.md$/, "");

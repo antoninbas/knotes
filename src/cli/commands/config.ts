@@ -5,7 +5,7 @@ import { notifyConfigChanged } from "../../core/client.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, readFile, writeFile } from "fs/promises";
 
 async function notifyServerOfConfigChange(): Promise<void> {
   if (!isServerAlive()) return;
@@ -54,7 +54,7 @@ export function registerConfigCommand(program: Command): void {
       await ensureHome();
       const cfg = getConfigAsJson();
       const tempFile = join(tmpdir(), `knotes-config-${Date.now()}.json`);
-      await Bun.write(tempFile, JSON.stringify(cfg, null, 2) + "\n");
+      await writeFile(tempFile, JSON.stringify(cfg, null, 2) + "\n");
 
       const ok = await openInEditor(tempFile);
       if (!ok) {
@@ -63,7 +63,7 @@ export function registerConfigCommand(program: Command): void {
         process.exit(1);
       }
 
-      const content = await Bun.file(tempFile).text();
+      const content = await readFile(tempFile, "utf-8");
       await unlink(tempFile).catch(() => {});
 
       try {

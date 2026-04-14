@@ -9,44 +9,44 @@ all: check test
 # --- Dependencies ---
 
 deps:
-	bun install
-	cd src/web/app && bun install
+	npm install
+	cd src/web/app && npm install
 
 # --- Development ---
 
 dev: deps check web-build
-	bun run src/main.ts server
+	npx tsx src/main.ts server
 
 run:
-	bun run src/main.ts $(ARGS)
+	npx tsx src/main.ts $(ARGS)
 
 dev-web:
-	cd src/web/app && bun run dev
+	cd src/web/app && npx vite dev
 
 web-build: deps
-	cd src/web/app && bun run build
+	cd src/web/app && npx vite build
 
 # --- Quality ---
 
 test:
-	bun test
+	npx vitest run
 
 fmt:
-	bunx prettier --write 'src/**/*.{ts,tsx,css,json}' 'test/**/*.ts'
+	npx prettier --write 'src/**/*.{ts,tsx,css,json}' 'test/**/*.ts'
 
 check:
-	bun run tsc --noEmit
-	cd src/web/app && bunx tsc --noEmit
+	npx tsc --noEmit
+	cd src/web/app && npx tsc --noEmit
 
 # --- Install ---
 
 install: deps web-build
 	install -d $(LIBDIR)
-	cp -r src package.json bun.lock node_modules $(LIBDIR)/
+	cp -r src package.json package-lock.json node_modules $(LIBDIR)/
 	cp -r src/web/app/node_modules $(LIBDIR)/src/web/app/ 2>/dev/null || true
 	git describe --tags --always > $(LIBDIR)/VERSION
 	install -d $(PREFIX)/bin
-	@printf '#!/bin/sh\nexec "$(shell which bun)" run "$(LIBDIR)/src/main.ts" "$$@"\n' > $(PREFIX)/bin/knotes
+	@printf '#!/bin/sh\nexec npx tsx "$(LIBDIR)/src/main.ts" "$$@"\n' > $(PREFIX)/bin/knotes
 	chmod +x $(PREFIX)/bin/knotes
 	@echo "Installed knotes v$(VERSION) to $(PREFIX)/bin/knotes"
 
@@ -64,9 +64,9 @@ deploy:
 
 # --- Release ---
 
+# Tag and push — CI builds and publishes the release.
 release:
-	@echo "Creating release v$(VERSION)..."
-	gh release create "v$(VERSION)" \
-		--title "v$(VERSION)" \
-		--generate-notes
-	@echo "Released v$(VERSION)"
+	@echo "Tagging v$(VERSION)..."
+	git tag "v$(VERSION)"
+	git push origin "v$(VERSION)"
+	@echo "Tag v$(VERSION) pushed. CI will build and publish the release."

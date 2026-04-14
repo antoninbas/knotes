@@ -1,5 +1,6 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm } from "fs/promises";
+import { test, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, readFile } from "fs/promises";
+import { existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -30,7 +31,7 @@ test("createNote creates a markdown file with frontmatter", async () => {
   expect(result.tags).toEqual(["tag1"]);
   expect(result.type).toBe("note");
 
-  const raw = await Bun.file(join(testHome, "notes/test.md")).text();
+  const raw = await readFile(join(testHome, "notes/test.md"), "utf-8");
   expect(raw).toContain('title: "Test Note"');
   expect(raw).toContain("type: note");
 });
@@ -101,7 +102,7 @@ test("listNotes lists files and directories", async () => {
 test("createFolder creates dir with .keep", async () => {
   const { createFolder } = await import("../src/core/notes.ts");
   await createFolder("notes/projects");
-  expect(await Bun.file(join(testHome, "notes/projects/.keep")).exists()).toBe(true);
+  expect(existsSync(join(testHome, "notes/projects/.keep"))).toBe(true);
 });
 
 test("createFolder rejects paths not under notes/ or logs/", async () => {

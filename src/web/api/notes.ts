@@ -10,6 +10,8 @@ import {
 } from "../../core/notes.ts";
 import { importDocument, checkMarkitdown } from "../../core/importer.ts";
 import { basename } from "path";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 
 export const notesApi = new Hono();
 
@@ -39,11 +41,10 @@ notesApi.get("/download", async (c) => {
   if (!path) return c.json({ error: "path is required" }, 400);
   try {
     const filePath = resolvePath(path);
-    const file = Bun.file(filePath);
-    if (!(await file.exists())) {
+    if (!existsSync(filePath)) {
       return c.json({ error: "not found" }, 404);
     }
-    const raw = await file.text();
+    const raw = await readFile(filePath, "utf-8");
     const filename = basename(filePath);
     return new Response(raw, {
       headers: {

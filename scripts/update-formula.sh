@@ -22,22 +22,22 @@ FORMULA='class Knotes < Formula
   sha256 "'"${sha}"'"
   license "MIT"
 
-  depends_on "oven-sh/bun/bun"
+  depends_on "node"
 
   def install
-    system "bun", "install"
+    system "npm", "install", "--production"
     cd "src/web/app" do
-      system "bun", "install"
-      system "bun", "run", "build"
+      system "npm", "install"
+      system "npx", "vite", "build"
     end
 
-    libexec.install Dir["src", "package.json", "bun.lock", "node_modules"]
+    libexec.install Dir["src", "package.json", "package-lock.json", "node_modules"]
     # Frontend node_modules needed for the built assets path resolution
     (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
 
     (bin/"knotes").write <<~SH
       #!/bin/sh
-      exec "#{Formula["oven-sh/bun/bun"].opt_bin}/bun" run "#{libexec}/src/main.ts" "$@"
+      exec npx tsx "#{libexec}/src/main.ts" "$@"
     SH
   end
 

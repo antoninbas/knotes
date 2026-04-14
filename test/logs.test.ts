@@ -1,5 +1,5 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm } from "fs/promises";
+import { test, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, readFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -24,7 +24,7 @@ afterEach(async () => {
 test("createLog creates a log file", async () => {
   const { createLog } = await import("../src/core/logs.ts");
   await createLog("logs/daily", "Daily Log");
-  const raw = await Bun.file(join(testHome, "logs/daily.md")).text();
+  const raw = await readFile(join(testHome, "logs/daily.md"), "utf-8");
   expect(raw).toContain('title: "Daily Log"');
   expect(raw).toContain("type: log");
 });
@@ -148,7 +148,7 @@ test("log file format is valid markdown", async () => {
   await addEntry("logs/format", "Entry one");
   await addEntry("logs/format", "Entry two");
 
-  const raw = await Bun.file(join(testHome, "logs/format.md")).text();
+  const raw = await readFile(join(testHome, "logs/format.md"), "utf-8");
   // Should have frontmatter
   expect(raw).toMatch(/^---\n/);
   // Should have H2 headings with timestamps and IDs

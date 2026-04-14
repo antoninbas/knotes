@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
+import { test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -38,6 +38,8 @@ beforeEach(async () => {
   process.env["KNOTES_HOME"] = testHome;
   const { resetConfigCache, ensureHome } = await import("../src/core/config.ts");
   resetConfigCache();
+  const { resetDb } = await import("../src/core/db.ts");
+  resetDb();
   const { resetStore } = await import("../src/core/search.ts");
   resetStore();
   await ensureHome();
@@ -46,6 +48,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  const { resetDb } = await import("../src/core/db.ts");
+  resetDb();
   await rm(testHome, { recursive: true, force: true });
   delete process.env["KNOTES_HOME"];
 });

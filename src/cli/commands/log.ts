@@ -11,17 +11,17 @@ import {
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, readFile, writeFile } from "fs/promises";
 
 async function getContentFromEditor(prefill?: string): Promise<string | null> {
   const tempFile = join(tmpdir(), `knotes-log-${Date.now()}.md`);
-  await Bun.write(tempFile, prefill || "");
+  await writeFile(tempFile, prefill || "");
   const ok = await openInEditor(tempFile);
   if (!ok) {
     console.error("Editor exited with error");
     process.exit(1);
   }
-  const content = (await Bun.file(tempFile).text()).trim();
+  const content = (await readFile(tempFile, "utf-8")).trim();
   await unlink(tempFile).catch(() => {});
   return content || null;
 }

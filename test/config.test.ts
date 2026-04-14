@@ -1,5 +1,6 @@
-import { test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdtemp, rm } from "fs/promises";
+import { test, expect, beforeEach, afterEach } from "vitest";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -36,13 +37,13 @@ test("getConfig returns defaults", async () => {
 test("ensureHome creates directory structure", async () => {
   const { ensureHome } = await import("../src/core/config.ts");
   await ensureHome();
-  expect(await Bun.file(join(testHome, ".config")).exists()).toBe(false); // it's a dir
-  expect(await Bun.file(join(testHome, "notes", ".keep")).exists()).toBe(false); // no .keep by default
+  // .config is a directory, not a file — no .keep files by default
+  expect(existsSync(join(testHome, "notes", ".keep"))).toBe(false);
   // Check dirs exist by trying to write to them
-  await Bun.write(join(testHome, ".config", "test"), "ok");
-  await Bun.write(join(testHome, ".data", "test"), "ok");
-  await Bun.write(join(testHome, "notes", "test"), "ok");
-  await Bun.write(join(testHome, "logs", "test"), "ok");
+  await writeFile(join(testHome, ".config", "test"), "ok");
+  await writeFile(join(testHome, ".data", "test"), "ok");
+  await writeFile(join(testHome, "notes", "test"), "ok");
+  await writeFile(join(testHome, "logs", "test"), "ok");
 });
 
 test("resolvePath and toLogicalPath are inverses", async () => {

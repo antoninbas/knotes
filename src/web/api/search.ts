@@ -48,7 +48,7 @@ searchApi.post("/embed", async (c) => {
 searchApi.get("/embed/status", async (c) => {
   try {
     const last = getLastJob("embed");
-    return c.json({ lastJob: last });
+    return c.json({ lastJob: last ?? null });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

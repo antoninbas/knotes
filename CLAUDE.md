@@ -1,14 +1,15 @@
 # Knotes
 
-Local-first note and activity log manager with hybrid search. Built with Bun.
+Local-first note and activity log manager with hybrid search.
 
 ## Tech Stack
 
-- **Runtime**: Bun
+- **Runtime**: Node.js (via tsx for TypeScript execution)
 - **Backend**: Hono (web server), Commander (CLI), MCP SDK (MCP server)
 - **Frontend**: SolidJS + Tailwind CSS v4 (built with Vite, needed for solid-js JSX transform)
+- **Database**: better-sqlite3
 - **Search**: @tobilu/qmd (BM25 + vector + hybrid)
-- **Document import**: markitdown (Python CLI, called via Bun.spawn)
+- **Document import**: markitdown (Python CLI, called via child_process.spawn)
 
 ## Architecture
 
@@ -26,36 +27,36 @@ The server (`knotes server`) is the central hub. CLI commands and MCP tools rout
 ## Commands
 
 ```sh
-bun run src/main.ts --help              # CLI help
-bun run src/main.ts server              # Start server (web UI + API)
-bun run src/main.ts server --port 8080  # Custom port
-bun run src/main.ts mcp                 # Start MCP server (stdio)
-bun run src/main.ts mcp --read-only     # MCP server without write tools
-bun run src/main.ts config show         # Show current config
-bun run src/main.ts config edit         # Edit config in $EDITOR
-bun run src/main.ts config set serverless true  # Enable serverless mode
-bun run src/main.ts index              # Update search index
-bun run src/main.ts embed              # Generate embeddings
+npx tsx src/main.ts --help              # CLI help
+npx tsx src/main.ts server              # Start server (web UI + API)
+npx tsx src/main.ts server --port 8080  # Custom port
+npx tsx src/main.ts mcp                 # Start MCP server (stdio)
+npx tsx src/main.ts mcp --read-only     # MCP server without write tools
+npx tsx src/main.ts config show         # Show current config
+npx tsx src/main.ts config edit         # Edit config in $EDITOR
+npx tsx src/main.ts config set serverless true  # Enable serverless mode
+npx tsx src/main.ts index              # Update search index
+npx tsx src/main.ts embed              # Generate embeddings
 ```
 
 ## Frontend Development
 
 ```sh
-cd src/web/app && bun install && bun run dev    # Vite dev server (proxies /api to :7713)
-cd src/web/app && bun run build                 # Production build
+cd src/web/app && npm install && npx vite dev    # Vite dev server (proxies /api to :7713)
+cd src/web/app && npx vite build                 # Production build
 ```
 
 ## Testing
 
 ```sh
-bun test                            # Run all tests
-KNOTES_HOME=/tmp/test bun test      # Tests use temp KNOTES_HOME
+npx vitest run                            # Run all tests
+KNOTES_HOME=/tmp/test npx vitest run      # Tests use temp KNOTES_HOME
 ```
 
 ## Conventions
 
-- Use `Bun.file()` and `Bun.write()` for file I/O (not node:fs readFile/writeFile)
-- Use `Bun.spawn()` for subprocesses
+- Use `node:fs` and `node:fs/promises` for file I/O (`readFileSync`, `writeFile`, etc.)
+- Use `node:child_process` for subprocesses (`spawn`, `spawnSync`)
 - All three interfaces (CLI, MCP, web) call into `src/core/router.ts` — not directly into notes/logs/search
 - The server API (`src/web/api/`) calls core modules directly (it IS the server)
 - Notes addressed by logical path without .md extension (e.g. `notes/projects/foo`)

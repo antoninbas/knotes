@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Wrapper script for knotes CLI.
+# Detects the correct runtime (Node.js or Bun) based on lockfiles
+# to avoid ABI mismatches with native modules (better-sqlite3).
+
+# Resolve symlinks to find the actual package directory
+SCRIPT="$0"
+while [ -L "$SCRIPT" ]; do
+  SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+  SCRIPT="$(readlink "$SCRIPT")"
+  [[ "$SCRIPT" != /* ]] && SCRIPT="$SCRIPT_DIR/$SCRIPT"
+done
+SCRIPT_DIR="$(cd -P "$(dirname "$SCRIPT")" && pwd)"
+PACKAGE_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Detect runtime from lockfiles
+if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+  exec npx tsx "$PACKAGE_DIR/src/main.ts" "$@"
+elif [ -f "$PACKAGE_DIR/bun.lock" ] || [ -f "$PACKAGE_DIR/bun.lockb" ]; then
+  exec bunx tsx "$PACKAGE_DIR/src/main.ts" "$@"
+else
+  # Default to node
+  exec npx tsx "$PACKAGE_DIR/src/main.ts" "$@"
+fi

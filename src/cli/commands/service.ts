@@ -1,7 +1,12 @@
 import type { Command } from "commander";
 import { homedir, platform } from "os";
-import { join } from "path";
-import { mkdir } from "fs/promises";
+import { join, dirname } from "path";
+import { mkdir, unlink } from "fs/promises";
+import { existsSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync, spawn } from "node:child_process";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SERVICE_NAME = "com.knotes.server";
 const SYSTEMD_UNIT = "knotes.service";
@@ -22,10 +27,14 @@ function findBinary(): string {
     join(homedir(), ".local", "bin", "knotes"),
   ];
   for (const c of candidates) {
-    if (Bun.file(c).size > 0) return c;
+    try {
+      if (existsSync(c) && statSync(c).size > 0) return c;
+    } catch {
+      continue;
+    }
   }
-  // Fall back to bun run with the source tree
-  return `${process.execPath} run ${join(import.meta.dir, "../../main.ts")}`;
+  // Fall back to npx tsx with the source tree
+  return `npx tsx ${join(__dirname, "../../main.ts")}`;
 }
 
 function generatePlist(opts: { port?: number; home?: string }): string {
@@ -85,6 +94,13 @@ function generateSystemdUnit(opts: { port?: number; home?: string }): string {
   }
 
   const env: string[] = [];
+  // Pass through PATH so the service finds the same node/npx as the user's shell.
+  // Filter out npx/node_modules/.bin entries that are specific to the current process.
+  const cleanPath = (process.env["PATH"] || "")
+    .split(":")
+    .filter((p) => !p.includes("node_modules/.bin") && !p.includes("node-gyp-bin"))
+    .join(":");
+  env.push(`Environment=PATH=${cleanPath}`);
   if (opts.home) {
     env.push(`Environment=KNOTES_HOME=${opts.home}`);
   }
@@ -180,19 +196,19 @@ async function installLaunchd(opts: { port?: number; home?: string }) {
   const plistPath = getPlistPath();
 
   // Check if already installed
-  if (await Bun.file(plistPath).exists()) {
+  if (existsSync(plistPath)) {
     console.error("Service is already installed. Run `knotes service uninstall` first.");
     process.exit(1);
   }
 
   const plist = generatePlist(opts);
   await mkdir(join(homedir(), "Library", "LaunchAgents"), { recursive: true });
-  await Bun.write(plistPath, plist);
+  writeFileSync(plistPath, plist);
 
   // Load the service
-  const load = Bun.spawnSync(["launchctl", "load", plistPath]);
-  if (load.exitCode !== 0) {
-    console.error("Failed to load service:", new TextDecoder().decode(load.stderr));
+  const load = spawnSync("launchctl", ["load", plistPath], { stdio: ["ignore", "pipe", "pipe"] });
+  if (load.status !== 0) {
+    console.error("Failed to load service:", load.stderr.toString());
     process.exit(1);
   }
 
@@ -209,30 +225,29 @@ async function installLaunchd(opts: { port?: number; home?: string }) {
 
 async function uninstallLaunchd() {
   const plistPath = getPlistPath();
-  if (!(await Bun.file(plistPath).exists())) {
+  if (!existsSync(plistPath)) {
     console.error("Service is not installed.");
     process.exit(1);
   }
 
-  Bun.spawnSync(["launchctl", "unload", plistPath]);
-  const { unlink } = await import("fs/promises");
+  spawnSync("launchctl", ["unload", plistPath], { stdio: ["ignore", "pipe", "pipe"] });
   await unlink(plistPath);
   console.log("Service stopped and removed.");
 }
 
 async function statusLaunchd() {
-  const result = Bun.spawnSync(["launchctl", "list", SERVICE_NAME]);
-  if (result.exitCode !== 0) {
+  const result = spawnSync("launchctl", ["list", SERVICE_NAME], { stdio: ["ignore", "pipe", "pipe"] });
+  if (result.status !== 0) {
     console.log("Service is not running.");
   } else {
-    const output = new TextDecoder().decode(result.stdout);
+    const output = result.stdout.toString();
     console.log(output);
   }
 }
 
 async function logsLaunchd(opts: { follow?: boolean; lines: string }) {
   const logPath = join(homedir(), "Library", "Logs", "knotes.log");
-  if (!(await Bun.file(logPath).exists())) {
+  if (!existsSync(logPath)) {
     console.log("No logs found.");
     return;
   }
@@ -240,8 +255,8 @@ async function logsLaunchd(opts: { follow?: boolean; lines: string }) {
   const args = opts.follow
     ? ["tail", "-f", "-n", opts.lines, logPath]
     : ["tail", "-n", opts.lines, logPath];
-  const proc = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });
-  await proc.exited;
+  const proc = spawn(args[0]!, args.slice(1), { stdio: "inherit" });
+  await new Promise<void>((resolve) => proc.on("close", resolve));
 }
 
 // ─── Linux (systemd) ────────────────────────────────────────────
@@ -249,20 +264,20 @@ async function logsLaunchd(opts: { follow?: boolean; lines: string }) {
 async function installSystemd(opts: { port?: number; home?: string }) {
   const unitPath = getSystemdPath();
 
-  if (await Bun.file(unitPath).exists()) {
+  if (existsSync(unitPath)) {
     console.error("Service is already installed. Run `knotes service uninstall` first.");
     process.exit(1);
   }
 
   const unit = generateSystemdUnit(opts);
   await mkdir(join(homedir(), ".config", "systemd", "user"), { recursive: true });
-  await Bun.write(unitPath, unit);
+  writeFileSync(unitPath, unit);
 
   // Reload systemd and enable+start the service
-  Bun.spawnSync(["systemctl", "--user", "daemon-reload"]);
-  const enable = Bun.spawnSync(["systemctl", "--user", "enable", "--now", SYSTEMD_UNIT]);
-  if (enable.exitCode !== 0) {
-    console.error("Failed to enable service:", new TextDecoder().decode(enable.stderr));
+  spawnSync("systemctl", ["--user", "daemon-reload"], { stdio: ["ignore", "pipe", "pipe"] });
+  const enable = spawnSync("systemctl", ["--user", "enable", "--now", SYSTEMD_UNIT], { stdio: ["ignore", "pipe", "pipe"] });
+  if (enable.status !== 0) {
+    console.error("Failed to enable service:", enable.stderr.toString());
     process.exit(1);
   }
 
@@ -279,29 +294,27 @@ async function installSystemd(opts: { port?: number; home?: string }) {
 
 async function uninstallSystemd() {
   const unitPath = getSystemdPath();
-  if (!(await Bun.file(unitPath).exists())) {
+  if (!existsSync(unitPath)) {
     console.error("Service is not installed.");
     process.exit(1);
   }
 
-  Bun.spawnSync(["systemctl", "--user", "disable", "--now", SYSTEMD_UNIT]);
-  const { unlink } = await import("fs/promises");
+  spawnSync("systemctl", ["--user", "disable", "--now", SYSTEMD_UNIT], { stdio: ["ignore", "pipe", "pipe"] });
   await unlink(unitPath);
-  Bun.spawnSync(["systemctl", "--user", "daemon-reload"]);
+  spawnSync("systemctl", ["--user", "daemon-reload"], { stdio: ["ignore", "pipe", "pipe"] });
   console.log("Service stopped and removed.");
 }
 
 async function statusSystemd() {
-  const proc = Bun.spawn(["systemctl", "--user", "status", SYSTEMD_UNIT], {
-    stdout: "inherit",
-    stderr: "inherit",
+  const proc = spawn("systemctl", ["--user", "status", SYSTEMD_UNIT], {
+    stdio: "inherit",
   });
-  await proc.exited;
+  await new Promise<void>((resolve) => proc.on("close", resolve));
 }
 
 async function logsSystemd(opts: { follow?: boolean; lines: string }) {
   const args = ["journalctl", "--user", "-u", SYSTEMD_UNIT, "-n", opts.lines, "--no-pager"];
   if (opts.follow) args.push("-f");
-  const proc = Bun.spawn(args, { stdout: "inherit", stderr: "inherit" });
-  await proc.exited;
+  const proc = spawn(args[0]!, args.slice(1), { stdio: "inherit" });
+  await new Promise<void>((resolve) => proc.on("close", resolve));
 }
