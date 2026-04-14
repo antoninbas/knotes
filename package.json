@@ -4,7 +4,7 @@
   "description": "A local-first note and activity log manager with hybrid search",
   "type": "module",
   "bin": {
-    "knotes": "src/main.ts"
+    "knotes": "bin/knotes.mjs"
   },
   "scripts": {
     "dev": "npx tsx src/main.ts",
@@ -15,8 +15,14 @@
     "node": ">=20"
   },
   "files": [
+    "bin/",
     "src/",
-    "package.json"
+    "!src/web/app/node_modules",
+    "!src/web/app/src",
+    "!src/web/app/*.ts",
+    "!src/web/app/*.json",
+    "!src/web/app/*.css",
+    "!src/web/app/*.html"
   ],
   "devDependencies": {
     "@types/better-sqlite3": "^7",

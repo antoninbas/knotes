@@ -10,6 +10,7 @@
 #   --global           System-wide install (prefix=/usr/local, may need sudo)
 #   --npm              Force npm/npx even if bun is available
 #   --version VERSION  Install a specific version (default: latest release)
+#   --local            Install from current directory (for development/CI)
 #   --help             Show this help message
 set -euo pipefail
 
@@ -17,6 +18,7 @@ REPO="antoninbas/knotes"
 PREFIX=""
 USE_NPM=false
 VERSION=""
+LOCAL=false
 
 # ── Parse arguments ──────────────────────────────────────────────
 
@@ -37,6 +39,10 @@ while [[ $# -gt 0 ]]; do
     --version)
       VERSION="$2"
       shift 2
+      ;;
+    --local)
+      LOCAL=true
+      shift
       ;;
     --help|-h)
       head -14 "$0" | tail -11
@@ -112,42 +118,58 @@ fi
 
 echo "Using package manager: ${PKG_INSTALL}"
 
-# ── Determine version ───────────────────────────────────────────
+# ── Determine version and source ────────────────────────────────
 
-if [[ -z "${VERSION}" ]]; then
-  echo "Fetching latest release..."
-  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+if [[ "${LOCAL}" == true ]]; then
+  # Install from current directory
+  VERSION="${VERSION:-local}"
+  echo "Installing knotes ${VERSION} from local source..."
+  SOURCE_DIR="$(pwd)"
+else
   if [[ -z "${VERSION}" ]]; then
-    echo "Error: Could not determine latest release version."
-    exit 1
+    echo "Fetching latest release..."
+    VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
+    if [[ -z "${VERSION}" ]]; then
+      echo "Error: Could not determine latest release version."
+      exit 1
+    fi
   fi
+
+  echo "Installing knotes ${VERSION}..."
+
+  TMPDIR=$(mktemp -d)
+  trap 'rm -rf "${TMPDIR}"' EXIT
+
+  TARBALL_URL="https://github.com/${REPO}/archive/refs/tags/${VERSION}.tar.gz"
+  echo "Downloading ${TARBALL_URL}..."
+  curl -fsSL "${TARBALL_URL}" | tar xz -C "${TMPDIR}"
+
+  # GitHub tarballs extract to repo-name-version/
+  EXTRACTED_DIR="${TMPDIR}/knotes-${VERSION#v}"
+  if [[ ! -d "${EXTRACTED_DIR}" ]]; then
+    # Try alternate naming
+    EXTRACTED_DIR=$(ls -d "${TMPDIR}"/knotes-* 2>/dev/null | head -1)
+    if [[ -z "${EXTRACTED_DIR}" || ! -d "${EXTRACTED_DIR}" ]]; then
+      echo "Error: Could not find extracted source directory."
+      exit 1
+    fi
+  fi
+
+  SOURCE_DIR="${EXTRACTED_DIR}"
 fi
 
-echo "Installing knotes ${VERSION}..."
+cd "${SOURCE_DIR}"
 
-# ── Download and extract ─────────────────────────────────────────
+# ── Install dependencies and build ──────────────────────────────
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "${TMPDIR}"' EXIT
-
-TARBALL_URL="https://github.com/${REPO}/archive/refs/tags/${VERSION}.tar.gz"
-echo "Downloading ${TARBALL_URL}..."
-curl -fsSL "${TARBALL_URL}" | tar xz -C "${TMPDIR}"
-
-# GitHub tarballs extract to repo-name-version/
-EXTRACTED_DIR="${TMPDIR}/knotes-${VERSION#v}"
-if [[ ! -d "${EXTRACTED_DIR}" ]]; then
-  # Try alternate naming
-  EXTRACTED_DIR=$(ls -d "${TMPDIR}"/knotes-* 2>/dev/null | head -1)
-  if [[ -z "${EXTRACTED_DIR}" || ! -d "${EXTRACTED_DIR}" ]]; then
-    echo "Error: Could not find extracted source directory."
-    exit 1
-  fi
+if [[ "${LOCAL}" == true ]]; then
+  # Local mode: install deps and build in a copy to avoid modifying the source tree
+  TMPDIR=$(mktemp -d)
+  trap 'rm -rf "${TMPDIR}"' EXIT
+  INSTALL_SRC="${TMPDIR}/knotes"
+  cp -r "${SOURCE_DIR}" "${INSTALL_SRC}"
+  cd "${INSTALL_SRC}"
 fi
-
-cd "${EXTRACTED_DIR}"
-
-# ── Install dependencies ────────────────────────────────────────
 
 echo "Installing dependencies..."
 if [[ "${PKG_INSTALL}" == "bun" ]]; then

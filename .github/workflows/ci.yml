@@ -48,7 +48,7 @@ jobs:
           node-version: '22'
       - name: Test install from source
         run: |
-          ./scripts/install.sh --prefix /tmp/knotes-npm --npm --version "$(git describe --tags --always)"
+          ./scripts/install.sh --prefix /tmp/knotes-npm --npm --local
       - name: Verify install
         run: |
           export PATH="/tmp/knotes-npm/bin:$PATH"
