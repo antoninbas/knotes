@@ -94,6 +94,13 @@ function generateSystemdUnit(opts: { port?: number; home?: string }): string {
   }
 
   const env: string[] = [];
+  // Pass through PATH so the service finds the same node/npx as the user's shell.
+  // Filter out npx/node_modules/.bin entries that are specific to the current process.
+  const cleanPath = (process.env["PATH"] || "")
+    .split(":")
+    .filter((p) => !p.includes("node_modules/.bin") && !p.includes("node-gyp-bin"))
+    .join(":");
+  env.push(`Environment=PATH=${cleanPath}`);
   if (opts.home) {
     env.push(`Environment=KNOTES_HOME=${opts.home}`);
   }
