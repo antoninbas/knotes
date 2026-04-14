@@ -40,6 +40,4 @@ jobs:
       - run: cd src/web/app && npm install && npx vite build
 
       - name: Publish to npm
-        run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: NODE_AUTH_TOKEN="" npm publish --access public --provenance
