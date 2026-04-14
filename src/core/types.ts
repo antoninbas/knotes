@@ -51,6 +51,13 @@ export interface SearchResult {
   score: number;
 }
 
+export interface ListEntry {
+  path: string;
+  title: string;
+  type: "note" | "log" | "directory";
+  modified?: string;
+}
+
 export interface CreateNoteOptions {
   title?: string;
   content?: string;

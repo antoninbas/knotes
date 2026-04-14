@@ -10,8 +10,7 @@ import * as directNotes from "./notes.ts";
 import * as directLogs from "./logs.ts";
 import * as directSearch from "./search.ts";
 import * as directImporter from "./importer.ts";
-import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
-import type { ListEntry } from "./notes.ts";
+import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
 
 function useServer(): boolean {
   const config = getConfig();
