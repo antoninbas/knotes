@@ -49,9 +49,13 @@ logsApi.get("/entries", async (c) => {
   const path = c.req.query("path");
   if (!path) return c.json({ error: "path is required" }, 400);
   const limit = c.req.query("limit");
+  const since = c.req.query("since");
+  const before = c.req.query("before");
   try {
     const entries = await listEntries(path, {
       limit: limit ? parseInt(limit, 10) : undefined,
+      since: since || undefined,
+      before: before || undefined,
     });
     return c.json(entries);
   } catch (err: any) {

@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import type { Hono } from "hono";
@@ -237,6 +237,82 @@ test("GET /api/logs/entries lists entries newest first", async () => {
   expect(entries.length).toBe(3);
   expect(entries[0].content).toBe("Third");
   expect(entries[2].content).toBe("First");
+});
+
+test("GET /api/logs/entries filters by since", async () => {
+  await post("/api/logs", { path: "logs/api-since" });
+  await writeFile(join(testHome, "logs/api-since.md"), [
+    "---",
+    'title: api-since',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-3300000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-3300000000000002}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const res = await api("/api/logs/entries?path=logs/api-since&since=2025-04-07T00:00:00.000Z");
+  expect(res.status).toBe(200);
+  const entries = await json(res);
+  expect(entries.length).toBe(1);
+  expect(entries[0].content).toBe("New entry");
+});
+
+test("GET /api/logs/entries filters by before", async () => {
+  await post("/api/logs", { path: "logs/api-before" });
+  await writeFile(join(testHome, "logs/api-before.md"), [
+    "---",
+    'title: api-before',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-4400000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-4400000000000002}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const res = await api("/api/logs/entries?path=logs/api-before&before=2025-04-07T00:00:00.000Z");
+  expect(res.status).toBe(200);
+  const entries = await json(res);
+  expect(entries.length).toBe(1);
+  expect(entries[0].content).toBe("Old entry");
+});
+
+test("GET /api/logs/entries filters by date range", async () => {
+  await post("/api/logs", { path: "logs/api-range" });
+  await writeFile(join(testHome, "logs/api-range.md"), [
+    "---",
+    'title: api-range',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-05T00:00:00.000Z {#e-5500000000000001}",
+    "",
+    "Too old",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-5500000000000002}",
+    "",
+    "In range",
+    "",
+    "## 2025-04-12T00:00:00.000Z {#e-5500000000000003}",
+    "",
+    "Too new",
+  ].join("\n"));
+
+  const res = await api("/api/logs/entries?path=logs/api-range&since=2025-04-07T00:00:00.000Z&before=2025-04-10T00:00:00.000Z");
+  expect(res.status).toBe(200);
+  const entries = await json(res);
+  expect(entries.length).toBe(1);
+  expect(entries[0].content).toBe("In range");
 });
 
 test("GET /api/logs/entries respects limit", async () => {

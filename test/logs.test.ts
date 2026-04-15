@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm, readFile } from "fs/promises";
+import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -140,6 +140,126 @@ test("getEntry returns null for missing entry", async () => {
   await createLog("logs/get-missing");
   const found = await getEntry("logs/get-missing", "e-0000");
   expect(found).toBeNull();
+});
+
+test("listEntries filters by since", async () => {
+  const { createLog, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/since-test");
+  await writeFile(join(testHome, "logs/since-test.md"), [
+    "---",
+    'title: since-test',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-aa00000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-aa00000000000002}",
+    "",
+    "Mid entry",
+    "",
+    "## 2025-04-10T00:00:00.000Z {#e-aa00000000000003}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const entries = await listEntries("logs/since-test", { since: "2025-04-07T00:00:00.000Z" });
+  expect(entries.length).toBe(2);
+  const contents = entries.map((e) => e.content);
+  expect(contents).toContain("Mid entry");
+  expect(contents).toContain("New entry");
+  expect(contents).not.toContain("Old entry");
+});
+
+test("listEntries filters by before", async () => {
+  const { createLog, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/before-test");
+  await writeFile(join(testHome, "logs/before-test.md"), [
+    "---",
+    'title: before-test',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-bb00000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-bb00000000000002}",
+    "",
+    "Mid entry",
+    "",
+    "## 2025-04-10T00:00:00.000Z {#e-bb00000000000003}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const entries = await listEntries("logs/before-test", { before: "2025-04-09T00:00:00.000Z" });
+  expect(entries.length).toBe(2);
+  const contents = entries.map((e) => e.content);
+  expect(contents).toContain("Old entry");
+  expect(contents).toContain("Mid entry");
+  expect(contents).not.toContain("New entry");
+});
+
+test("listEntries filters by since and before range", async () => {
+  const { createLog, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/range-test");
+  await writeFile(join(testHome, "logs/range-test.md"), [
+    "---",
+    'title: range-test',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-cc00000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-cc00000000000002}",
+    "",
+    "Mid entry",
+    "",
+    "## 2025-04-10T00:00:00.000Z {#e-cc00000000000003}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const entries = await listEntries("logs/range-test", {
+    since: "2025-04-07T00:00:00.000Z",
+    before: "2025-04-09T00:00:00.000Z",
+  });
+  expect(entries.length).toBe(1);
+  expect(entries[0]!.content).toBe("Mid entry");
+});
+
+test("listEntries date filter combined with limit", async () => {
+  const { createLog, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/filter-limit");
+  await writeFile(join(testHome, "logs/filter-limit.md"), [
+    "---",
+    'title: filter-limit',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-08T00:00:00.000Z {#e-dd00000000000001}",
+    "",
+    "Entry A",
+    "",
+    "## 2025-04-09T00:00:00.000Z {#e-dd00000000000002}",
+    "",
+    "Entry B",
+    "",
+    "## 2025-04-10T00:00:00.000Z {#e-dd00000000000003}",
+    "",
+    "Entry C",
+  ].join("\n"));
+
+  // since filters to A/B/C, then limit cuts to first 2
+  const entries = await listEntries("logs/filter-limit", {
+    since: "2025-04-07T00:00:00.000Z",
+    limit: 2,
+  });
+  expect(entries.length).toBe(2);
 });
 
 test("log file format is valid markdown", async () => {

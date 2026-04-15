@@ -75,9 +75,17 @@ export function registerTools(
         .number()
         .optional()
         .describe("Maximum number of entries to return"),
+      since: z
+        .string()
+        .optional()
+        .describe("Only return entries at or after this date/time (ISO 8601 or any parseable date, e.g. '2025-04-07T00:00:00Z')"),
+      before: z
+        .string()
+        .optional()
+        .describe("Only return entries before this date/time (ISO 8601 or any parseable date, e.g. '2025-04-14T00:00:00Z')"),
     },
-    async ({ path, limit }) => {
-      const entries = await listEntries(path, { limit });
+    async ({ path, limit, since, before }) => {
+      const entries = await listEntries(path, { limit, since, before });
       if (entries.length === 0) return text("No entries found.");
 
       const lines = entries.map((e) => {

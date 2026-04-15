@@ -102,10 +102,12 @@ export async function addEntry(path: string, content: string): Promise<LogEntry>
   });
 }
 
-export async function listEntries(path: string, opts?: { limit?: number }): Promise<LogEntry[]> {
-  return request<LogEntry[]>(
-    `/logs/entries?path=${encodeURIComponent(path)}${opts?.limit ? `&limit=${opts.limit}` : ""}`
-  );
+export async function listEntries(path: string, opts?: { limit?: number; since?: string; before?: string }): Promise<LogEntry[]> {
+  const params = new URLSearchParams({ path });
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.since) params.set("since", opts.since);
+  if (opts?.before) params.set("before", opts.before);
+  return request<LogEntry[]>(`/logs/entries?${params.toString()}`);
 }
 
 export async function updateEntry(path: string, entryId: string, content: string): Promise<LogEntry> {
