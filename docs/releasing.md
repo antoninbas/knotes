@@ -38,10 +38,11 @@
 The Homebrew formula installs knotes from source:
 
 1. `depends_on "node"` — ensures Node.js is installed
-2. Runs `npm install --production` to fetch dependencies
+2. Runs `npm install --omit=dev` to fetch runtime dependencies
 3. Builds the frontend (`npx vite build` in `src/web/app`)
-4. Copies source + `node_modules` to `libexec/`
-5. Creates a wrapper script in `bin/knotes` that runs `npx tsx libexec/src/main.ts`
+4. Runs `npm run build` to compile the backend TypeScript to `dist/`
+5. Copies `dist/` + `node_modules` to `libexec/`
+6. Creates a wrapper script in `bin/knotes` that runs `node libexec/dist/main.js`
 
 ## Installation (end user)
 
@@ -65,4 +66,4 @@ To deploy the currently checked-out version on this machine:
 make deploy
 ```
 
-This runs `make install` (builds frontend, copies source to `~/.local/lib/knotes`, creates wrapper script) and restarts the systemd service.
+This runs `make install` (builds frontend and backend, installs compiled output to `~/.local/lib/knotes`, creates wrapper script) and restarts the systemd service.

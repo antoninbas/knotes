@@ -38,6 +38,7 @@ jobs:
 
       - run: npm install
       - run: cd src/web/app && npm install && npx vite build
+      - run: npm run build
 
       - name: Publish to npm
         run: NODE_AUTH_TOKEN="" npm publish --access public --provenance

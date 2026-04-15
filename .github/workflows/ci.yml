@@ -48,6 +48,7 @@ jobs:
           node-version: '24'
       - run: npm install
       - run: cd src/web/app && npm install && npx vite build
+      - run: npm run build
       - run: npm pack
       - run: npm install -g ./antoninbas-knotes-*.tgz
       - run: knotes --help
@@ -63,6 +64,7 @@ jobs:
           node-version: '24'
       - run: bun install
       - run: cd src/web/app && bun install && bunx vite build
+      - run: npm run build
       - run: npm pack
       - name: Install globally
         run: bun install -g "$(pwd)/$(ls antoninbas-knotes-*.tgz)"

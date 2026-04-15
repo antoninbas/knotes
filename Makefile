@@ -2,7 +2,7 @@ PREFIX ?= $(HOME)/.local
 VERSION := $(shell grep '"version"' package.json | head -1 | sed 's/.*"\([0-9.]*\)".*/\1/')
 LIBDIR := $(PREFIX)/lib/knotes
 
-.PHONY: all install uninstall clean test fmt check dev dev-web deps run web-build release deploy
+.PHONY: all install uninstall clean test fmt check dev dev-web deps run web-build build release deploy
 
 all: check test
 
@@ -26,6 +26,9 @@ dev-web:
 web-build: deps
 	cd src/web/app && npx vite build
 
+build: web-build
+	node scripts/build.js
+
 # --- Quality ---
 
 test:
@@ -40,13 +43,11 @@ check:
 
 # --- Install ---
 
-install: deps web-build
+install: build
 	install -d $(LIBDIR)
-	cp -r src package.json package-lock.json node_modules $(LIBDIR)/
-	cp -r src/web/app/node_modules $(LIBDIR)/src/web/app/ 2>/dev/null || true
-	git describe --tags --always > $(LIBDIR)/VERSION
+	cp -r dist node_modules package.json $(LIBDIR)/
 	install -d $(PREFIX)/bin
-	@printf '#!/bin/sh\nexec npx tsx "$(LIBDIR)/src/main.ts" "$$@"\n' > $(PREFIX)/bin/knotes
+	@printf '#!/bin/sh\nKNOTES_BIN="$(PREFIX)/bin/knotes"\nexport KNOTES_BIN\nexec node "$(LIBDIR)/dist/main.js" "$$@"\n' > $(PREFIX)/bin/knotes
 	chmod +x $(PREFIX)/bin/knotes
 	@echo "Installed knotes v$(VERSION) to $(PREFIX)/bin/knotes"
 
