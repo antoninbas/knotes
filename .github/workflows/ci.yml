@@ -67,3 +67,23 @@ jobs:
       - name: Install globally
         run: bun install -g "$(pwd)/$(ls antoninbas-knotes-*.tgz)"
       - run: knotes --help
+
+  lockfile-check:
+    name: Verify lock files are up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+      - name: Check root lock files
+        run: |
+          npm install --ignore-scripts
+          git diff --exit-code package-lock.json bun.lock
+      - name: Check frontend lock files
+        run: |
+          cd src/web/app
+          npm install --ignore-scripts
+          bun install
+          git diff --exit-code package-lock.json bun.lock
