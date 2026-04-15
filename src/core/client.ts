@@ -141,8 +141,8 @@ export async function updateIndex(opts?: { force?: boolean }): Promise<void> {
   });
 }
 
-export async function embed(opts?: { force?: boolean }): Promise<{ started: boolean; reason?: string }> {
-  return request("/search/embed", {
+export async function embed(opts?: { force?: boolean }): Promise<void> {
+  await request("/search/embed", {
     method: "POST",
     body: JSON.stringify({ force: opts?.force }),
   });
