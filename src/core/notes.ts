@@ -9,6 +9,7 @@ import type {
   CreateNoteOptions,
   UpdateNoteOptions,
   NoteMeta,
+  ListEntry,
 } from "./types.ts";
 
 function nowISO(): string {
@@ -164,13 +165,6 @@ export async function deleteNote(logicalPath: string): Promise<void> {
 
   await unlink(filePath);
   await updateIndex();
-}
-
-export interface ListEntry {
-  path: string;
-  title: string;
-  type: "note" | "log" | "directory";
-  modified?: string;
 }
 
 export async function listNotes(prefix?: string): Promise<ListEntry[]> {

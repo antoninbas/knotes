@@ -4,8 +4,7 @@
  */
 
 import { getServerInfo, isServerAlive } from "./db.ts";
-import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions } from "./types.ts";
-import type { ListEntry } from "./notes.ts";
+import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
 
 function getBaseUrl(): string {
   const info = getServerInfo();

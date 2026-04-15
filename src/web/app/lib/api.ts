@@ -1,3 +1,6 @@
+import type { ListEntry, NoteResult, LogEntry, SearchResult } from "../../../core/types.ts";
+export type { ListEntry, NoteResult, LogEntry, SearchResult };
+
 const BASE = "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -13,38 +16,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     throw new Error(body.error || `HTTP ${res.status}`);
   }
   return res.json();
-}
-
-// Types matching the core layer
-export interface ListEntry {
-  path: string;
-  title: string;
-  type: "note" | "log" | "directory";
-  modified?: string;
-}
-
-export interface NoteResult {
-  path: string;
-  filePath: string;
-  title: string;
-  created: string;
-  modified: string;
-  tags: string[];
-  type: "note" | "log";
-  content: string;
-}
-
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  content: string;
-}
-
-export interface SearchResult {
-  path: string;
-  title: string;
-  snippet: string;
-  score: number;
 }
 
 // Notes API
