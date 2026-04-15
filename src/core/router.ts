@@ -67,7 +67,7 @@ export async function addEntry(path: string, content: string): Promise<LogEntry>
   return directLogs.addEntry(path, content);
 }
 
-export async function listEntries(path: string, opts?: { limit?: number }): Promise<LogEntry[]> {
+export async function listEntries(path: string, opts?: { limit?: number; since?: string; before?: string }): Promise<LogEntry[]> {
   if (useServer()) return client.listEntries(path, opts);
   return directLogs.listEntries(path, opts);
 }

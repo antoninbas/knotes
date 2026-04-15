@@ -67,9 +67,13 @@ export function registerLogCommands(program: Command): void {
     .description("List entries in a log")
     .argument("<path>", "Logical path of the log")
     .option("-l, --limit <limit>", "Maximum entries to show", "20")
+    .option("--since <date>", "Only show entries at or after this date/time (ISO 8601 or any parseable date)")
+    .option("--before <date>", "Only show entries before this date/time (ISO 8601 or any parseable date)")
     .action(async (path: string, opts) => {
       const entries = await listEntries(path, {
         limit: parseInt(opts.limit, 10),
+        since: opts.since,
+        before: opts.before,
       });
       if (entries.length === 0) {
         console.log("No entries found.");

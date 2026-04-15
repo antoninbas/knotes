@@ -105,13 +105,21 @@ export async function addEntry(
 
 export async function listEntries(
   logicalPath: string,
-  options?: { limit?: number }
+  options?: { limit?: number; since?: string; before?: string }
 ): Promise<LogEntry[]> {
   const note = await getNote(logicalPath);
-  const entries = parseEntries(note.content);
+  let entries = parseEntries(note.content);
 
+  if (options?.since) {
+    const sinceMs = new Date(options.since).getTime();
+    entries = entries.filter((e) => new Date(e.timestamp).getTime() >= sinceMs);
+  }
+  if (options?.before) {
+    const beforeMs = new Date(options.before).getTime();
+    entries = entries.filter((e) => new Date(e.timestamp).getTime() < beforeMs);
+  }
   if (options?.limit) {
-    return entries.slice(0, options.limit);
+    entries = entries.slice(0, options.limit);
   }
   return entries;
 }
