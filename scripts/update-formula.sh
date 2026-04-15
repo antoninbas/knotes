@@ -9,23 +9,28 @@ VERSION_NUM="${VERSION#v}"
 TAP_DIR="${2:-}"
 REPO="antoninbas/knotes"
 
-ARCHIVE_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
+SOURCE_URL="https://github.com/${REPO}/archive/refs/tags/${TAG}.tar.gz"
 
-echo "Fetching checksum for ${TAG}..."
-sha=$(curl -sL "${ARCHIVE_URL}" | shasum -a 256 | cut -d' ' -f1)
+echo "Fetching checksum for source tarball..."
+sha=$(curl -sL "${SOURCE_URL}" | shasum -a 256 | cut -d' ' -f1)
 echo "  sha256: ${sha}"
 
 FORMULA='class Knotes < Formula
   desc "Local-first note and activity log manager with hybrid search"
   homepage "https://github.com/'"${REPO}"'"
-  url "'"${ARCHIVE_URL}"'"
+  url "'"${SOURCE_URL}"'"
   sha256 "'"${sha}"'"
   license "MIT"
 
   depends_on "node"
 
   def install
-    system "npm", "install", "--production"
+    # Skip node-llama-cpp binary download (done lazily on first use of `knotes embed`)
+    ENV["NODE_LLAMA_CPP_SKIP_DOWNLOAD"] = "1"
+    # Point node-gyp to local Node.js headers so better-sqlite3 compiles without network access
+    ENV["npm_config_nodedir"] = Formula["node"].opt_prefix.to_s
+
+    system "npm", "install", "--omit=dev"
     cd "src/web/app" do
       system "npm", "install"
       system "npx", "vite", "build"
