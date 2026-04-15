@@ -1,5 +1,5 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
-import { mkdtemp, rm } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -204,6 +204,107 @@ test("knotes_log_list respects limit", async () => {
   expect(text).toContain("Three");
   expect(text).toContain("Two");
   expect(text).not.toContain("One");
+});
+
+test("knotes_log_list filters by since", async () => {
+  await callTool("knotes_log_create", { path: "logs/mcp-since" });
+  await writeFile(join(testHome, "logs/mcp-since.md"), [
+    "---",
+    'title: mcp-since',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-ee00000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-ee00000000000002}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const text = await callTool("knotes_log_list", {
+    path: "logs/mcp-since",
+    since: "2025-04-07T00:00:00.000Z",
+  });
+  expect(text).toContain("New entry");
+  expect(text).not.toContain("Old entry");
+});
+
+test("knotes_log_list filters by before", async () => {
+  await callTool("knotes_log_create", { path: "logs/mcp-before" });
+  await writeFile(join(testHome, "logs/mcp-before.md"), [
+    "---",
+    'title: mcp-before',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-ff00000000000001}",
+    "",
+    "Old entry",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-ff00000000000002}",
+    "",
+    "New entry",
+  ].join("\n"));
+
+  const text = await callTool("knotes_log_list", {
+    path: "logs/mcp-before",
+    before: "2025-04-07T00:00:00.000Z",
+  });
+  expect(text).toContain("Old entry");
+  expect(text).not.toContain("New entry");
+});
+
+test("knotes_log_list filters by date range", async () => {
+  await callTool("knotes_log_create", { path: "logs/mcp-range" });
+  await writeFile(join(testHome, "logs/mcp-range.md"), [
+    "---",
+    'title: mcp-range',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-05T00:00:00.000Z {#e-1100000000000001}",
+    "",
+    "Too old",
+    "",
+    "## 2025-04-08T12:00:00.000Z {#e-1100000000000002}",
+    "",
+    "In range",
+    "",
+    "## 2025-04-12T00:00:00.000Z {#e-1100000000000003}",
+    "",
+    "Too new",
+  ].join("\n"));
+
+  const text = await callTool("knotes_log_list", {
+    path: "logs/mcp-range",
+    since: "2025-04-07T00:00:00.000Z",
+    before: "2025-04-10T00:00:00.000Z",
+  });
+  expect(text).toContain("In range");
+  expect(text).not.toContain("Too old");
+  expect(text).not.toContain("Too new");
+});
+
+test("knotes_log_list returns empty message when date filter excludes all entries", async () => {
+  await callTool("knotes_log_create", { path: "logs/mcp-filter-empty" });
+  await writeFile(join(testHome, "logs/mcp-filter-empty.md"), [
+    "---",
+    'title: mcp-filter-empty',
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-06T00:00:00.000Z {#e-2200000000000001}",
+    "",
+    "Old entry",
+  ].join("\n"));
+
+  const text = await callTool("knotes_log_list", {
+    path: "logs/mcp-filter-empty",
+    since: "2025-04-10T00:00:00.000Z",
+  });
+  expect(text).toContain("No entries found");
 });
 
 // ─── read-only mode ──────────────────────────────────────────────
