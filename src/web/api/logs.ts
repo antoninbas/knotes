@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { ensureHome } from "../../core/config.ts";
 import {
   createLog,
@@ -8,14 +9,33 @@ import {
   deleteEntry,
 } from "../../core/logs.ts";
 
+const CreateLogSchema = z.object({
+  path: z.string().min(1, "path is required"),
+  title: z.string().optional(),
+});
+
+const AddEntrySchema = z.object({
+  path: z.string().min(1, "path is required"),
+  content: z.string().min(1, "content is required"),
+});
+
+const UpdateEntrySchema = z.object({
+  path: z.string().min(1, "path is required"),
+  entryId: z.string().min(1, "entryId is required"),
+  content: z.string().min(1, "content is required"),
+});
+
 export const logsApi = new Hono();
 
 // Create a new log
 logsApi.post("/", async (c) => {
   await ensureHome();
-  const body = await c.req.json();
-  const { path, title } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = CreateLogSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, title } = parsed.data;
   try {
     await createLog(path, title);
     return c.json({ ok: true, path }, 201);
@@ -41,10 +61,12 @@ logsApi.get("/entries", async (c) => {
 
 // Add an entry to a log
 logsApi.post("/entries", async (c) => {
-  const body = await c.req.json();
-  const { path, content } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
-  if (!content) return c.json({ error: "content is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = AddEntrySchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, content } = parsed.data;
   try {
     const entry = await addEntry(path, content);
     return c.json(entry, 201);
@@ -55,11 +77,12 @@ logsApi.post("/entries", async (c) => {
 
 // Update an entry
 logsApi.put("/entries", async (c) => {
-  const body = await c.req.json();
-  const { path, entryId, content } = body;
-  if (!path) return c.json({ error: "path is required" }, 400);
-  if (!entryId) return c.json({ error: "entryId is required" }, 400);
-  if (!content) return c.json({ error: "content is required" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = UpdateEntrySchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, entryId, content } = parsed.data;
   try {
     const entry = await updateEntry(path, entryId, content);
     return c.json(entry);

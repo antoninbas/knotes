@@ -372,6 +372,115 @@ test("GET /api/jobs supports pagination", async () => {
   expect(body2.page).toBe(2);
 });
 
+// ─── Zod Body Validation ─────────────────────────────────────────
+
+test("POST /api/notes returns 400 for non-object body", async () => {
+  const res = await api("/api/notes", { method: "POST", body: '"just a string"' });
+  expect(res.status).toBe(400);
+});
+
+test("POST /api/notes returns 400 for empty path string", async () => {
+  const res = await post("/api/notes", { path: "" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/notes returns 400 when tags is not an array", async () => {
+  const res = await post("/api/notes", { path: "notes/bad-tags", tags: "not-an-array" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("PUT /api/notes returns 400 for missing path", async () => {
+  const res = await put("/api/notes", { title: "No Path" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("PUT /api/notes returns 400 when tags is not an array", async () => {
+  const res = await put("/api/notes", { path: "notes/foo", tags: 42 });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/notes/folder returns 400 for missing path", async () => {
+  const res = await post("/api/notes/folder", {});
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/notes/folder returns 400 for non-object body", async () => {
+  const res = await api("/api/notes/folder", { method: "POST", body: "null" });
+  expect(res.status).toBe(400);
+});
+
+test("POST /api/notes/import returns 400 for missing filePath", async () => {
+  const res = await post("/api/notes/import", { to: "notes/foo" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/logs returns 400 for missing path", async () => {
+  const res = await post("/api/logs", { title: "No Path" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/logs returns 400 for non-object body", async () => {
+  const res = await api("/api/logs", { method: "POST", body: "[]" });
+  expect(res.status).toBe(400);
+});
+
+test("POST /api/logs/entries returns 400 for missing path", async () => {
+  const res = await post("/api/logs/entries", { content: "hello" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/logs/entries returns 400 for empty content", async () => {
+  await post("/api/logs", { path: "logs/empty-content" });
+  const res = await post("/api/logs/entries", { path: "logs/empty-content", content: "" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("PUT /api/logs/entries returns 400 for missing entryId", async () => {
+  const res = await put("/api/logs/entries", { path: "logs/foo", content: "hi" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("PUT /api/logs/entries returns 400 for missing content", async () => {
+  const res = await put("/api/logs/entries", { path: "logs/foo", entryId: "e-0001" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/search/index returns 400 for non-boolean force", async () => {
+  const res = await post("/api/search/index", { force: "yes" });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
+test("POST /api/search/embed returns 400 for non-boolean force", async () => {
+  const res = await post("/api/search/embed", { force: 1 });
+  expect(res.status).toBe(400);
+  const body = await json(res);
+  expect(body.error).toBeTruthy();
+});
+
 test("GET /api/jobs supports type filter", async () => {
   const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
   const id1 = recordJobStart("embed:background");
