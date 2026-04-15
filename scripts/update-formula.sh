@@ -30,19 +30,21 @@ FORMULA='class Knotes < Formula
     # Point node-gyp to local Node.js headers so better-sqlite3 compiles without network access
     ENV["npm_config_nodedir"] = Formula["node"].opt_prefix.to_s
 
-    system "npm", "install", "--omit=dev"
+    system "npm", "install"
     cd "src/web/app" do
       system "npm", "install"
       system "npx", "vite", "build"
     end
+    system "npm", "run", "build"
+    system "npm", "prune", "--omit=dev"
 
-    libexec.install Dir["src", "package.json", "package-lock.json", "node_modules"]
-    # Frontend node_modules needed for the built assets path resolution
-    (libexec/"src/web/app/node_modules").install Dir["src/web/app/node_modules/*"] if Dir.exist?("src/web/app/node_modules")
+    libexec.install "dist", "node_modules", "package.json"
 
     (bin/"knotes").write <<~SH
       #!/bin/sh
-      exec npx tsx "#{libexec}/src/main.ts" "$@"
+      KNOTES_BIN="#{bin}/knotes"
+      export KNOTES_BIN
+      exec node "#{libexec}/dist/main.js" "$@"
     SH
   end
 
