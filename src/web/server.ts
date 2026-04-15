@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { serve } from "@hono/node-server";
 import { notesApi } from "./api/notes.ts";
 import { logsApi } from "./api/logs.ts";
@@ -74,7 +75,7 @@ export function createWebServer(port: number) {
     const distPath = join(__dirname, "app", "dist", urlPath);
     if (existsSync(distPath)) {
       const ext = urlPath.split(".").pop() || "";
-      const content = readFileSync(distPath);
+      const content = await readFile(distPath);
       return new Response(content, {
         headers: { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" },
       });
@@ -83,7 +84,7 @@ export function createWebServer(port: number) {
     // SPA fallback
     const indexPath = join(__dirname, "app", "dist", "index.html");
     if (existsSync(indexPath)) {
-      const content = readFileSync(indexPath);
+      const content = await readFile(indexPath);
       return new Response(content, {
         headers: { "Content-Type": "text/html" },
       });
