@@ -215,7 +215,7 @@ test("POST /api/logs/entries adds an entry", async () => {
   const res = await post("/api/logs/entries", { path: "logs/add", content: "First entry" });
   expect(res.status).toBe(201);
   const entry = await json(res);
-  expect(entry.id).toMatch(/^e-[a-f0-9]{4}$/);
+  expect(entry.id).toMatch(/^e-[a-f0-9]{16}$/);
   expect(entry.content).toBe("First entry");
   expect(entry.timestamp).toBeTruthy();
 });

@@ -121,7 +121,7 @@ test("log add adds an entry", async () => {
   const { code, stdout } = await run("log", "add", "logs/test", "-m", "First entry");
   expect(code).toBe(0);
   expect(stdout).toContain("Added entry");
-  expect(stdout).toMatch(/e-[a-f0-9]{4}/);
+  expect(stdout).toMatch(/e-[a-f0-9]{16}/);
 });
 
 test("log list shows entries", async () => {
