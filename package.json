@@ -12,6 +12,7 @@
     "knotes": "bin/knotes"
   },
   "scripts": {
+    "build": "node scripts/build.js",
     "dev": "npx tsx src/main.ts",
     "dev:web": "npx tsx src/main.ts web",
     "test": "vitest run"
@@ -21,17 +22,13 @@
   },
   "files": [
     "bin/",
-    "src/",
-    "!src/web/app/node_modules",
-    "!src/web/app/src",
-    "!src/web/app/*.ts",
-    "!src/web/app/*.json",
-    "!src/web/app/*.css",
-    "!src/web/app/*.html"
+    "dist/"
   ],
   "devDependencies": {
     "@types/better-sqlite3": "^7",
     "@types/node": "^22",
+    "esbuild": "^0.25",
+    "tsx": "^4",
     "vitest": "^4.1.4"
   },
   "peerDependencies": {
@@ -45,7 +42,6 @@
     "commander": "^13",
     "gray-matter": "^4",
     "hono": "^4",
-    "tsx": "^4",
     "zod": "^3"
   }
 }

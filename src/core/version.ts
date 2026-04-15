@@ -5,6 +5,9 @@ import { readFileSync, existsSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// Injected by esbuild at build time (production builds only).
+declare const __PACKAGE_VERSION__: string | undefined;
+
 let cachedVersion: string | null = null;
 
 /**
@@ -14,14 +17,21 @@ let cachedVersion: string | null = null;
  * - Dev build: "0.3.0-dev.2+gabc1234" (2 commits after v0.3.0, at commit abc1234)
  *
  * Resolution order:
- * 1. Git describe (if running from a git repo — dev mode)
- * 2. VERSION file (written by `make install`)
- * 3. package.json version (fallback)
+ * 1. __PACKAGE_VERSION__ constant (injected by esbuild in production builds)
+ * 2. Git describe (if running from a git repo — dev mode)
+ * 3. VERSION file (written by `make install`)
+ * 4. package.json version (fallback)
  */
 export function getVersion(): string {
   if (cachedVersion) return cachedVersion;
 
-  // Try git describe first (dev mode — running from source in a git repo)
+  // Build-time injection takes priority in production builds
+  if (typeof __PACKAGE_VERSION__ !== "undefined") {
+    cachedVersion = __PACKAGE_VERSION__;
+    return cachedVersion;
+  }
+
+  // Dev mode fallbacks (running via tsx from source)
   cachedVersion = tryGitDescribe() ?? tryVersionFile() ?? tryPackageJson() ?? "unknown";
   return cachedVersion;
 }

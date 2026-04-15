@@ -4,7 +4,7 @@ Local-first note and activity log manager with hybrid search.
 
 ## Tech Stack
 
-- **Runtime**: Node.js (via tsx for TypeScript execution)
+- **Runtime**: Node.js (compiled with esbuild; tsx used only in dev/test)
 - **Backend**: Hono (web server), Commander (CLI), MCP SDK (MCP server)
 - **Frontend**: SolidJS + Tailwind CSS v4 (built with Vite, needed for solid-js JSX transform)
 - **Database**: better-sqlite3
@@ -26,6 +26,7 @@ The server (`knotes server`) is the central hub. CLI commands and MCP tools rout
 
 ## Commands
 
+Dev mode (running from source with tsx):
 ```sh
 npx tsx src/main.ts --help              # CLI help
 npx tsx src/main.ts server              # Start server (web UI + API)
@@ -37,6 +38,12 @@ npx tsx src/main.ts config edit         # Edit config in $EDITOR
 npx tsx src/main.ts config set serverless true  # Enable serverless mode
 npx tsx src/main.ts index              # Update search index
 npx tsx src/main.ts embed              # Generate embeddings
+```
+
+Production build:
+```sh
+npm run build                           # Compile src/ → dist/ (requires frontend built first)
+node dist/main.js --help               # Run compiled binary directly
 ```
 
 ## Frontend Development

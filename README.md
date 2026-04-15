@@ -42,7 +42,7 @@ git clone <repo-url> && cd knotes
 make install   # installs to ~/.local/bin/knotes
 ```
 
-Requires Node.js v22+. `make install` fetches dependencies, builds the frontend, and creates a wrapper script.
+Requires Node.js v22+. `make install` fetches dependencies, builds the frontend and backend, and installs a wrapper script.
 
 ## Quick start
 
@@ -155,8 +155,8 @@ For use with Claude Desktop, Cursor, and other MCP-compatible clients. Example C
 {
   "mcpServers": {
     "knotes": {
-      "command": "npx",
-      "args": ["tsx", "/path/to/knotes/src/main.ts", "mcp"]
+      "command": "knotes",
+      "args": ["mcp"]
     }
   }
 }

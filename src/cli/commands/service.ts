@@ -20,11 +20,26 @@ function getSystemdPath(): string {
 }
 
 function findBinary(): string {
-  // Check for a wrapper script in common locations (e.g. from Homebrew or make install)
+  // KNOTES_BIN is set by the bin/knotes wrapper to its own resolved path.
+  // This is the most reliable source — the binary that launched this process IS the binary.
+  const knotesEnv = process.env["KNOTES_BIN"];
+  if (knotesEnv && existsSync(knotesEnv) && statSync(knotesEnv).size > 0) {
+    return knotesEnv;
+  }
+
+  // Try `which knotes` — works for any install method when knotes is in PATH.
+  const which = spawnSync("which", ["knotes"], { encoding: "utf8" });
+  if (which.status === 0) {
+    const bin = which.stdout.trim();
+    if (bin && existsSync(bin) && statSync(bin).size > 0) return bin;
+  }
+
+  // Check common hardcoded locations (e.g. from Homebrew or make install)
   const candidates = [
     "/usr/local/bin/knotes",
     "/opt/homebrew/bin/knotes",
     join(homedir(), ".local", "bin", "knotes"),
+    join(homedir(), ".bun", "bin", "knotes"),
   ];
   for (const c of candidates) {
     try {
@@ -33,8 +48,19 @@ function findBinary(): string {
       continue;
     }
   }
-  // Fall back to npx tsx with the source tree
-  return `npx tsx ${join(__dirname, "../../main.ts")}`;
+
+  // Last resort: run dist/main.js directly with node (production) or tsx from source (dev).
+  const distMain = join(__dirname, "main.js");
+  if (existsSync(distMain)) {
+    return `node ${distMain}`;
+  }
+  const mainTs = join(__dirname, "../../main.ts");
+  const hasBun = spawnSync("which", ["bun"], { encoding: "utf8" }).status === 0;
+  const hasNpx = spawnSync("which", ["npx"], { encoding: "utf8" }).status === 0;
+  if (hasBun && !hasNpx) {
+    return `bunx tsx ${mainTs}`;
+  }
+  return `npx tsx ${mainTs}`;
 }
 
 function generatePlist(opts: { port?: number; home?: string }): string {
