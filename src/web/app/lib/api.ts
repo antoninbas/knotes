@@ -1,5 +1,5 @@
-// Re-export shared types from core so consumers of this module get them all from one place
-export type { ListEntry, NoteResult, LogEntry, SearchResult } from "../../../core/types.ts";
+import type { ListEntry, NoteResult, LogEntry, SearchResult } from "../../../core/types.ts";
+export type { ListEntry, NoteResult, LogEntry, SearchResult };
 
 const BASE = "/api";
 
