@@ -79,11 +79,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Check root lock files
         run: |
-          npm install --ignore-scripts
-          git diff --exit-code package-lock.json bun.lock
+          npm ci --ignore-scripts
+          bun install --frozen-lockfile
       - name: Check frontend lock files
         run: |
           cd src/web/app
-          npm install --ignore-scripts
-          bun install
-          git diff --exit-code package-lock.json bun.lock
+          npm ci --ignore-scripts
+          bun install --frozen-lockfile
