@@ -16,13 +16,16 @@
     "@codemirror/search": "^6.6.0",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.0",
+    "@types/dompurify": "^3.0.5",
+    "dompurify": "^3.4.0",
+    "marked": "^18.0.0",
     "solid-js": "^1.9"
   },
   "devDependencies": {
-    "vite": "^6",
-    "vite-plugin-solid": "^2",
-    "tailwindcss": "^4",
     "@tailwindcss/vite": "^4",
-    "typescript": "^5"
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^6",
+    "vite-plugin-solid": "^2"
   }
 }
