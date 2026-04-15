@@ -58,8 +58,6 @@ export interface ListEntry {
   modified?: string;
 }
 
-export type SearchMode = "hybrid" | "bm25" | "vector";
-
 export interface CreateNoteOptions {
   title?: string;
   content?: string;
