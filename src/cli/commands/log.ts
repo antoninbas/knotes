@@ -2,6 +2,8 @@ import type { Command } from "commander";
 import { ensureHome } from "../../core/config.ts";
 import {
   createLog,
+  updateLog,
+  deleteLog,
   addEntry,
   listEntries,
   listJournals,
@@ -53,10 +55,40 @@ export function registerLogCommands(program: Command): void {
     .description("Create a new log")
     .argument("<path>", "Logical path for the log (e.g. logs/daily)")
     .option("-t, --title <title>", "Log title")
+    .option("-d, --description <description>", "Journal description (used as search context)")
     .action(async (path: string, opts) => {
       await ensureHome();
-      await createLog(path, opts.title);
+      await createLog(path, opts.title, opts.description);
       console.log(`Created log: ${path}`);
+    });
+
+  log
+    .command("update-journal")
+    .description("Update a log journal's title or description")
+    .argument("<path>", "Logical path of the journal (e.g. logs/daily)")
+    .option("-t, --title <title>", "New title")
+    .option("-d, --description <description>", "New description (use empty string to clear)")
+    .action(async (path: string, opts) => {
+      const updates: { title?: string; description?: string | null } = {};
+      if (opts.title !== undefined) updates.title = opts.title;
+      if (opts.description !== undefined) {
+        updates.description = opts.description === "" ? null : opts.description;
+      }
+      if (Object.keys(updates).length === 0) {
+        console.error("Provide at least --title or --description");
+        process.exit(1);
+      }
+      await updateLog(path, updates);
+      console.log(`Updated journal: ${path}`);
+    });
+
+  log
+    .command("delete-journal")
+    .description("Delete an entire log journal")
+    .argument("<path>", "Logical path of the journal (e.g. logs/daily)")
+    .action(async (path: string) => {
+      await deleteLog(path);
+      console.log(`Deleted journal: ${path}`);
     });
 
   log

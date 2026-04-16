@@ -3,6 +3,8 @@ import { z } from "zod";
 import { ensureHome } from "../../core/config.ts";
 import {
   createLog,
+  updateLog,
+  deleteLog,
   addEntry,
   listEntries,
   listJournals,
@@ -13,6 +15,13 @@ import {
 const CreateLogSchema = z.object({
   path: z.string().min(1, "path is required"),
   title: z.string().optional(),
+  description: z.string().optional(),
+});
+
+const UpdateLogSchema = z.object({
+  path: z.string().min(1, "path is required"),
+  title: z.string().optional(),
+  description: z.string().nullable().optional(),
 });
 
 const AddEntrySchema = z.object({
@@ -47,12 +56,40 @@ logsApi.post("/", async (c) => {
   if (!parsed.success) {
     return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
   }
-  const { path, title } = parsed.data;
+  const { path, title, description } = parsed.data;
   try {
-    await createLog(path, title);
+    await createLog(path, title, description);
     return c.json({ ok: true, path }, 201);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
+  }
+});
+
+// Update a log journal's metadata (title, description)
+logsApi.put("/", async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = UpdateLogSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { path, title, description } = parsed.data;
+  try {
+    await updateLog(path, { title, description });
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+// Delete an entire log journal
+logsApi.delete("/", async (c) => {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    await deleteLog(path);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
   }
 });
 

@@ -24,15 +24,18 @@ function buildFrontmatter(meta: NoteMeta): string {
     `modified: ${meta.modified}`,
     `tags: [${meta.tags.map((t) => `"${t}"`).join(", ")}]`,
     `type: ${meta.type}`,
-    "---",
   ];
+  if (meta.description) {
+    lines.push(`description: "${meta.description.replace(/"/g, '\\"')}"`);
+  }
+  lines.push("---");
   return lines.join("\n");
 }
 
 function parseNote(filePath: string, raw: string): NoteResult {
   const parsed = matter(raw);
   const data = parsed.data as Partial<NoteMeta>;
-  return {
+  const result: NoteResult = {
     path: toLogicalPath(filePath),
     filePath,
     title: (data.title as string) || basename(filePath, ".md"),
@@ -42,6 +45,10 @@ function parseNote(filePath: string, raw: string): NoteResult {
     type: (data.type as "note" | "log") || "note",
     content: parsed.content.trim(),
   };
+  if (data.description) {
+    result.description = data.description as string;
+  }
+  return result;
 }
 
 /**
@@ -67,6 +74,7 @@ export async function writeMarkdownFile(
     modified: now,
     tags: options?.tags || [],
     type: logicalPath.startsWith("logs/") ? "log" : "note",
+    ...(options?.description ? { description: options.description } : {}),
   };
 
   const content = options?.content || "";

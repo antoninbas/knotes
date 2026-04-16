@@ -7,7 +7,7 @@ import SearchBar from "./components/SearchBar.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import DropdownMenu from "./components/DropdownMenu.tsx";
 import JobsList from "./components/JobsList.tsx";
-import { searchApi, versionApi, type NoteResult } from "./lib/api.ts";
+import { notes, searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
 
@@ -31,6 +31,26 @@ export default function App() {
 
   function handleNoteSaved() {
     setSidebarRefresh((n) => n + 1);
+  }
+
+  function handleDeleteActive(path: string) {
+    if (currentNote()?.path === path) {
+      setCurrentNote(null);
+      setViewMode("view");
+    }
+    setSidebarRefresh((n) => n + 1);
+  }
+
+  async function handleUpdateJournal() {
+    // Reload current note to pick up updated frontmatter (description etc.)
+    const path = currentNote()?.path;
+    if (!path) return;
+    try {
+      const updated = await notes.get(path);
+      setCurrentNote(updated);
+    } catch (err) {
+      console.error("Failed to reload note after journal update:", err);
+    }
   }
 
   async function triggerEmbed() {
@@ -82,6 +102,7 @@ export default function App() {
           onNewNote={handleNoteSaved}
           currentPath={currentPath}
           readOnly={readOnly()}
+          onDeleteActive={handleDeleteActive}
         />
       </div>
 
@@ -97,6 +118,7 @@ export default function App() {
               onNewNote={handleNoteSaved}
               currentPath={currentPath}
               readOnly={readOnly()}
+              onDeleteActive={handleDeleteActive}
             />
           </div>
           <div
@@ -245,7 +267,7 @@ export default function App() {
                 </Show>
               }
             >
-              <LogView note={currentNote()!} readOnly={readOnly()} />
+              <LogView note={currentNote()!} readOnly={readOnly()} onUpdateJournal={handleUpdateJournal} />
             </Show>
           </Show>
         </main>

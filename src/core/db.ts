@@ -45,6 +45,15 @@ const migrations: Migration[] = [
   (db) => {
     db.exec(`ALTER TABLE jobs ADD COLUMN metadata TEXT`);
   },
+  // Migration 3: contexts table for folder/journal context hints used by qmd
+  (db) => {
+    db.exec(`
+      CREATE TABLE contexts (
+        path TEXT PRIMARY KEY,
+        context TEXT NOT NULL
+      )
+    `);
+  },
 ];
 
 function runMigrations(db: DatabaseInstance): void {
@@ -241,6 +250,40 @@ export interface PaginatedJobs {
   page: number;
   pageSize: number;
 }
+
+// --- Context operations ---
+
+export interface ContextEntry {
+  path: string;
+  context: string;
+}
+
+export function getAllContexts(): ContextEntry[] {
+  const db = getDb();
+  return db.prepare("SELECT path, context FROM contexts ORDER BY path").all() as ContextEntry[];
+}
+
+export function getContextValue(path: string): string | null {
+  const db = getDb();
+  const row = db.prepare("SELECT context FROM contexts WHERE path = ?").get(path) as
+    | { context: string }
+    | undefined;
+  return row?.context ?? null;
+}
+
+export function setContextValue(path: string, context: string): void {
+  const db = getDb();
+  db.prepare(
+    "INSERT INTO contexts (path, context) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET context = ?"
+  ).run(path, context, context);
+}
+
+export function removeContextValue(path: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM contexts WHERE path = ?").run(path);
+}
+
+// --- Job operations ---
 
 export function getJobs(options?: { page?: number; pageSize?: number; type?: string }): PaginatedJobs {
   const db = getDb();

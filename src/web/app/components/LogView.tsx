@@ -4,6 +4,7 @@ import { logs, type LogEntry, type NoteResult } from "../lib/api.ts";
 interface Props {
   note: NoteResult;
   readOnly?: boolean;
+  onUpdateJournal?: () => void;
 }
 
 export default function LogView(props: Props) {
@@ -15,6 +16,14 @@ export default function LogView(props: Props) {
   const [editContent, setEditContent] = createSignal("");
   const [editError, setEditError] = createSignal<string | null>(null);
   const [deleteError, setDeleteError] = createSignal<string | null>(null);
+
+  // Description state
+  const [editingDesc, setEditingDesc] = createSignal(false);
+  const [descInput, setDescInput] = createSignal("");
+  const [descSaving, setDescSaving] = createSignal(false);
+
+  // Get description from note frontmatter (stored as extra metadata)
+  const description = () => (props.note as any).description as string | undefined;
 
   async function loadEntries() {
     try {
@@ -85,11 +94,95 @@ export default function LogView(props: Props) {
     }
   }
 
+  function startEditDesc() {
+    setDescInput(description() ?? "");
+    setEditingDesc(true);
+  }
+
+  async function saveDesc() {
+    setDescSaving(true);
+    try {
+      const text = descInput().trim() || null;
+      await logs.updateJournal(props.note.path, { description: text });
+      props.onUpdateJournal?.();
+      setEditingDesc(false);
+    } catch (err: any) {
+      console.error("Failed to save description:", err);
+    } finally {
+      setDescSaving(false);
+    }
+  }
+
   return (
     <div class="max-w-3xl mx-auto space-y-6">
-      <h2 class="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
-        {props.note.title}
-      </h2>
+      <div>
+        <h2 class="text-xl font-bold" style={{ color: "var(--color-text-primary)" }}>
+          {props.note.title}
+        </h2>
+
+        {/* Description */}
+        <Show when={!editingDesc()}>
+          <div
+            class="mt-1 flex items-start gap-1 group cursor-pointer"
+            onClick={() => !props.readOnly && startEditDesc()}
+            title={props.readOnly ? undefined : "Click to edit description"}
+          >
+            <Show when={!props.readOnly}>
+              <span
+                class="text-xs mt-0.5 shrink-0 opacity-30 group-hover:opacity-60"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                ✎
+              </span>
+            </Show>
+            <span
+              class="text-sm italic"
+              style={{ color: "var(--color-text-muted)", opacity: description() ? 0.8 : 0.4 }}
+            >
+              {description() || (props.readOnly ? "" : "Add a description...")}
+            </span>
+          </div>
+        </Show>
+        <Show when={editingDesc()}>
+          <div class="mt-2 space-y-2">
+            <input
+              type="text"
+              value={descInput()}
+              onInput={(e) => setDescInput(e.currentTarget.value)}
+              placeholder="Describe this journal..."
+              class="w-full px-2 py-1 text-sm rounded border outline-none"
+              style={{
+                "background-color": "var(--color-bg-surface)",
+                "border-color": "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveDesc();
+                if (e.key === "Escape") setEditingDesc(false);
+              }}
+              // eslint-disable-next-line solid/reactivity
+              ref={(el) => setTimeout(() => el?.focus(), 0)}
+            />
+            <div class="flex gap-2">
+              <button
+                onClick={saveDesc}
+                disabled={descSaving()}
+                class="px-3 py-1 text-xs rounded cursor-pointer disabled:opacity-50"
+                style={{ background: "var(--color-accent)", color: "#fff" }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditingDesc(false)}
+                class="px-3 py-1 text-xs rounded cursor-pointer"
+                style={{ background: "var(--color-bg-hover)", color: "var(--color-text-secondary)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Show>
+      </div>
 
       {/* Add entry form */}
       <Show when={!props.readOnly}>

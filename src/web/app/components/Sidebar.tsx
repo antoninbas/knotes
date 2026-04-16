@@ -1,5 +1,5 @@
-import { createSignal, createEffect, For, Show } from "solid-js";
-import { notes, logs, type ListEntry, type NoteResult } from "../lib/api.ts";
+import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
+import { notes, logs, contextApi, type ListEntry, type NoteResult } from "../lib/api.ts";
 
 interface Props {
   onSelect: (note: NoteResult) => void;
@@ -7,9 +7,16 @@ interface Props {
   onNewNote: () => void;
   currentPath: () => string | undefined;
   readOnly: boolean;
+  onDeleteActive?: (path: string) => void;
 }
 
 type CreateMode = null | "note" | "folder" | "log";
+
+interface ContextMenu {
+  x: number;
+  y: number;
+  entry: ListEntry;
+}
 
 export default function Sidebar(props: Props) {
   const [entries, setEntries] = createSignal<ListEntry[]>([]);
@@ -19,6 +26,13 @@ export default function Sidebar(props: Props) {
   const [inputName, setInputName] = createSignal("");
   const [inputTitle, setInputTitle] = createSignal("");
   const [createError, setCreateError] = createSignal<string | null>(null);
+  const [contextMenu, setContextMenu] = createSignal<ContextMenu | null>(null);
+
+  // Folder context state
+  const [folderContext, setFolderContext] = createSignal<string>("");
+  const [editingContext, setEditingContext] = createSignal(false);
+  const [contextInput, setContextInput] = createSignal("");
+  const [contextLoading, setContextLoading] = createSignal(false);
 
   async function loadEntries(prefix?: string) {
     try {
@@ -30,15 +44,42 @@ export default function Sidebar(props: Props) {
     }
   }
 
+  async function loadFolderContext(path: string) {
+    try {
+      const res = await contextApi.get(path);
+      setFolderContext(res.context ?? "");
+    } catch {
+      setFolderContext("");
+    }
+  }
+
   createEffect(() => {
     const _ = props.refreshTrigger;
     loadEntries(browsePath());
   });
 
+  createEffect(() => {
+    const path = browsePath();
+    if (path) {
+      loadFolderContext(path);
+    } else {
+      setFolderContext("");
+      setEditingContext(false);
+    }
+  });
+
   loadEntries();
+
+  // Dismiss context menu on outside click
+  function handleDocumentClick() {
+    setContextMenu(null);
+  }
+  document.addEventListener("click", handleDocumentClick);
+  onCleanup(() => document.removeEventListener("click", handleDocumentClick));
 
   function navigateInto(path: string) {
     setPathStack([...pathStack(), browsePath() || ""]);
+    setEditingContext(false);
     loadEntries(path);
   }
 
@@ -47,6 +88,7 @@ export default function Sidebar(props: Props) {
     if (stack.length === 0) return;
     const prev = stack[stack.length - 1];
     setPathStack(stack.slice(0, -1));
+    setEditingContext(false);
     loadEntries(prev || undefined);
   }
 
@@ -104,6 +146,61 @@ export default function Sidebar(props: Props) {
   function handleCreateKeyDown(e: KeyboardEvent) {
     if (e.key === "Enter") handleCreate();
     if (e.key === "Escape") setCreateMode(null);
+  }
+
+  function handleContextMenu(e: MouseEvent, entry: ListEntry) {
+    if (props.readOnly) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, entry });
+  }
+
+  async function handleDelete(entry: ListEntry) {
+    setContextMenu(null);
+    const label = entry.type === "log" ? "journal" : "note";
+    if (!confirm(`Delete this ${label}? This cannot be undone.`)) return;
+    try {
+      if (entry.type === "log") {
+        await logs.deleteJournal(entry.path);
+      } else {
+        await notes.delete(entry.path);
+      }
+      props.onDeleteActive?.(entry.path);
+      loadEntries(browsePath());
+    } catch (err: any) {
+      alert(`Failed to delete: ${err.message}`);
+    }
+  }
+
+  function startEditContext() {
+    setContextInput(folderContext());
+    setEditingContext(true);
+  }
+
+  async function saveContext() {
+    const path = browsePath();
+    if (!path) return;
+    setContextLoading(true);
+    try {
+      const text = contextInput().trim();
+      if (text) {
+        await contextApi.set(path, text);
+        setFolderContext(text);
+      } else {
+        await contextApi.remove(path);
+        setFolderContext("");
+      }
+      setEditingContext(false);
+    } catch (err: any) {
+      console.error("Failed to save context:", err);
+    } finally {
+      setContextLoading(false);
+    }
+  }
+
+  function cancelEditContext() {
+    setEditingContext(false);
+    setContextInput("");
   }
 
   // Determine which zone we're in based on browsePath
@@ -187,6 +284,73 @@ export default function Sidebar(props: Props) {
         >
           <span>&#8592;</span>
           <span>{browsePath()}</span>
+        </div>
+      </Show>
+
+      {/* Folder context panel */}
+      <Show when={browsePath() && !editingContext()}>
+        <div
+          class="px-4 py-2 border-b"
+          style={{ "border-color": "var(--color-border)" }}
+        >
+          <div
+            class="flex items-start gap-1 cursor-pointer group"
+            onClick={() => !props.readOnly && startEditContext()}
+            title={props.readOnly ? undefined : "Click to edit folder context"}
+          >
+            <Show when={!props.readOnly}>
+              <span
+                class="text-xs mt-0.5 shrink-0 opacity-40 group-hover:opacity-70"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                ✎
+              </span>
+            </Show>
+            <span
+              class="text-xs italic leading-snug"
+              style={{ color: folderContext() ? "var(--color-text-muted)" : "var(--color-text-muted)", opacity: folderContext() ? 0.8 : 0.4 }}
+            >
+              {folderContext() || (props.readOnly ? "" : "Add context for this folder...")}
+            </span>
+          </div>
+        </div>
+      </Show>
+      <Show when={browsePath() && editingContext()}>
+        <div
+          class="px-3 py-2 border-b space-y-2"
+          style={{ "border-color": "var(--color-border)", "background-color": "var(--color-bg-surface)" }}
+        >
+          <textarea
+            rows={3}
+            placeholder="Describe what this folder contains..."
+            value={contextInput()}
+            onInput={(e) => setContextInput(e.currentTarget.value)}
+            class="w-full px-2 py-1 text-xs rounded border outline-none resize-none"
+            style={{
+              "background-color": "var(--color-bg-primary)",
+              "border-color": "var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+            // eslint-disable-next-line solid/reactivity
+            ref={(el) => setTimeout(() => el?.focus(), 0)}
+          />
+          <div class="flex gap-2">
+            <button
+              onClick={saveContext}
+              disabled={contextLoading()}
+              class="flex-1 px-2 py-1 text-xs rounded cursor-pointer"
+              style={{ background: "var(--color-accent)", color: "#fff" }}
+            >
+              Save
+            </button>
+            <button
+              onClick={cancelEditContext}
+              class="flex-1 px-2 py-1 text-xs rounded cursor-pointer"
+              style={{ background: "var(--color-bg-hover)", color: "var(--color-text-secondary)" }}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </Show>
 
@@ -282,6 +446,7 @@ export default function Sidebar(props: Props) {
                     if (!isActive()) e.currentTarget.style.backgroundColor = "transparent";
                   }}
                   onClick={() => handleSelect(entry)}
+                  onContextMenu={(e) => handleContextMenu(e, entry)}
                 >
                   <span class="shrink-0">
                     {entry.type === "directory"
@@ -297,6 +462,50 @@ export default function Sidebar(props: Props) {
           </For>
         </Show>
       </div>
+
+      {/* Right-click context menu */}
+      <Show when={contextMenu()}>
+        {(menu) => (
+          <div
+            class="fixed z-50 rounded shadow-lg border py-1 text-sm"
+            style={{
+              left: `${menu().x}px`,
+              top: `${menu().y}px`,
+              "background-color": "var(--color-bg-surface)",
+              "border-color": "var(--color-border)",
+              "min-width": "120px",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Show when={menu().entry.type !== "directory"}>
+              <button
+                class="w-full text-left px-3 py-1.5 cursor-pointer"
+                style={{ color: "var(--color-text-primary)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                onClick={async () => {
+                  setContextMenu(null);
+                  const note = await notes.get(menu().entry.path);
+                  props.onSelect(note);
+                }}
+              >
+                Open
+              </button>
+            </Show>
+            <Show when={menu().entry.type !== "directory"}>
+              <button
+                class="w-full text-left px-3 py-1.5 cursor-pointer"
+                style={{ color: "#ef4444" }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                onClick={() => handleDelete(menu().entry)}
+              >
+                Delete
+              </button>
+            </Show>
+          </div>
+        )}
+      </Show>
     </aside>
   );
 }

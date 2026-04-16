@@ -10,6 +10,7 @@ import * as directNotes from "./notes.ts";
 import * as directLogs from "./logs.ts";
 import * as directSearch from "./search.ts";
 import * as directImporter from "./importer.ts";
+import * as directContext from "./context.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
 
 function useServer(): boolean {
@@ -62,9 +63,19 @@ export async function listJournals(prefix?: string): Promise<ListEntry[]> {
   return directLogs.listJournals(prefix);
 }
 
-export async function createLog(path: string, title?: string): Promise<void> {
-  if (useServer()) return client.createLog(path, title);
-  return directLogs.createLog(path, title);
+export async function createLog(path: string, title?: string, description?: string): Promise<void> {
+  if (useServer()) return client.createLog(path, title, description);
+  return directLogs.createLog(path, title, description);
+}
+
+export async function updateLog(path: string, opts: { title?: string; description?: string | null }): Promise<void> {
+  if (useServer()) return client.updateLog(path, opts);
+  return directLogs.updateLog(path, opts);
+}
+
+export async function deleteLog(path: string): Promise<void> {
+  if (useServer()) return client.deleteLog(path);
+  return directLogs.deleteLog(path);
 }
 
 export async function addEntry(path: string, content: string): Promise<LogEntry> {
@@ -114,6 +125,28 @@ export async function updateIndex(opts?: { force?: boolean }): Promise<void> {
 export async function embed(opts?: { force?: boolean }): Promise<void> {
   if (useServer()) return client.embed(opts);
   return directSearch.embed(opts);
+}
+
+// --- Context ---
+
+export async function listContexts(): Promise<{ path: string; context: string }[]> {
+  if (useServer()) return client.listContexts();
+  return directContext.listContexts();
+}
+
+export async function getContext(path: string): Promise<string | undefined> {
+  if (useServer()) return client.getContext(path);
+  return directContext.getContext(path);
+}
+
+export async function setContext(path: string, context: string): Promise<void> {
+  if (useServer()) return client.setContext(path, context);
+  directContext.setContext(path, context);
+}
+
+export async function removeContext(path: string): Promise<void> {
+  if (useServer()) return client.removeContext(path);
+  directContext.removeContext(path);
 }
 
 // --- Import ---

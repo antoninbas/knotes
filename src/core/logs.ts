@@ -3,9 +3,10 @@ import { mkdir, readFile, writeFile } from "fs/promises";
 import { existsSync } from "fs";
 import { randomBytes } from "node:crypto";
 import matter from "gray-matter";
-import { resolvePath, toLogicalPath } from "./config.ts";
-import { writeMarkdownFile, getNote, listNotes } from "./notes.ts";
+import { resolvePath } from "./config.ts";
+import { writeMarkdownFile, getNote, listNotes, deleteNote } from "./notes.ts";
 import { updateIndex } from "./search.ts";
+import { setContextValue, removeContextValue } from "./db.ts";
 import type { LogEntry, ListEntry } from "./types.ts";
 
 const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
@@ -57,7 +58,8 @@ function serializeEntries(entries: LogEntry[]): string {
 /** Create a new log document. Throws if it already exists. */
 export async function createLog(
   logicalPath: string,
-  title?: string
+  title?: string,
+  description?: string
 ): Promise<void> {
   if (!logicalPath.startsWith("logs/")) {
     throw new Error(`Logs must be created under logs/. Got: ${logicalPath}`);
@@ -67,8 +69,51 @@ export async function createLog(
   await writeMarkdownFile(logicalPath, {
     title: title || logicalPath.split("/").pop() || "Log",
     tags: [],
+    ...(description ? { description } : {}),
   });
+  if (description) {
+    setContextValue(logicalPath, description);
+  }
   await updateIndex();
+}
+
+/** Update a log journal's metadata (title and/or description). */
+export async function updateLog(
+  logicalPath: string,
+  opts: { title?: string; description?: string | null }
+): Promise<void> {
+  const filePath = resolvePath(logicalPath);
+  if (!existsSync(filePath)) {
+    throw new Error(`Log not found: ${logicalPath}`);
+  }
+
+  const raw = await readFile(filePath, "utf-8");
+  const parsed = matter(raw);
+
+  if (opts.title !== undefined) {
+    parsed.data.title = opts.title;
+  }
+  if (opts.description !== undefined) {
+    if (opts.description === null || opts.description === "") {
+      delete parsed.data.description;
+      removeContextValue(logicalPath);
+    } else {
+      parsed.data.description = opts.description;
+      setContextValue(logicalPath, opts.description);
+    }
+  }
+
+  parsed.data.modified = new Date().toISOString();
+  const frontmatter = matter.stringify("", parsed.data).trim();
+  const body = parsed.content ? "\n" + parsed.content : "";
+  await writeFile(filePath, frontmatter + body);
+  await updateIndex();
+}
+
+/** Delete an entire log journal (the file and its context entry). */
+export async function deleteLog(logicalPath: string): Promise<void> {
+  await deleteNote(logicalPath);
+  removeContextValue(logicalPath);
 }
 
 export async function addEntry(

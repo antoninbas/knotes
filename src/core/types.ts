@@ -21,6 +21,8 @@ export interface NoteMeta {
   modified: string;
   tags: string[];
   type: "note" | "log";
+  /** Optional description — used by log journals as context for search. */
+  description?: string;
 }
 
 export interface NoteResult {
@@ -34,6 +36,8 @@ export interface NoteResult {
   tags: string[];
   type: "note" | "log";
   content: string;
+  /** Optional description — only present on log journals. */
+  description?: string;
 }
 
 export interface LogEntry {
@@ -62,6 +66,7 @@ export interface CreateNoteOptions {
   title?: string;
   content?: string;
   tags?: string[];
+  description?: string;
 }
 
 export interface UpdateNoteOptions {

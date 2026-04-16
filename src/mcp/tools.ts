@@ -8,6 +8,8 @@ import {
   listNotes,
   createFolder,
   createLog,
+  updateLog,
+  deleteLog,
   addEntry,
   listEntries,
   listJournals,
@@ -17,6 +19,10 @@ import {
   updateIndex,
   embed,
   importDocument,
+  listContexts,
+  getContext,
+  setContext,
+  removeContext,
 } from "../core/router.ts";
 
 function text(content: string) {
@@ -245,9 +251,10 @@ export function registerTools(
     {
       path: z.string().describe("Logical path for the log (e.g. logs/daily)"),
       title: z.string().optional().describe("Log title"),
+      description: z.string().optional().describe("Journal description (also used as search context hint)"),
     },
-    async ({ path, title }) => {
-      await createLog(path, title);
+    async ({ path, title, description }) => {
+      await createLog(path, title, description);
       return text(`Created log: ${path}`);
     }
   );
@@ -315,4 +322,71 @@ export function registerTools(
       return text(`Imported as: ${result.path} (${result.title})`);
     }
   );
+
+  // --- Context tools (read-only) ---
+
+  server.tool(
+    "knotes_context_list",
+    "List all search context hints for folders and journals",
+    {},
+    async () => {
+      const entries = await listContexts();
+      if (entries.length === 0) return text("No context hints set.");
+      const lines = entries.map(({ path, context }) => `${path}\n  ${context}`);
+      return text(lines.join("\n\n"));
+    }
+  );
+
+  if (!readOnly) {
+    server.tool(
+      "knotes_context_set",
+      "Set a search context hint for a folder or journal path. Context hints help qmd understand the content of a folder when searching.",
+      {
+        path: z.string().describe("Logical path (e.g. notes/projects or logs/daily)"),
+        context: z.string().describe("Context description for this path"),
+      },
+      async ({ path, context }) => {
+        await setContext(path, context);
+        return text(`Context set for: ${path}`);
+      }
+    );
+
+    server.tool(
+      "knotes_context_remove",
+      "Remove the search context hint for a path",
+      {
+        path: z.string().describe("Logical path whose context to remove"),
+      },
+      async ({ path }) => {
+        await removeContext(path);
+        return text(`Context removed for: ${path}`);
+      }
+    );
+
+    server.tool(
+      "knotes_log_update_journal",
+      "Update a log journal's title and/or description",
+      {
+        path: z.string().describe("Logical path of the journal"),
+        title: z.string().optional().describe("New title"),
+        description: z.string().nullable().optional().describe("New description (null or empty string to clear)"),
+      },
+      async ({ path, title, description }) => {
+        await updateLog(path, { title, description });
+        return text(`Updated journal: ${path}`);
+      }
+    );
+
+    server.tool(
+      "knotes_log_delete_journal",
+      "Delete an entire log journal document",
+      {
+        path: z.string().describe("Logical path of the journal to delete"),
+      },
+      async ({ path }) => {
+        await deleteLog(path);
+        return text(`Deleted journal: ${path}`);
+      }
+    );
+  }
 }

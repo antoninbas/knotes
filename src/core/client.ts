@@ -92,11 +92,22 @@ export async function listJournals(prefix?: string): Promise<ListEntry[]> {
   return request<ListEntry[]>(`/logs?${prefix ? `prefix=${encodeURIComponent(prefix)}` : ""}`);
 }
 
-export async function createLog(path: string, title?: string): Promise<void> {
+export async function createLog(path: string, title?: string, description?: string): Promise<void> {
   await request("/logs", {
     method: "POST",
-    body: JSON.stringify({ path, title }),
+    body: JSON.stringify({ path, title, description }),
   });
+}
+
+export async function updateLog(path: string, opts: { title?: string; description?: string | null }): Promise<void> {
+  await request("/logs", {
+    method: "PUT",
+    body: JSON.stringify({ path, ...opts }),
+  });
+}
+
+export async function deleteLog(path: string): Promise<void> {
+  await request(`/logs?path=${encodeURIComponent(path)}`, { method: "DELETE" });
 }
 
 export async function addEntry(path: string, content: string): Promise<LogEntry> {
@@ -155,6 +166,28 @@ export async function embed(opts?: { force?: boolean }): Promise<void> {
 
 export async function notifyConfigChanged(): Promise<{ actions: string[] }> {
   return request("/config/notify", { method: "POST" });
+}
+
+// --- Context ---
+
+export async function listContexts(): Promise<{ path: string; context: string }[]> {
+  return request("/context");
+}
+
+export async function getContext(path: string): Promise<string | undefined> {
+  const res = await request<{ context: string | null }>(`/context/get?path=${encodeURIComponent(path)}`);
+  return res.context ?? undefined;
+}
+
+export async function setContext(path: string, context: string): Promise<void> {
+  await request("/context", {
+    method: "PUT",
+    body: JSON.stringify({ path, context }),
+  });
+}
+
+export async function removeContext(path: string): Promise<void> {
+  await request(`/context?path=${encodeURIComponent(path)}`, { method: "DELETE" });
 }
 
 // --- Import ---

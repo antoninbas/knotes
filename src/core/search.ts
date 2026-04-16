@@ -1,7 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { getHome, getConfig, getModelDefaults } from "./config.ts";
-import { recordJobStart, recordJobComplete, recordJobFailed, getConfigValue, setConfigValue } from "./db.ts";
+import { recordJobStart, recordJobComplete, recordJobFailed, getConfigValue, setConfigValue, getAllContexts } from "./db.ts";
 import type { SearchResult } from "./types.ts";
 
 export type JobTrigger = "background" | "on-demand";
@@ -34,6 +34,24 @@ async function getStore() {
     if (config.queryExpansionModel) process.env["QMD_GENERATE_MODEL"] = config.queryExpansionModel;
     if (config.rerankModel) process.env["QMD_RERANK_MODEL"] = config.rerankModel;
 
+    // Build context maps for each collection from the contexts table.
+    // Knotes paths like "notes/foo/bar" map to collection "notes", prefix "/foo/bar".
+    // A path of just "notes" or "logs" maps to prefix "/".
+    const allContexts = getAllContexts();
+    const notesContext: Record<string, string> = {};
+    const logsContext: Record<string, string> = {};
+    for (const { path, context } of allContexts) {
+      if (path === "notes") {
+        notesContext["/"] = context;
+      } else if (path.startsWith("notes/")) {
+        notesContext["/" + path.slice("notes/".length)] = context;
+      } else if (path === "logs") {
+        logsContext["/"] = context;
+      } else if (path.startsWith("logs/")) {
+        logsContext["/" + path.slice("logs/".length)] = context;
+      }
+    }
+
     storeInstance = await createStore({
       dbPath: `${home}/.data/index.sqlite`,
       config: {
@@ -41,10 +59,12 @@ async function getStore() {
           notes: {
             path: `${home}/notes`,
             pattern: "**/*.md",
+            ...(Object.keys(notesContext).length > 0 ? { context: notesContext } : {}),
           },
           logs: {
             path: `${home}/logs`,
             pattern: "**/*.md",
+            ...(Object.keys(logsContext).length > 0 ? { context: logsContext } : {}),
           },
         },
       },

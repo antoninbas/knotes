@@ -52,10 +52,21 @@ export const notes = {
 
 // Logs API
 export const logs = {
-  create: (path: string, title?: string) =>
+  create: (path: string, title?: string, description?: string) =>
     request<{ ok: boolean; path: string }>("/logs", {
       method: "POST",
-      body: JSON.stringify({ path, title }),
+      body: JSON.stringify({ path, title, description }),
+    }),
+
+  updateJournal: (path: string, opts: { title?: string; description?: string | null }) =>
+    request<{ ok: boolean }>("/logs", {
+      method: "PUT",
+      body: JSON.stringify({ path, ...opts }),
+    }),
+
+  deleteJournal: (path: string) =>
+    request<{ ok: boolean }>(`/logs?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
     }),
 
   listEntries: (path: string, limit?: number) =>
@@ -134,4 +145,24 @@ export const versionApi = {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.text();
   },
+};
+
+// Context API
+export const contextApi = {
+  list: () =>
+    request<{ path: string; context: string }[]>("/context"),
+
+  get: (path: string) =>
+    request<{ context: string | null }>(`/context/get?path=${encodeURIComponent(path)}`),
+
+  set: (path: string, context: string) =>
+    request<{ ok: boolean }>("/context", {
+      method: "PUT",
+      body: JSON.stringify({ path, context }),
+    }),
+
+  remove: (path: string) =>
+    request<{ ok: boolean }>(`/context?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
 };
