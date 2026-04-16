@@ -95,10 +95,14 @@ export const logs = {
 
 // Search API
 export const searchApi = {
-  search: (query: string, opts?: { limit?: number; mode?: string }) =>
-    request<SearchResult[]>(
-      `/search?q=${encodeURIComponent(query)}${opts?.limit ? `&limit=${opts.limit}` : ""}${opts?.mode ? `&mode=${opts.mode}` : ""}`
-    ),
+  search: (query: string, opts?: { limit?: number; mode?: string; rerank?: boolean; queryExpand?: boolean }) => {
+    const params = new URLSearchParams({ q: query });
+    if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+    if (opts?.mode) params.set("mode", opts.mode);
+    if (opts?.rerank !== undefined) params.set("rerank", String(opts.rerank));
+    if (opts?.queryExpand !== undefined) params.set("queryExpand", String(opts.queryExpand));
+    return request<SearchResult[]>(`/search?${params}`);
+  },
 
   embed: (force?: boolean) =>
     request<{ ok: boolean }>("/search/embed", {

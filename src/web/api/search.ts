@@ -19,11 +19,15 @@ searchApi.get("/", async (c) => {
 
   const limit = c.req.query("limit");
   const mode = c.req.query("mode") as "hybrid" | "bm25" | "vector" | undefined;
+  const rerankParam = c.req.query("rerank");
+  const queryExpandParam = c.req.query("queryExpand");
 
   try {
     const results = await search(query, {
       limit: limit ? parseInt(limit, 10) : undefined,
       mode,
+      rerank: rerankParam !== undefined ? rerankParam === "true" : undefined,
+      queryExpand: queryExpandParam !== undefined ? queryExpandParam === "true" : undefined,
     });
     return c.json(results);
   } catch (err: any) {

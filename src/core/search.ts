@@ -210,6 +210,8 @@ export async function search(
     collections?: ("notes" | "logs")[];
     limit?: number;
     mode?: "hybrid" | "bm25" | "vector";
+    rerank?: boolean;
+    queryExpand?: boolean;
   }
 ): Promise<SearchResult[]> {
   const home = getHome();
@@ -231,8 +233,8 @@ export async function search(
     results = await store.searchVector(query, { limit });
   } else {
     const config = getConfig();
-    const rerank = config.rerank;
-    const queryExpand = config.queryExpand;
+    const rerank = options?.rerank ?? config.rerank;
+    const queryExpand = options?.queryExpand ?? config.queryExpand;
     if (queryExpand) {
       // Full hybrid: LLM query expansion + BM25 + vector + optional reranking
       results = await store.search({ query, limit, rerank });
@@ -252,7 +254,7 @@ export async function search(
   return results.map((r: any) => ({
     path: r.displayPath?.replace(/\.md$/, "") || r.path || r.id || "",
     title: r.title || r.metadata?.title || "",
-    snippet: r.bestChunk?.slice(0, 200) || r.body?.slice(0, 200) || r.content?.slice(0, 200) || r.snippet || "",
+    snippet: r.bestChunk?.slice(0, 500) || r.body?.slice(0, 500) || r.content?.slice(0, 500) || r.snippet || "",
     score: r.score || 0,
   }));
 }
