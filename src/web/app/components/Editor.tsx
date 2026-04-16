@@ -66,6 +66,17 @@ export default function Editor(props: Props) {
   // Track content via closure so save always gets the latest
   let currentContent = props.note.content;
 
+  function insertTodoList() {
+    if (!editorView) return;
+    const snippet = "- [ ] \n- [ ] \n- [ ] \n";
+    const pos = editorView.state.selection.main.head;
+    editorView.dispatch({
+      changes: { from: pos, insert: snippet },
+      selection: { anchor: pos + 6 }, // place cursor after "- [ ] " on first line
+    });
+    editorView.focus();
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
@@ -153,6 +164,16 @@ export default function Editor(props: Props) {
           }
         }}
       />
+      <div class="flex gap-2">
+        <button
+          onClick={insertTodoList}
+          class="px-2 py-1 text-xs rounded cursor-pointer"
+          style={{ background: "var(--color-bg-surface)", color: "var(--color-text-secondary)" }}
+          title="Insert a GFM task list"
+        >
+          &#9634; Todo list
+        </button>
+      </div>
       <div
         ref={containerRef}
         class="min-h-[60vh] rounded overflow-hidden"
