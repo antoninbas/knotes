@@ -1,4 +1,4 @@
-import { createSignal, onMount, onCleanup } from "solid-js";
+import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { notes, type NoteResult } from "../lib/api.ts";
 import { EditorView, keymap, placeholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from "@codemirror/view";
 import { EditorState } from "@codemirror/state";
@@ -9,6 +9,8 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { theme } from "../lib/theme.ts";
+
+const AUTOSAVE_DELAY_MS = 1500;
 
 interface Props {
   note: NoteResult;
@@ -62,9 +64,34 @@ export default function Editor(props: Props) {
   const [title, setTitle] = createSignal(props.note.title);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
+  const [saveStatus, setSaveStatus] = createSignal<"saved" | "saving" | "unsaved">("saved");
 
-  // Track content via closure so save always gets the latest
+  // Mutable refs — not signals, no reactivity needed
   let currentContent = props.note.content;
+  let isDirty = false;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function scheduleSave() {
+    isDirty = true;
+    setSaveStatus("unsaved");
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(autoSave, AUTOSAVE_DELAY_MS);
+  }
+
+  /** Auto-save: saves silently, does not switch to view mode. */
+  async function autoSave() {
+    debounceTimer = null;
+    if (!isDirty) return;
+    isDirty = false;
+    setSaveStatus("saving");
+    try {
+      await notes.update(props.note.path, { title: title(), content: currentContent });
+      setSaveStatus("saved");
+    } catch {
+      isDirty = true;
+      setSaveStatus("unsaved");
+    }
+  }
 
   function insertTodoList() {
     if (!editorView) return;
@@ -77,17 +104,24 @@ export default function Editor(props: Props) {
     editorView.focus();
   }
 
+  /** Manual save: cancels pending auto-save, saves immediately, switches to view mode. */
   async function handleSave() {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+    isDirty = false;
     setSaving(true);
+    setSaveStatus("saving");
     setError(null);
     try {
       const updated = await notes.update(props.note.path, {
         title: title(),
         content: currentContent,
       });
+      setSaveStatus("saved");
       props.onSave(updated);
     } catch (err: any) {
+      isDirty = true;
       setError(err.message);
+      setSaveStatus("unsaved");
     } finally {
       setSaving(false);
     }
@@ -129,6 +163,7 @@ export default function Editor(props: Props) {
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             currentContent = update.state.doc.toString();
+            scheduleSave();
           }
         }),
         EditorView.lineWrapping,
@@ -140,11 +175,28 @@ export default function Editor(props: Props) {
       parent: containerRef,
     });
 
-    // Focus the editor
     editorView.focus();
+
+    // Save when the tab is hidden (user switches tabs, minimises, or closes the window)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && isDirty) {
+        if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+        autoSave();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    onCleanup(() => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    });
   });
 
   onCleanup(() => {
+    // Flush any pending auto-save when navigating away
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
+    if (isDirty) {
+      notes.update(props.note.path, { title: title(), content: currentContent }).catch(() => {});
+    }
     editorView?.destroy();
   });
 
@@ -153,7 +205,7 @@ export default function Editor(props: Props) {
       <input
         type="text"
         value={title()}
-        onInput={(e) => setTitle(e.currentTarget.value)}
+        onInput={(e) => { setTitle(e.currentTarget.value); scheduleSave(); }}
         class="w-full text-2xl font-bold bg-transparent border-none outline-none"
         style={{ color: "var(--color-text-primary)" }}
         placeholder="Note title"
@@ -187,11 +239,16 @@ export default function Editor(props: Props) {
         >
           {saving() ? "Saving..." : "Save (Ctrl+S)"}
         </button>
-        {error() && (
+        <span class="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <Show when={saveStatus() === "unsaved"}>Unsaved changes</Show>
+          <Show when={saveStatus() === "saving" && !saving()}>Saving...</Show>
+          <Show when={saveStatus() === "saved"}>Saved</Show>
+        </span>
+        <Show when={error()}>
           <span class="text-sm" style={{ color: "var(--color-danger)" }}>
             {error()}
           </span>
-        )}
+        </Show>
       </div>
     </div>
   );
