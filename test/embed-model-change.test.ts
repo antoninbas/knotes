@@ -1,4 +1,4 @@
-import { test, expect, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -120,6 +120,11 @@ test("API: POST /api/config/notify returns no actions when no change", async () 
 });
 
 test("API: POST /api/config/notify triggers reembed when embed model changed", async () => {
+  // Spy on embed to prevent the fire-and-forget job from writing to .data
+  // during cleanup — otherwise afterEach gets ENOTEMPTY removing the temp dir.
+  const searchModule = await import("../src/core/search.ts");
+  const embedSpy = vi.spyOn(searchModule, "embed").mockResolvedValue(undefined);
+
   const { createApp } = await import("../src/web/server.ts");
   const { setConfigValue } = await import("../src/core/db.ts");
   const { getModelDefaults } = await import("../src/core/config.ts");
@@ -135,4 +140,6 @@ test("API: POST /api/config/notify triggers reembed when embed model changed", a
   const body = await res.json();
   expect(body.ok).toBe(true);
   expect(body.actions).toContain("reembed");
+
+  embedSpy.mockRestore();
 });

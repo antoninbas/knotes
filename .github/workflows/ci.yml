@@ -70,6 +70,27 @@ jobs:
         run: bun install -g "$(pwd)/$(ls antoninbas-knotes-*.tgz)"
       - run: knotes --help
 
+  test-homebrew-formula:
+    name: Simulate Homebrew formula install (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Homebrew Node
+        run: brew install node
+      - name: Install and run via Homebrew Node (mimics formula)
+        env:
+          NODE_LLAMA_CPP_SKIP_DOWNLOAD: "1"
+        run: |
+          BREW_PREFIX="$(brew --prefix node)"
+          export npm_config_nodedir="$BREW_PREFIX"
+          "$BREW_PREFIX/bin/npm" install
+          cd src/web/app && "$BREW_PREFIX/bin/npm" install && "$BREW_PREFIX/bin/npx" vite build
+          cd ../../..
+          "$BREW_PREFIX/bin/node" scripts/build.js
+          "$BREW_PREFIX/bin/npm" prune --omit=dev
+          # Run via Homebrew node exactly as the formula shim does
+          "$BREW_PREFIX/bin/node" dist/main.js --help
+
   lockfile-check:
     name: Verify lock files are up to date
     runs-on: ubuntu-latest
