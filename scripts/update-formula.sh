@@ -44,7 +44,7 @@ FORMULA='class Knotes < Formula
       #!/bin/sh
       KNOTES_BIN="#{bin}/knotes"
       export KNOTES_BIN
-      exec node "#{libexec}/dist/main.js" "$@"
+      exec "#{Formula["node"].opt_bin}/node" "#{libexec}/dist/main.js" "$@"
     SH
   end
 
