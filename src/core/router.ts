@@ -57,6 +57,11 @@ export async function createFolder(path: string): Promise<void> {
 
 // --- Logs ---
 
+export async function listJournals(prefix?: string): Promise<ListEntry[]> {
+  if (useServer()) return client.listJournals(prefix);
+  return directLogs.listJournals(prefix);
+}
+
 export async function createLog(path: string, title?: string): Promise<void> {
   if (useServer()) return client.createLog(path, title);
   return directLogs.createLog(path, title);

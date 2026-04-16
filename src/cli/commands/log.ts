@@ -4,6 +4,7 @@ import {
   createLog,
   addEntry,
   listEntries,
+  listJournals,
   getEntry,
   updateEntry,
   deleteEntry,
@@ -30,6 +31,22 @@ export function registerLogCommands(program: Command): void {
   const log = program
     .command("log")
     .description("Manage logs and log entries");
+
+  log
+    .command("journals")
+    .description("List all journals (log documents)")
+    .argument("[prefix]", "Filter to a sub-path (e.g. logs/work)")
+    .action(async (prefix?: string) => {
+      await ensureHome();
+      const journals = await listJournals(prefix);
+      if (journals.length === 0) {
+        console.log("No journals found.");
+        return;
+      }
+      for (const j of journals) {
+        console.log(`${j.path}  ${j.title}`);
+      }
+    });
 
   log
     .command("create")

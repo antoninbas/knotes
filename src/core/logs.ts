@@ -4,9 +4,9 @@ import { existsSync } from "fs";
 import { randomBytes } from "node:crypto";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath } from "./config.ts";
-import { writeMarkdownFile, getNote } from "./notes.ts";
+import { writeMarkdownFile, getNote, listNotes } from "./notes.ts";
 import { updateIndex } from "./search.ts";
-import type { LogEntry } from "./types.ts";
+import type { LogEntry, ListEntry } from "./types.ts";
 
 const ENTRY_HEADING_RE = /^## (.+?) \{#(e-[a-f0-9]+)\}\s*$/;
 
@@ -158,6 +158,26 @@ export async function updateEntry(
 
   await updateIndex();
   return entry;
+}
+
+export async function listJournals(prefix?: string): Promise<ListEntry[]> {
+  const root = prefix || "logs";
+  const results = await collectLogs(root);
+  return results.sort((a, b) => a.path.localeCompare(b.path));
+}
+
+async function collectLogs(prefix: string): Promise<ListEntry[]> {
+  const entries = await listNotes(prefix);
+  const results: ListEntry[] = [];
+  for (const entry of entries) {
+    if (entry.type === "log") {
+      results.push(entry);
+    } else if (entry.type === "directory") {
+      const children = await collectLogs(entry.path);
+      results.push(...children);
+    }
+  }
+  return results;
 }
 
 export async function deleteEntry(

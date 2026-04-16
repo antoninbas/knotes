@@ -88,6 +88,10 @@ export async function createFolder(path: string): Promise<void> {
 
 // --- Logs ---
 
+export async function listJournals(prefix?: string): Promise<ListEntry[]> {
+  return request<ListEntry[]>(`/logs?${prefix ? `prefix=${encodeURIComponent(prefix)}` : ""}`);
+}
+
 export async function createLog(path: string, title?: string): Promise<void> {
   await request("/logs", {
     method: "POST",
