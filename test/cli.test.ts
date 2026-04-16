@@ -211,7 +211,7 @@ test("note --help shows subcommands", async () => {
   expect(code).toBe(0);
   expect(stdout).toContain("create");
   expect(stdout).toContain("edit");
-  expect(stdout).toContain("show");
+  expect(stdout).toContain("get");
   expect(stdout).toContain("delete");
   expect(stdout).toContain("list");
 });
