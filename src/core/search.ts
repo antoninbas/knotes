@@ -252,9 +252,17 @@ export async function search(
   }
 
   return results.map((r: any) => ({
-    path: r.displayPath?.replace(/\.md$/, "") || r.path || r.id || "",
+    // Use the absolute filepath to preserve original casing, then strip KNOTES_HOME prefix.
+    // displayPath from qmd can be lowercased, which breaks case-sensitive file lookups.
+    path: (() => {
+      const abs: string = r.filepath || r.file || "";
+      if (abs.startsWith(home + "/")) {
+        return abs.slice(home.length + 1).replace(/\.md$/, "");
+      }
+      return r.displayPath?.replace(/\.md$/, "") || r.id || "";
+    })(),
     title: r.title || r.metadata?.title || "",
-    snippet: r.bestChunk?.slice(0, 500) || r.body?.slice(0, 500) || r.content?.slice(0, 500) || r.snippet || "",
+    snippet: r.bestChunk || r.body || r.content || r.snippet || "",
     score: r.score || 0,
   }));
 }

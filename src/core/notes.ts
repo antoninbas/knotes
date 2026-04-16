@@ -1,5 +1,5 @@
 import { mkdir, unlink, readdir, stat, readFile, writeFile } from "fs/promises";
-import { existsSync } from "fs";
+import { existsSync, readdirSync } from "fs";
 import { dirname, join, basename } from "path";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath, getHome } from "./config.ts";
@@ -97,10 +97,24 @@ export async function createNote(
 }
 
 export async function getNote(logicalPath: string): Promise<NoteResult> {
-  const filePath = resolvePath(logicalPath);
+  let filePath = resolvePath(logicalPath);
 
   if (!existsSync(filePath)) {
-    throw new Error(`Note not found: ${logicalPath}`);
+    // Case-insensitive fallback: search engines (e.g. qmd) may lowercase paths.
+    const dir = dirname(filePath);
+    const base = basename(filePath);
+    try {
+      const entries = readdirSync(dir);
+      const match = entries.find((e) => e.toLowerCase() === base.toLowerCase());
+      if (match) {
+        filePath = join(dir, match);
+      } else {
+        throw new Error(`Note not found: ${logicalPath}`);
+      }
+    } catch (err: any) {
+      if (err.message?.startsWith("Note not found")) throw err;
+      throw new Error(`Note not found: ${logicalPath}`);
+    }
   }
 
   const raw = await readFile(filePath, "utf-8");

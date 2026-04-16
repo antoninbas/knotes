@@ -232,7 +232,9 @@ export default function SearchView(props: Props) {
                         "word-break": "break-word",
                       }}
                     >
-                      {result.snippet}
+                      {result.snippet.length > 600
+                        ? result.snippet.slice(0, 600) + "…"
+                        : result.snippet}
                     </p>
                   </Show>
                 </div>
