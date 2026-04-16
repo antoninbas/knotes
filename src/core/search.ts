@@ -227,10 +227,20 @@ export async function search(
 
   let results: any[];
 
+  // All modes use store.search() with pre-built queries so results always
+  // include bestChunk (the specific matching section), not just the full body.
   if (options?.mode === "bm25") {
-    results = await store.searchLex(query, { limit });
+    results = await store.search({
+      queries: [{ type: "lex", query }],
+      limit,
+      rerank: false,
+    });
   } else if (options?.mode === "vector") {
-    results = await store.searchVector(query, { limit });
+    results = await store.search({
+      queries: [{ type: "vec", query }],
+      limit,
+      rerank: false,
+    });
   } else {
     const config = getConfig();
     const rerank = options?.rerank ?? config.rerank;
