@@ -337,6 +337,19 @@ export function registerTools(
     }
   );
 
+  server.tool(
+    "knotes_context_get",
+    "Get the search context hint for a specific folder or journal path",
+    {
+      path: z.string().describe("Logical path (e.g. notes/projects or logs/daily)"),
+    },
+    async ({ path }) => {
+      const context = await getContext(path);
+      if (context === undefined) return text(`No context set for: ${path}`);
+      return text(context);
+    }
+  );
+
   if (!readOnly) {
     server.tool(
       "knotes_context_set",

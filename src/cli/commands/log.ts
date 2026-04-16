@@ -34,33 +34,51 @@ export function registerLogCommands(program: Command): void {
     .command("log")
     .description("Manage logs and log entries");
 
-  log
-    .command("journals")
-    .description("List all journals (log documents)")
-    .argument("[prefix]", "Filter to a sub-path (e.g. logs/work)")
-    .action(async (prefix?: string) => {
-      await ensureHome();
-      const journals = await listJournals(prefix);
-      if (journals.length === 0) {
-        console.log("No journals found.");
-        return;
-      }
-      for (const j of journals) {
-        console.log(`${j.path}  ${j.title}`);
-      }
-    });
+  const listJournalsAction = async (prefix?: string) => {
+    await ensureHome();
+    const journals = await listJournals(prefix);
+    if (journals.length === 0) {
+      console.log("No journals found.");
+      return;
+    }
+    for (const j of journals) {
+      console.log(`${j.path}  ${j.title}`);
+    }
+  };
 
   log
-    .command("create")
-    .description("Create a new log")
+    .command("list-journals")
+    .description("List all journals (log documents)")
+    .argument("[prefix]", "Filter to a sub-path (e.g. logs/work)")
+    .action(listJournalsAction);
+
+  // Hidden alias for backward compatibility
+  log
+    .command("journals", { hidden: true })
+    .argument("[prefix]")
+    .action(listJournalsAction);
+
+  const createJournalAction = async (path: string, opts: { title?: string; description?: string }) => {
+    await ensureHome();
+    await createLog(path, opts.title, opts.description);
+    console.log(`Created log: ${path}`);
+  };
+
+  log
+    .command("create-journal")
+    .description("Create a new log journal")
     .argument("<path>", "Logical path for the log (e.g. logs/daily)")
     .option("-t, --title <title>", "Log title")
     .option("-d, --description <description>", "Journal description (used as search context)")
-    .action(async (path: string, opts) => {
-      await ensureHome();
-      await createLog(path, opts.title, opts.description);
-      console.log(`Created log: ${path}`);
-    });
+    .action(createJournalAction);
+
+  // Hidden alias for backward compatibility
+  log
+    .command("create", { hidden: true })
+    .argument("<path>")
+    .option("-t, --title <title>")
+    .option("-d, --description <description>")
+    .action(createJournalAction);
 
   log
     .command("update-journal")

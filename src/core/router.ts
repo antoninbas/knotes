@@ -141,12 +141,12 @@ export async function getContext(path: string): Promise<string | undefined> {
 
 export async function setContext(path: string, context: string): Promise<void> {
   if (useServer()) return client.setContext(path, context);
-  directContext.setContext(path, context);
+  return directContext.setContext(path, context);
 }
 
 export async function removeContext(path: string): Promise<void> {
   if (useServer()) return client.removeContext(path);
-  directContext.removeContext(path);
+  return directContext.removeContext(path);
 }
 
 // --- Import ---
