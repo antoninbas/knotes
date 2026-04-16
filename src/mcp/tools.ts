@@ -10,6 +10,7 @@ import {
   createLog,
   addEntry,
   listEntries,
+  listJournals,
   updateEntry,
   deleteEntry,
   search,
@@ -62,6 +63,23 @@ export function registerTools(
           e.type === "directory" ? "📁" : e.type === "log" ? "📋" : "📄";
         return `${icon} ${e.path} — ${e.title}`;
       });
+      return text(lines.join("\n"));
+    }
+  );
+
+  server.tool(
+    "knotes_log_list_journals",
+    "List all journal documents (logs)",
+    {
+      prefix: z
+        .string()
+        .optional()
+        .describe("Filter to a sub-path (e.g. logs/work)"),
+    },
+    async ({ prefix }) => {
+      const journals = await listJournals(prefix);
+      if (journals.length === 0) return text("No journals found.");
+      const lines = journals.map((j) => `${j.path} — ${j.title}`);
       return text(lines.join("\n"));
     }
   );

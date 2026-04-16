@@ -59,15 +59,23 @@ export function registerNoteCommands(program: Command): void {
       await editNoteViaTemp(path);
     });
 
+  const showAction = async (path: string) => {
+    const result = await getNote(path);
+    console.log(`# ${result.title}\n`);
+    console.log(result.content);
+  };
+
   note
-    .command("show")
+    .command("get")
     .description("Display a note's content")
     .argument("<path>", "Logical path of the note")
-    .action(async (path: string) => {
-      const result = await getNote(path);
-      console.log(`# ${result.title}\n`);
-      console.log(result.content);
-    });
+    .action(showAction);
+
+  // Keep "show" as a hidden alias
+  note
+    .command("show", { hidden: true })
+    .argument("<path>", "Logical path of the note")
+    .action(showAction);
 
   note
     .command("delete")

@@ -5,6 +5,7 @@ import {
   createLog,
   addEntry,
   listEntries,
+  listJournals,
   updateEntry,
   deleteEntry,
 } from "../../core/logs.ts";
@@ -26,6 +27,17 @@ const UpdateEntrySchema = z.object({
 });
 
 export const logsApi = new Hono();
+
+// List all journals
+logsApi.get("/", async (c) => {
+  const prefix = c.req.query("prefix");
+  try {
+    const journals = await listJournals(prefix);
+    return c.json(journals);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
 
 // Create a new log
 logsApi.post("/", async (c) => {
