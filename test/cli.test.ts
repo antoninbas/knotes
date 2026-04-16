@@ -111,13 +111,13 @@ test("note create with tags", async () => {
 // ─── Log commands ────────────────────────────────────────────────
 
 test("log create creates a log", async () => {
-  const { code, stdout } = await run("log", "create", "logs/daily", "--title", "Daily");
+  const { code, stdout } = await run("log", "create-journal", "logs/daily", "--title", "Daily");
   expect(code).toBe(0);
   expect(stdout).toContain("Created log");
 });
 
 test("log add adds an entry", async () => {
-  await run("log", "create", "logs/test");
+  await run("log", "create-journal", "logs/test");
   const { code, stdout } = await run("log", "add", "logs/test", "-m", "First entry");
   expect(code).toBe(0);
   expect(stdout).toContain("Added entry");
@@ -125,7 +125,7 @@ test("log add adds an entry", async () => {
 });
 
 test("log list shows entries", async () => {
-  await run("log", "create", "logs/list");
+  await run("log", "create-journal", "logs/list");
   await run("log", "add", "logs/list", "-m", "Entry one");
   await run("log", "add", "logs/list", "-m", "Entry two");
 
@@ -136,7 +136,7 @@ test("log list shows entries", async () => {
 });
 
 test("log list respects limit", async () => {
-  await run("log", "create", "logs/lim");
+  await run("log", "create-journal", "logs/lim");
   await run("log", "add", "logs/lim", "-m", "One");
   await run("log", "add", "logs/lim", "-m", "Two");
   await run("log", "add", "logs/lim", "-m", "Three");
