@@ -1,5 +1,6 @@
 import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import matter from "gray-matter";
 import { getHome, getConfig, getModelDefaults } from "./config.ts";
 import { recordJobStart, recordJobComplete, recordJobFailed, getConfigValue, setConfigValue, getAllContexts } from "./db.ts";
 import type { SearchResult } from "./types.ts";
@@ -266,8 +267,6 @@ export async function search(
   }
 
   return results.map((r: any) => ({
-    // Use the absolute filepath to preserve original casing, then strip KNOTES_HOME prefix.
-    // displayPath from qmd can be lowercased, which breaks case-sensitive file lookups.
     path: (() => {
       const abs: string = r.filepath || r.file || "";
       if (abs.startsWith(home + "/")) {
@@ -275,8 +274,33 @@ export async function search(
       }
       return r.displayPath?.replace(/\.md$/, "") || r.id || "";
     })(),
-    title: r.title || r.metadata?.title || "",
+    title: resolveTitle(r),
     snippet: r.bestChunk || r.body || r.content || r.snippet || "",
     score: r.score || 0,
   }));
+}
+
+/**
+ * qmd extracts the title from the first Markdown heading in the body. Knotes
+ * writes the canonical title in YAML frontmatter and doesn't emit a heading,
+ * so qmd's title is unreliable (it's the filename for notes and the latest
+ * entry's `## <timestamp>` line for logs). Parse the frontmatter from the
+ * returned body to get the real title. Fall back to qmd's title, then to the
+ * filename basename, so callers always get a usable string.
+ */
+function resolveTitle(r: any): string {
+  const body: string | undefined = r.body;
+  if (body) {
+    try {
+      const data = matter(body).data as { title?: unknown };
+      if (typeof data.title === "string" && data.title.length > 0) {
+        return data.title;
+      }
+    } catch {
+      // fall through to the qmd-extracted title
+    }
+  }
+  if (typeof r.title === "string" && r.title.length > 0) return r.title;
+  const dp: string = r.displayPath || "";
+  return basename(dp, ".md");
 }

@@ -24,6 +24,38 @@ afterEach(async () => {
   delete process.env["KNOTES_HOME"];
 });
 
+test("search results carry the frontmatter title, not the filename", async () => {
+  const { createNote } = await import("../src/core/notes.ts");
+  const { search, updateIndex } = await import("../src/core/search.ts");
+
+  await createNote("notes/zipline-rigging", {
+    title: "Zipline Rigging Checklist",
+    content: "Pre-flight inspection steps for every zipline installation.",
+  });
+  await updateIndex();
+
+  const results = await search("zipline rigging", { mode: "bm25", limit: 5 });
+  const hit = results.find((r) => r.path === "notes/zipline-rigging");
+  expect(hit).toBeTruthy();
+  expect(hit?.title).toBe("Zipline Rigging Checklist");
+}, 60_000);
+
+test("search results for logs carry the log's title, not an entry timestamp", async () => {
+  const { createLog, addEntry } = await import("../src/core/logs.ts");
+  const { search, updateIndex } = await import("../src/core/search.ts");
+
+  await createLog("logs/sourdough", "Sourdough Journal", "Ongoing bread experiments");
+  await addEntry("logs/sourdough", "Tried 85% hydration. Crumb was beautifully open.");
+  await updateIndex();
+
+  const results = await search("hydration", { mode: "bm25", limit: 5 });
+  const hit = results.find((r) => r.path === "logs/sourdough");
+  expect(hit).toBeTruthy();
+  expect(hit?.title).toBe("Sourdough Journal");
+  // Make sure we're not leaking the per-entry "## <timestamp> {#e-...}" heading.
+  expect(hit?.title).not.toMatch(/\{#e-/);
+}, 60_000);
+
 test("search reindexes after an out-of-band file deletion", async () => {
   const { createNote } = await import("../src/core/notes.ts");
   const { search, updateIndex } = await import("../src/core/search.ts");
