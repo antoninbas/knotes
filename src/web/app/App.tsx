@@ -3,7 +3,7 @@ import Sidebar from "./components/Sidebar.tsx";
 import NoteView from "./components/NoteView.tsx";
 import Editor from "./components/Editor.tsx";
 import LogView from "./components/LogView.tsx";
-import SearchBar from "./components/SearchBar.tsx";
+import SearchView from "./components/SearchView.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import DropdownMenu from "./components/DropdownMenu.tsx";
 import JobsList from "./components/JobsList.tsx";
@@ -26,6 +26,7 @@ export default function App() {
   function handleNoteSelect(note: NoteResult) {
     setCurrentNote(note);
     setViewMode("view");
+    setShowSearch(false);
     setSidebarOpen(false);
   }
 
@@ -85,8 +86,11 @@ export default function App() {
       setShowSearch((v) => !v);
     }
     if (e.key === "Escape") {
-      setShowSearch(false);
-      setSidebarOpen(false);
+      if (showSearch()) {
+        setShowSearch(false);
+      } else {
+        setSidebarOpen(false);
+      }
     }
   });
 
@@ -169,8 +173,8 @@ export default function App() {
             </Show>
           </div>
           <div class="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Only show Edit button for notes, not logs, and not in read-only mode */}
-            <Show when={currentNote() && !isLog() && !readOnly()}>
+            {/* Only show Edit button for notes, not logs, not in read-only mode, not in search */}
+            <Show when={!showSearch() && currentNote() && !isLog() && !readOnly()}>
               <button
                 onClick={() => setViewMode(viewMode() === "view" ? "edit" : "view")}
                 class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
@@ -182,7 +186,7 @@ export default function App() {
                 {viewMode() === "view" ? "Edit" : "View"}
               </button>
             </Show>
-            <Show when={currentNote()}>
+            <Show when={!showSearch() && currentNote()}>
               <a
                 href={`/api/notes/download?path=${encodeURIComponent(currentNote()!.path)}`}
                 download=""
@@ -198,11 +202,11 @@ export default function App() {
               </a>
             </Show>
             <button
-              onClick={() => setShowSearch(true)}
+              onClick={() => setShowSearch((v) => !v)}
               class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
               style={{
-                background: "var(--color-bg-surface)",
-                color: "var(--color-text-secondary)",
+                background: showSearch() ? "var(--color-accent)" : "var(--color-bg-surface)",
+                color: showSearch() ? "#fff" : "var(--color-text-secondary)",
               }}
               title="Search (Ctrl+K)"
             >
@@ -234,55 +238,51 @@ export default function App() {
         </header>
 
         {/* Content area */}
-        <main class="flex-1 overflow-auto p-3 sm:p-6" style={{ "background-color": "var(--color-bg-primary)" }}>
-          <Show
-            when={currentNote()}
-            fallback={
-              <div class="flex items-center justify-center h-full">
-                <div class="text-center px-4" style={{ color: "var(--color-text-muted)" }}>
-                  <p class="text-xl mb-2">Welcome to Knotes</p>
-                  <p class="text-sm">
-                    <span class="hidden sm:inline">Select a note from the sidebar or press Ctrl+K to search</span>
-                    <span class="sm:hidden">Tap &#9776; to browse or Search to find notes</span>
-                  </p>
-                </div>
-              </div>
-            }
-          >
-            <Show
-              when={isLog()}
-              fallback={
+        <main class="flex-1 overflow-hidden" style={{ "background-color": "var(--color-bg-primary)" }}>
+          <Show when={showSearch()}>
+            <SearchView onSelect={handleNoteSelect} />
+          </Show>
+          <Show when={!showSearch()}>
+            <div class="h-full overflow-auto p-3 sm:p-6">
+              <Show
+                when={currentNote()}
+                fallback={
+                  <div class="flex items-center justify-center h-full">
+                    <div class="text-center px-4" style={{ color: "var(--color-text-muted)" }}>
+                      <p class="text-xl mb-2">Welcome to Knotes</p>
+                      <p class="text-sm">
+                        <span class="hidden sm:inline">Select a note from the sidebar or press Ctrl+K to search</span>
+                        <span class="sm:hidden">Tap &#9776; to browse or Search to find notes</span>
+                      </p>
+                    </div>
+                  </div>
+                }
+              >
                 <Show
-                  when={viewMode() === "edit" && !readOnly()}
-                  fallback={<NoteView note={currentNote()!} />}
+                  when={isLog()}
+                  fallback={
+                    <Show
+                      when={viewMode() === "edit" && !readOnly()}
+                      fallback={<NoteView note={currentNote()!} />}
+                    >
+                      <Editor
+                        note={currentNote()!}
+                        onSave={(updated) => {
+                          setCurrentNote(updated);
+                          setViewMode("view");
+                          handleNoteSaved();
+                        }}
+                      />
+                    </Show>
+                  }
                 >
-                  <Editor
-                    note={currentNote()!}
-                    onSave={(updated) => {
-                      setCurrentNote(updated);
-                      setViewMode("view");
-                      handleNoteSaved();
-                    }}
-                  />
+                  <LogView note={currentNote()!} readOnly={readOnly()} onUpdateJournal={handleUpdateJournal} />
                 </Show>
-              }
-            >
-              <LogView note={currentNote()!} readOnly={readOnly()} onUpdateJournal={handleUpdateJournal} />
-            </Show>
+              </Show>
+            </div>
           </Show>
         </main>
       </div>
-
-      {/* Search modal */}
-      <Show when={showSearch()}>
-        <SearchBar
-          onClose={() => setShowSearch(false)}
-          onSelect={(note) => {
-            handleNoteSelect(note);
-            setShowSearch(false);
-          }}
-        />
-      </Show>
 
       {/* Jobs modal */}
       <Show when={showJobs()}>

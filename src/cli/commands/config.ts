@@ -84,7 +84,7 @@ export function registerConfigCommand(program: Command): void {
     .argument("<value>", "Configuration value")
     .action(async (key: string, value: string) => {
       await ensureHome();
-      const validKeys = ["editor", "webPort", "theme", "embedInterval", "serverless", "embedModel", "queryExpansionModel", "rerankModel"];
+      const validKeys = ["editor", "webPort", "theme", "embedInterval", "serverless", "embedModel", "queryExpansionModel", "rerankModel", "rerank", "queryExpand"];
       if (!validKeys.includes(key)) {
         console.error(`Unknown config key: ${key}`);
         console.error(`Valid keys: ${validKeys.join(", ")}`);
@@ -103,12 +103,13 @@ export function registerConfigCommand(program: Command): void {
         console.error("theme must be one of: light, dark, system");
         process.exit(1);
       }
-      if (key === "serverless" && !["true", "false"].includes(value)) {
-        console.error("serverless must be true or false");
+      if (["serverless", "rerank", "queryExpand"].includes(key) && !["true", "false"].includes(value)) {
+        console.error(`${key} must be true or false`);
         process.exit(1);
       }
 
-      await applyConfigFromJson({ [key]: key === "serverless" ? value === "true" : value });
+      const boolKeys = ["serverless", "rerank", "queryExpand"];
+      await applyConfigFromJson({ [key]: boolKeys.includes(key) ? value === "true" : value });
       console.log(`${key} = ${value}`);
       await notifyServerOfConfigChange();
     });

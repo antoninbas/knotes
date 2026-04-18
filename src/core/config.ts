@@ -23,6 +23,8 @@ export function getConfig(): KnotesConfig {
     embedModel: getConfigValue("embedModel") || "",
     queryExpansionModel: getConfigValue("queryExpansionModel") || "",
     rerankModel: getConfigValue("rerankModel") || "",
+    rerank: getConfigValue("rerank") === "true",
+    queryExpand: getConfigValue("queryExpand") === "true",
   };
 }
 
@@ -43,6 +45,8 @@ export async function saveConfig(
   if (updates.embedModel !== undefined) setConfigValue("embedModel", updates.embedModel);
   if (updates.queryExpansionModel !== undefined) setConfigValue("queryExpansionModel", updates.queryExpansionModel);
   if (updates.rerankModel !== undefined) setConfigValue("rerankModel", updates.rerankModel);
+  if (updates.rerank !== undefined) setConfigValue("rerank", String(updates.rerank));
+  if (updates.queryExpand !== undefined) setConfigValue("queryExpand", String(updates.queryExpand));
 }
 
 /**

@@ -13,6 +13,10 @@ export interface KnotesConfig {
   queryExpansionModel: string;
   /** Custom reranker model URI (HuggingFace GGUF). Empty string = qmd default. */
   rerankModel: string;
+  /** Enable LLM reranking in hybrid search (default: false — slow on CPU). */
+  rerank: boolean;
+  /** Enable LLM query expansion in hybrid search (default: false — slow on CPU). */
+  queryExpand: boolean;
 }
 
 export interface NoteMeta {

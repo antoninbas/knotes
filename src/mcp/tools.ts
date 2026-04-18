@@ -136,10 +136,18 @@ export function registerTools(
       mode: z
         .enum(["hybrid", "bm25", "vector"])
         .optional()
-        .describe("Search mode (default: hybrid)"),
+        .describe("Search mode: hybrid (BM25 + vector, default), bm25 (keyword only), vector (semantic only)"),
+      rerank: z
+        .boolean()
+        .optional()
+        .describe("Enable LLM reranking for higher quality results (hybrid mode only, slow on CPU)"),
+      queryExpand: z
+        .boolean()
+        .optional()
+        .describe("Enable LLM query expansion for broader recall (hybrid mode only, slow on CPU)"),
     },
-    async ({ query, limit, mode }) => {
-      const results = await search(query, { limit, mode });
+    async ({ query, limit, mode, rerank, queryExpand }) => {
+      const results = await search(query, { limit, mode, rerank, queryExpand });
       if (results.length === 0) return text("No results found.");
 
       const lines = results.map(

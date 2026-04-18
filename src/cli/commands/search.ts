@@ -9,13 +9,17 @@ export function registerSearchCommand(program: Command): void {
     .option("-l, --limit <limit>", "Maximum results", "10")
     .option(
       "-m, --mode <mode>",
-      "Search mode: hybrid, bm25, or vector",
+      "Search mode: hybrid (default), bm25, or vector",
       "hybrid"
     )
+    .option("--rerank", "Enable LLM reranking (hybrid mode only, slow)")
+    .option("--expand", "Enable LLM query expansion (hybrid mode only, slow)")
     .action(async (query: string, opts) => {
       const results = await search(query, {
         limit: parseInt(opts.limit, 10),
         mode: opts.mode as "hybrid" | "bm25" | "vector",
+        rerank: opts.rerank ? true : undefined,
+        queryExpand: opts.expand ? true : undefined,
       });
 
       if (results.length === 0) {
