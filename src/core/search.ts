@@ -91,8 +91,10 @@ async function getStore() {
 }
 
 /**
- * Return the newest mtime (ms) of any .md file under the given directories.
- * Returns 0 if no files exist or directories can't be read.
+ * Return the newest mtime (ms) of any .md file OR directory under the given
+ * dirs. Directory mtimes are included so deletions and renames (which don't
+ * change any remaining file's mtime) still trigger a reindex.
+ * Returns 0 if nothing exists or directories can't be read.
  */
 async function newestMdMtime(dirs: string[]): Promise<number> {
   let newest = 0;
@@ -100,6 +102,8 @@ async function newestMdMtime(dirs: string[]): Promise<number> {
   async function walk(dir: string): Promise<void> {
     let entries;
     try {
+      const s = await stat(dir);
+      if (s.mtimeMs > newest) newest = s.mtimeMs;
       entries = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
