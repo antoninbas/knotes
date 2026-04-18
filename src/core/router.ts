@@ -56,6 +56,11 @@ export async function createFolder(path: string): Promise<void> {
   await directNotes.createFolder(path);
 }
 
+export async function deleteFolder(path: string): Promise<void> {
+  if (useServer()) return client.deleteFolder(path);
+  return directNotes.deleteFolder(path);
+}
+
 // --- Logs ---
 
 export async function listJournals(prefix?: string): Promise<ListEntry[]> {

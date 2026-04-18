@@ -86,6 +86,10 @@ export async function createFolder(path: string): Promise<void> {
   });
 }
 
+export async function deleteFolder(path: string): Promise<void> {
+  await request(`/notes/folder?path=${encodeURIComponent(path)}`, { method: "DELETE" });
+}
+
 // --- Logs ---
 
 export async function listJournals(prefix?: string): Promise<ListEntry[]> {

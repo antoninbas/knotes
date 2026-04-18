@@ -4,6 +4,7 @@ import { ensureHome, resolvePath } from "../../core/config.ts";
 import {
   createNote,
   createFolder,
+  deleteFolder,
   getNote,
   updateNote,
   deleteNote,
@@ -148,6 +149,18 @@ notesApi.post("/import", async (c) => {
     return c.json(result, 201);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
+  }
+});
+
+// Delete a folder
+notesApi.delete("/folder", async (c) => {
+  const path = c.req.query("path");
+  if (!path) return c.json({ error: "path is required" }, 400);
+  try {
+    await deleteFolder(path);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
   }
 });
 
