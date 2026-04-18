@@ -4,6 +4,28 @@ import { dirname, join, basename } from "path";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath, getHome } from "./config.ts";
 import { updateIndex } from "./search.ts";
+
+/**
+ * Mirror of qmd's handelize() for a single path segment. qmd lowercases and
+ * replaces every run of non-[letter/digit/$] characters with a single dash
+ * while preserving the file extension for the final segment. We reimplement
+ * rather than import because qmd only exports the function from its internal
+ * module, not from the package root.
+ */
+function handelizeSegment(segment: string, isFile: boolean): string | null {
+  if (!segment) return null;
+  const lower = segment.toLowerCase();
+  if (isFile) {
+    const extMatch = lower.match(/(\.[a-z0-9]+)$/);
+    const ext = extMatch ? extMatch[1]! : "";
+    const nameWithoutExt = ext ? lower.slice(0, -ext.length) : lower;
+    if (!/[\p{L}\p{N}$]/u.test(nameWithoutExt)) return null;
+    const cleaned = nameWithoutExt.replace(/[^\p{L}\p{N}$]+/gu, "-").replace(/^-+|-+$/g, "");
+    return cleaned + ext;
+  }
+  if (!/[\p{L}\p{N}$]/u.test(lower)) return null;
+  return lower.replace(/[^\p{L}\p{N}$]+/gu, "-").replace(/^-+|-+$/g, "");
+}
 import type {
   NoteResult,
   CreateNoteOptions,
@@ -96,26 +118,53 @@ export async function createNote(
   return result;
 }
 
-export async function getNote(logicalPath: string): Promise<NoteResult> {
-  let filePath = resolvePath(logicalPath);
+/**
+ * Resolve a logical path to the actual file on disk. qmd handelize()s paths
+ * when indexing — lowercasing and replacing non-alphanumeric runs with `-`,
+ * so a search result for "Mixed Case With Spaces.md" comes back as
+ * "notes/odd-names/mixed-case-with-spaces". An exact path lookup misses the
+ * on-disk file; we have to walk the segments and pick the entry whose own
+ * handelized form matches each requested segment.
+ *
+ * Returns null if no matching file exists.
+ */
+function resolveExistingPath(logicalPath: string): string | null {
+  const direct = resolvePath(logicalPath);
+  if (existsSync(direct)) return direct;
 
-  if (!existsSync(filePath)) {
-    // Case-insensitive fallback: search engines (e.g. qmd) may lowercase paths.
-    const dir = dirname(filePath);
-    const base = basename(filePath);
+  const home = getHome();
+  const cleaned = logicalPath.replace(/\.md$/, "");
+  const segments = cleaned.split("/").filter(Boolean);
+  const lastIdx = segments.length - 1;
+  let current = home;
+
+  for (let i = 0; i < segments.length; i++) {
+    const target = segments[i]!;
+    const isFile = i === lastIdx;
+    const expected = isFile ? `${target}.md` : target;
+
+    let match: string | undefined;
     try {
-      const entries = readdirSync(dir);
-      const match = entries.find((e) => e.toLowerCase() === base.toLowerCase());
-      if (match) {
-        filePath = join(dir, match);
-      } else {
-        throw new Error(`Note not found: ${logicalPath}`);
-      }
-    } catch (err: any) {
-      if (err.message?.startsWith("Note not found")) throw err;
-      throw new Error(`Note not found: ${logicalPath}`);
+      match = readdirSync(current).find((entry) => {
+        if (isFile && !entry.endsWith(".md")) return false;
+        if (entry === expected) return true;
+        const handelized = handelizeSegment(entry, isFile);
+        return handelized !== null && handelized === expected;
+      });
+    } catch {
+      return null;
     }
+
+    if (!match) return null;
+    current = join(current, match);
   }
+
+  return current;
+}
+
+export async function getNote(logicalPath: string): Promise<NoteResult> {
+  const filePath = resolveExistingPath(logicalPath);
+  if (!filePath) throw new Error(`Note not found: ${logicalPath}`);
 
   const raw = await readFile(filePath, "utf-8");
   return parseNote(filePath, raw);
@@ -125,11 +174,8 @@ export async function updateNote(
   logicalPath: string,
   options: UpdateNoteOptions
 ): Promise<NoteResult> {
-  const filePath = resolvePath(logicalPath);
-
-  if (!existsSync(filePath)) {
-    throw new Error(`Note not found: ${logicalPath}`);
-  }
+  const filePath = resolveExistingPath(logicalPath);
+  if (!filePath) throw new Error(`Note not found: ${logicalPath}`);
 
   const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
@@ -202,11 +248,8 @@ export async function deleteFolder(logicalPath: string): Promise<void> {
 }
 
 export async function deleteNote(logicalPath: string): Promise<void> {
-  const filePath = resolvePath(logicalPath);
-
-  if (!existsSync(filePath)) {
-    throw new Error(`Note not found: ${logicalPath}`);
-  }
+  const filePath = resolveExistingPath(logicalPath);
+  if (!filePath) throw new Error(`Note not found: ${logicalPath}`);
 
   await unlink(filePath);
   await updateIndex();
