@@ -30,6 +30,13 @@ export default function App() {
     setSidebarOpen(false);
   }
 
+  function handleNoteSelectEdit(note: NoteResult) {
+    setCurrentNote(note);
+    setViewMode("edit");
+    setShowSearch(false);
+    setSidebarOpen(false);
+  }
+
   function handleNoteSaved() {
     setSidebarRefresh((n) => n + 1);
   }
@@ -102,6 +109,7 @@ export default function App() {
       >
         <Sidebar
           onSelect={handleNoteSelect}
+          onSelectEdit={handleNoteSelectEdit}
           refreshTrigger={sidebarRefresh()}
           onNewNote={handleNoteSaved}
           currentPath={currentPath}
@@ -118,6 +126,7 @@ export default function App() {
           <div class="shrink-0">
             <Sidebar
               onSelect={handleNoteSelect}
+              onSelectEdit={handleNoteSelectEdit}
               refreshTrigger={sidebarRefresh()}
               onNewNote={handleNoteSaved}
               currentPath={currentPath}

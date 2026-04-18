@@ -48,6 +48,11 @@ export const notes = {
       method: "POST",
       body: JSON.stringify({ path }),
     }),
+
+  deleteFolder: (path: string) =>
+    request<{ ok: boolean }>(`/notes/folder?path=${encodeURIComponent(path)}`, {
+      method: "DELETE",
+    }),
 };
 
 // Logs API

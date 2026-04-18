@@ -3,6 +3,7 @@ import { notes, logs, contextApi, type ListEntry, type NoteResult } from "../lib
 
 interface Props {
   onSelect: (note: NoteResult) => void;
+  onSelectEdit?: (note: NoteResult) => void;
   refreshTrigger: number;
   onNewNote: () => void;
   currentPath: () => string | undefined;
@@ -157,10 +158,12 @@ export default function Sidebar(props: Props) {
 
   async function handleDelete(entry: ListEntry) {
     setContextMenu(null);
-    const label = entry.type === "log" ? "journal" : "note";
+    const label = entry.type === "directory" ? "folder and all its contents" : entry.type === "log" ? "journal" : "note";
     if (!confirm(`Delete this ${label}? This cannot be undone.`)) return;
     try {
-      if (entry.type === "log") {
+      if (entry.type === "directory") {
+        await notes.deleteFolder(entry.path);
+      } else if (entry.type === "log") {
         await logs.deleteJournal(entry.path);
       } else {
         await notes.delete(entry.path);
@@ -465,46 +468,74 @@ export default function Sidebar(props: Props) {
 
       {/* Right-click context menu */}
       <Show when={contextMenu()}>
-        {(menu) => (
-          <div
-            class="fixed z-50 rounded shadow-lg border py-1 text-sm"
-            style={{
-              left: `${menu().x}px`,
-              top: `${menu().y}px`,
-              "background-color": "var(--color-bg-surface)",
-              "border-color": "var(--color-border)",
-              "min-width": "120px",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Show when={menu().entry.type !== "directory"}>
+        {(menu) => {
+          const entry = () => menu().entry;
+          const isTopLevel = () => entry().path === "notes" || entry().path === "logs";
+          const isDirectory = () => entry().type === "directory";
+          const isNote = () => entry().type === "note";
+          return (
+            <div
+              class="fixed z-50 rounded shadow-lg border py-1 text-sm"
+              style={{
+                left: `${menu().x}px`,
+                top: `${menu().y}px`,
+                "background-color": "var(--color-bg-surface)",
+                "border-color": "var(--color-border)",
+                "min-width": "120px",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Open — always shown */}
               <button
                 class="w-full text-left px-3 py-1.5 cursor-pointer"
                 style={{ color: "var(--color-text-primary)" }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
                 onClick={async () => {
+                  const { path, type } = entry();
                   setContextMenu(null);
-                  const note = await notes.get(menu().entry.path);
-                  props.onSelect(note);
+                  if (type === "directory") {
+                    navigateInto(path);
+                  } else {
+                    const note = await notes.get(path);
+                    props.onSelect(note);
+                  }
                 }}
               >
                 Open
               </button>
-            </Show>
-            <Show when={menu().entry.type !== "directory"}>
-              <button
-                class="w-full text-left px-3 py-1.5 cursor-pointer"
-                style={{ color: "#ef4444" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
-                onClick={() => handleDelete(menu().entry)}
-              >
-                Delete
-              </button>
-            </Show>
-          </div>
-        )}
+              {/* Edit — notes only (not logs, not directories) */}
+              <Show when={isNote() && !props.readOnly}>
+                <button
+                  class="w-full text-left px-3 py-1.5 cursor-pointer"
+                  style={{ color: "var(--color-text-primary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={async () => {
+                    const path = entry().path;
+                    setContextMenu(null);
+                    const note = await notes.get(path);
+                    props.onSelectEdit?.(note);
+                  }}
+                >
+                  Edit
+                </button>
+              </Show>
+              {/* Delete — non-top-level entries only */}
+              <Show when={!isTopLevel() && !props.readOnly}>
+                <button
+                  class="w-full text-left px-3 py-1.5 cursor-pointer"
+                  style={{ color: "#ef4444" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={() => handleDelete(entry())}
+                >
+                  Delete
+                </button>
+              </Show>
+            </div>
+          );
+        }}
       </Show>
     </aside>
   );

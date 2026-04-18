@@ -1,4 +1,4 @@
-import { mkdir, unlink, readdir, stat, readFile, writeFile } from "fs/promises";
+import { mkdir, unlink, readdir, stat, readFile, writeFile, rm } from "fs/promises";
 import { existsSync, readdirSync } from "fs";
 import { dirname, join, basename } from "path";
 import matter from "gray-matter";
@@ -176,6 +176,29 @@ export async function createFolder(logicalPath: string): Promise<string> {
   await mkdir(dirPath, { recursive: true });
   await writeFile(join(dirPath, ".keep"), "");
   return logicalPath;
+}
+
+/** Delete a folder and all its contents. */
+export async function deleteFolder(logicalPath: string): Promise<void> {
+  if (!logicalPath.startsWith("notes/") && !logicalPath.startsWith("logs/")) {
+    throw new Error(`Can only delete folders under notes/ or logs/. Got: ${logicalPath}`);
+  }
+
+  const home = getHome();
+  const dirPath = join(home, logicalPath);
+
+  try {
+    const s = await stat(dirPath);
+    if (!s.isDirectory()) {
+      throw new Error(`Not a folder: ${logicalPath}`);
+    }
+  } catch (err: any) {
+    if (err.code === "ENOENT") throw new Error(`Folder not found: ${logicalPath}`);
+    throw err;
+  }
+
+  await rm(dirPath, { recursive: true, force: true });
+  await updateIndex();
 }
 
 export async function deleteNote(logicalPath: string): Promise<void> {
