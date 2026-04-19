@@ -542,6 +542,13 @@ test("PUT /api/logs/entries returns 400 for missing content", async () => {
   expect(body.error).toBeTruthy();
 });
 
+test("GET /api/search returns 400 for invalid minScore", async () => {
+  const res1 = await api("/api/search?q=hi&minScore=abc");
+  expect(res1.status).toBe(400);
+  const res2 = await api("/api/search?q=hi&minScore=-0.1");
+  expect(res2.status).toBe(400);
+});
+
 test("POST /api/search/embed returns 400 for non-boolean force", async () => {
   const res = await post("/api/search/embed", { force: 1 });
   expect(res.status).toBe(400);

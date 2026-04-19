@@ -116,7 +116,7 @@ export async function deleteEntry(path: string, entryId: string): Promise<void> 
 
 export async function search(
   query: string,
-  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean; collections?: ("notes" | "logs")[] }
+  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean; collections?: ("notes" | "logs")[]; minScore?: number }
 ): Promise<SearchResult[]> {
   if (useServer()) return client.search(query, opts);
   return directSearch.search(query, opts);

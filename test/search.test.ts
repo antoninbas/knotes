@@ -123,6 +123,55 @@ test("collections option restricts results to the requested collections", async 
   expect(onlyLogs.some((r) => r.path.startsWith("notes/"))).toBe(false);
 }, 60_000);
 
+test("minScore filters out results below the threshold (bm25)", async () => {
+  const { createNote } = await import("../src/core/notes.ts");
+  const { search, updateIndex } = await import("../src/core/search.ts");
+
+  // Strong match: query terms repeated many times in a short doc.
+  await createNote("notes/strong-match", {
+    title: "Quantum Chromodynamics Lecture",
+    content: [
+      "Quantum chromodynamics quantum chromodynamics quantum chromodynamics.",
+      "Quantum chromodynamics quantum chromodynamics quantum chromodynamics.",
+      "Quantum chromodynamics quantum chromodynamics quantum chromodynamics.",
+    ].join("\n"),
+  });
+  // Weak match: same terms appear once each, buried in much longer unrelated prose.
+  await createNote("notes/weak-match", {
+    title: "Garden Pond Maintenance",
+    content: [
+      "A single passing mention of quantum theory appears here, nowhere else.",
+      "Chromodynamics is mentioned exactly once, deep in a footnote.",
+      "The rest of this document discusses pond filtration, koi feeding schedules,",
+      "algae control, seasonal temperature management, and winter aeration tactics,",
+      "at considerable length so that term frequency stays low relative to length.",
+    ].join("\n"),
+  });
+  await updateIndex();
+
+  const all = await search("quantum chromodynamics", { mode: "bm25", limit: 10 });
+  const strong = all.find((r) => r.path === "notes/strong-match");
+  const weak = all.find((r) => r.path === "notes/weak-match");
+  expect(strong).toBeTruthy();
+  expect(weak).toBeTruthy();
+  // Strong match should out-score the weak one.
+  expect(strong!.score).toBeGreaterThan(weak!.score);
+
+  // Floor between the two scores should keep only the strong match.
+  const floor = (strong!.score + weak!.score) / 2;
+  const filtered = await search("quantum chromodynamics", { mode: "bm25", limit: 10, minScore: floor });
+  expect(filtered.some((r) => r.path === "notes/strong-match")).toBe(true);
+  expect(filtered.some((r) => r.path === "notes/weak-match")).toBe(false);
+
+  // Floor above every match should wipe the result list entirely.
+  const none = await search("quantum chromodynamics", { mode: "bm25", limit: 10, minScore: 1 });
+  expect(none.length).toBe(0);
+
+  // minScore of 0 (or undefined) must not filter anything.
+  const zeroed = await search("quantum chromodynamics", { mode: "bm25", limit: 10, minScore: 0 });
+  expect(zeroed.length).toBe(all.length);
+}, 60_000);
+
 test("search reindexes after an out-of-band file deletion", async () => {
   const { createNote } = await import("../src/core/notes.ts");
   const { search, updateIndex } = await import("../src/core/search.ts");

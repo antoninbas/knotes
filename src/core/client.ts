@@ -147,7 +147,7 @@ export async function deleteEntry(path: string, entryId: string): Promise<void> 
 
 export async function search(
   query: string,
-  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean; collections?: ("notes" | "logs")[] }
+  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean; collections?: ("notes" | "logs")[]; minScore?: number }
 ): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q: query });
   if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
@@ -155,6 +155,7 @@ export async function search(
   if (opts?.rerank !== undefined) params.set("rerank", String(opts.rerank));
   if (opts?.queryExpand !== undefined) params.set("queryExpand", String(opts.queryExpand));
   if (opts?.collections && opts.collections.length > 0) params.set("collections", opts.collections.join(","));
+  if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
   return request<SearchResult[]>(`/search?${params}`);
 }
 

@@ -18,6 +18,14 @@ export function registerSearchCommand(program: Command): void {
       "-c, --collection <collection...>",
       "Restrict to collections: notes, logs (repeatable)"
     )
+    .option(
+      "--min-score <score>",
+      "Drop results below this score (default 0 = off). Scale depends on --mode: " +
+        "bm25 in [0, 1) (~0.3 weak, ~0.6 medium); " +
+        "vector cosine in [0, 1] (~0.3 noise floor, ~0.5 related); " +
+        "hybrid fused RRF (~0.02–0.08 for good matches). " +
+        "Run without the flag first to see typical values for your corpus."
+    )
     .action(async (query: string, opts) => {
       let collections: ("notes" | "logs")[] | undefined;
       if (opts.collection) {
@@ -30,12 +38,22 @@ export function registerSearchCommand(program: Command): void {
         collections = raw;
       }
 
+      let minScore: number | undefined;
+      if (opts.minScore !== undefined) {
+        const parsed = Number(opts.minScore);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          throw new Error(`Invalid --min-score: ${opts.minScore}. Expected a non-negative number.`);
+        }
+        minScore = parsed;
+      }
+
       const results = await search(query, {
         limit: parseInt(opts.limit, 10),
         mode: opts.mode as "hybrid" | "bm25" | "vector",
         rerank: opts.rerank ? true : undefined,
         queryExpand: opts.expand ? true : undefined,
         ...(collections ? { collections } : {}),
+        ...(minScore !== undefined ? { minScore } : {}),
       });
 
       if (results.length === 0) {

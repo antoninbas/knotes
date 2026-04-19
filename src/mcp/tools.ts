@@ -149,9 +149,20 @@ export function registerTools(
         .array(z.enum(["notes", "logs"]))
         .optional()
         .describe("Restrict results to specific collections (notes, logs). Defaults to both."),
+      minScore: z
+        .number()
+        .nonnegative()
+        .optional()
+        .describe(
+          "Drop results below this score (default 0 = off). Scale depends on mode: " +
+            "bm25 in [0, 1) (~0.3 weak, ~0.6 medium); " +
+            "vector cosine in [0, 1] (~0.3 noise floor, ~0.5 related); " +
+            "hybrid fused RRF (~0.02–0.08 for good matches). " +
+            "Run without it first to see typical values."
+        ),
     },
-    async ({ query, limit, mode, rerank, queryExpand, collections }) => {
-      const results = await search(query, { limit, mode, rerank, queryExpand, collections });
+    async ({ query, limit, mode, rerank, queryExpand, collections, minScore }) => {
+      const results = await search(query, { limit, mode, rerank, queryExpand, collections, minScore });
       if (results.length === 0) return text("No results found.");
 
       const lines = results.map(
