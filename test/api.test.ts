@@ -557,6 +557,27 @@ test("POST /api/search/embed returns 400 for non-boolean force", async () => {
   expect(body.error).toBeTruthy();
 });
 
+test("getLastJob matches prefixed types (embed:on-demand, embed:background)", async () => {
+  const { recordJobStart, recordJobComplete, getLastJob } = await import("../src/core/db.ts");
+  const id = recordJobStart("embed:on-demand");
+  recordJobComplete(id, 42);
+
+  const last = getLastJob("embed");
+  expect(last).not.toBeNull();
+  expect(last?.type).toBe("embed:on-demand");
+  expect(last?.status).toBe("completed");
+
+  // Newer background job should win.
+  const id2 = recordJobStart("embed:background");
+  recordJobComplete(id2, 99);
+  const last2 = getLastJob("embed");
+  expect(last2?.type).toBe("embed:background");
+
+  // Exact match still works.
+  const last3 = getLastJob("embed:on-demand");
+  expect(last3?.type).toBe("embed:on-demand");
+});
+
 test("GET /api/jobs supports type filter", async () => {
   const { recordJobStart, recordJobComplete } = await import("../src/core/db.ts");
   const id1 = recordJobStart("embed:background");
