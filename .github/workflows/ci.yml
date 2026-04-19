@@ -38,6 +38,23 @@ jobs:
           key: qmd-models-v1
       - run: npx vitest run
 
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install
+      - name: Cache qmd models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/qmd/models
+          key: qmd-models-v1
+      - run: npx vitest run --config vitest.e2e.config.ts
+
   install-npm-global:
     name: Test npm global install
     runs-on: ubuntu-latest
