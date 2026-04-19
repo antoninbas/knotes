@@ -232,9 +232,11 @@ export function recordJobFailed(id: number, error: string, durationMs: number): 
 
 export function getLastJob(type: string): JobRecord | null {
   const db = getDb();
+  // Match either the exact type or any "type:suffix" variant so callers can
+  // query "embed" and get the latest embed:on-demand / embed:background job.
   return (db.prepare(
-    "SELECT * FROM jobs WHERE type = ? ORDER BY id DESC LIMIT 1"
-  ).get(type) as JobRecord | undefined) ?? null;
+    "SELECT * FROM jobs WHERE type = ? OR type LIKE ? ORDER BY id DESC LIMIT 1"
+  ).get(type, `${type}:%`) as JobRecord | undefined) ?? null;
 }
 
 export function getRecentJobs(type: string, limit = 10): JobRecord[] {
