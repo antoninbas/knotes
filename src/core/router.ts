@@ -122,9 +122,9 @@ export async function search(
   return directSearch.search(query, opts);
 }
 
-export async function updateIndex(opts?: { force?: boolean }): Promise<void> {
-  if (useServer()) return client.updateIndex(opts);
-  return directSearch.updateIndex(opts);
+export async function updateIndex(): Promise<void> {
+  if (useServer()) return client.updateIndex();
+  return directSearch.updateIndex();
 }
 
 export async function embed(opts?: { force?: boolean }): Promise<void> {

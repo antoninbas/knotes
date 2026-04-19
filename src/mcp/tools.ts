@@ -164,15 +164,10 @@ export function registerTools(
 
   server.tool(
     "knotes_index",
-    "Update the search index (incremental by default)",
-    {
-      force: z
-        .boolean()
-        .optional()
-        .describe("Force full reindex instead of incremental"),
-    },
-    async ({ force }) => {
-      await updateIndex({ force });
+    "Update the search index (always incremental)",
+    {},
+    async () => {
+      await updateIndex();
       return text("Search index updated.");
     }
   );

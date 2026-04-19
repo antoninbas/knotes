@@ -131,10 +131,11 @@ async function newestMdMtime(dirs: string[]): Promise<number> {
   return newest;
 }
 
-/** Update the search index for changed files (incremental by default). */
-export async function updateIndex(options?: { force?: boolean }): Promise<void> {
+/** Update the search index for changed files (always incremental; qmd hashes
+ * each file and skips unchanged ones). */
+export async function updateIndex(): Promise<void> {
   const store = await getStore();
-  await store.update({ force: options?.force });
+  await store.update();
 }
 
 /**
