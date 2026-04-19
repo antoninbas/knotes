@@ -17,11 +17,21 @@ let storeCreating: Promise<any> | null = null;
  */
 let lastIndexedAt: number = 0;
 
+/**
+ * Short-lived cache of newestMdMtime() so a burst of rapid searches doesn't
+ * re-walk the tree for every query. TTL is tiny so deletions are still
+ * picked up quickly — just enough to absorb a handful of in-flight-UI
+ * queries firing in the same tick.
+ */
+const MTIME_CACHE_TTL_MS = 10;
+let mtimeCache: { value: number; checkedAt: number } | null = null;
+
 /** Reset the store singleton (for tests). */
 export function resetStore() {
   storeInstance = null;
   storeCreating = null;
   lastIndexedAt = 0;
+  mtimeCache = null;
 }
 
 async function getStore() {
@@ -222,10 +232,20 @@ export async function search(
 ): Promise<SearchResult[]> {
   const home = getHome();
   const dirs = [join(home, "notes"), join(home, "logs")];
-  const newest = await newestMdMtime(dirs);
+  const now = Date.now();
+  let newest: number;
+  if (mtimeCache && now - mtimeCache.checkedAt < MTIME_CACHE_TTL_MS) {
+    newest = mtimeCache.value;
+  } else {
+    newest = await newestMdMtime(dirs);
+    mtimeCache = { value: newest, checkedAt: now };
+  }
   if (newest > lastIndexedAt) {
+    // Capture the timestamp *before* the update so any file written while
+    // the reindex is running will still trigger the next search to reindex.
+    const startedAt = Date.now();
     await updateIndex();
-    lastIndexedAt = Date.now();
+    lastIndexedAt = startedAt;
   }
 
   const store = await getStore();
