@@ -232,39 +232,39 @@ export async function search(
   const collections = options?.collections && options.collections.length > 0
     ? options.collections
     : undefined;
+  // searchLex/searchVector take a single-collection filter; knotes only has
+  // two collections, so restrict only when the caller picked exactly one.
+  const singleCollection = collections?.length === 1 ? collections[0] : undefined;
 
   let results: any[];
 
-  // All modes use store.search() with pre-built queries so results always
-  // include bestChunk (the specific matching section), not just the full body.
   if (options?.mode === "bm25") {
-    results = await store.search({
-      queries: [{ type: "lex", query }],
+    // Direct BM25: raw scores in [0, 1), no chunking, single SQL statement.
+    results = await store.searchLex(query, {
       limit,
-      rerank: false,
-      ...(collections ? { collections } : {}),
+      ...(singleCollection ? { collection: singleCollection } : {}),
     });
   } else if (options?.mode === "vector") {
-    results = await store.search({
-      queries: [{ type: "vec", query }],
+    // Direct vector search: raw cosine similarity, no reranking.
+    results = await store.searchVector(query, {
       limit,
-      rerank: false,
-      ...(collections ? { collections } : {}),
+      ...(singleCollection ? { collection: singleCollection } : {}),
     });
   } else {
     const config = getConfig();
     const rerank = options?.rerank ?? config.rerank;
     const queryExpand = options?.queryExpand ?? config.queryExpand;
+    // `explain: true` attaches the real RRF score (weighted fusion + top-rank
+    // bonus) so we can surface it instead of qmd's 1/rank position score.
     if (queryExpand) {
-      // Full hybrid: LLM query expansion + BM25 + vector + optional reranking
       results = await store.search({
         query,
         limit,
         rerank,
+        explain: true,
         ...(collections ? { collections } : {}),
       });
     } else {
-      // Fast hybrid: BM25 + vector, no LLM query expansion, optional reranking
       results = await store.search({
         queries: [
           { type: "lex", query },
@@ -272,10 +272,14 @@ export async function search(
         ],
         limit,
         rerank,
+        explain: true,
         ...(collections ? { collections } : {}),
       });
     }
   }
+
+  const mode = options?.mode ?? "hybrid";
+  const { extractSnippet } = await import("@tobilu/qmd");
 
   return results.map((r: any) => ({
     path: (() => {
@@ -286,9 +290,56 @@ export async function search(
       return r.displayPath?.replace(/\.md$/, "") || r.id || "";
     })(),
     title: resolveTitle(r),
-    snippet: r.bestChunk || r.body || r.content || r.snippet || "",
-    score: r.score || 0,
+    snippet: buildSnippet(r, query, extractSnippet),
+    score: resolveScore(r, mode),
   }));
+}
+
+/**
+ * qmd's hybrid/structuredSearch overwrites the fused RRF score with
+ * `1 / (rank + 1)` before returning — so rank-1 always gets 1.0, rank-2 0.5,
+ * etc., regardless of match quality. When we pass `explain: true` qmd still
+ * reports the real fused score inside `explain.rrf.totalScore`; prefer that
+ * so callers get a meaningful relevance number. searchLex/searchVector
+ * already return the raw backend score in [0, 1), so use it as-is.
+ */
+function resolveScore(r: any, mode: "hybrid" | "bm25" | "vector"): number {
+  if (mode !== "hybrid") return typeof r.score === "number" ? r.score : 0;
+  const total = r?.explain?.rrf?.totalScore;
+  if (typeof total === "number" && total > 0) return total;
+  return typeof r.score === "number" ? r.score : 0;
+}
+
+/**
+ * Build a short, query-focused excerpt. For hybrid results qmd already
+ * selected a bestChunk; for searchLex/searchVector we only get the body.
+ * Strip any YAML frontmatter so the excerpt never leaks "title: ..." /
+ * "tags: [...]" preamble.
+ */
+function buildSnippet(
+  r: any,
+  query: string,
+  extractSnippet: (body: string, query: string, maxLen?: number, chunkPos?: number, chunkLen?: number) => { snippet: string },
+): string {
+  const source: string = r.bestChunk || r.body || r.content || r.snippet || "";
+  if (!source) return "";
+  const body = stripFrontmatter(source);
+  if (!body) return "";
+  try {
+    const chunkPos: number | undefined = typeof r.bestChunkPos === "number" ? r.bestChunkPos : undefined;
+    const out = extractSnippet(body, query, 240, chunkPos);
+    return out.snippet;
+  } catch {
+    return body.slice(0, 240);
+  }
+}
+
+function stripFrontmatter(content: string): string {
+  if (!content.startsWith("---")) return content;
+  const end = content.indexOf("\n---", 3);
+  if (end === -1) return content;
+  const after = content.slice(end + 4).replace(/^\r?\n+/, "");
+  return after;
 }
 
 /**
