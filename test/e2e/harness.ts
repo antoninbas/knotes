@@ -65,7 +65,7 @@ export class Harness {
     if (mode === "serverless") {
       const { updateIndex, embed } = await import("../../src/core/search.ts");
       await updateIndex();
-      await embed({ trigger: "on-demand" });
+      if (!process.env["CI"]) await embed({ trigger: "on-demand" });
     } else {
       // Release the DB before spawning so subprocess can open it
       resetDb();
@@ -109,7 +109,10 @@ export class Harness {
         const data = (await resp.json()) as { lastJob: { status: string; error?: string } | null };
         const s = data.lastJob?.status;
         if (s === "completed") return;
-        if (s === "failed") throw new Error(`Embed failed: ${data.lastJob?.error ?? "unknown"}`);
+        if (s === "failed") {
+          if (process.env["CI"]) return; // LLM ops disabled in CI — expected
+          throw new Error(`Embed failed: ${data.lastJob?.error ?? "unknown"}`);
+        }
       } catch (err: any) {
         if (err.message?.startsWith("Embed failed:")) throw err;
       }

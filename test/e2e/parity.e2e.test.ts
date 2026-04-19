@@ -20,13 +20,13 @@ describe("parity e2e [serverless vs server]", () => {
   });
 
   const searchQueries = [
-    { q: "carbonara recipe guanciale pecorino", mode: "bm25" as const },
-    { q: "semantic concept of cooperative concurrency async", mode: "vector" as const },
-    { q: "quantum measurement Bell state nonlocality", mode: "hybrid" as const },
+    { q: "carbonara recipe guanciale pecorino", mode: "bm25" as const, needsEmbed: false },
+    { q: "semantic concept of cooperative concurrency async", mode: "vector" as const, needsEmbed: true },
+    { q: "quantum measurement Bell state nonlocality", mode: "hybrid" as const, needsEmbed: true },
   ];
 
-  for (const { q, mode } of searchQueries) {
-    test(`search parity: "${q}" [${mode}]`, async () => {
+  for (const { q, mode, needsEmbed } of searchQueries) {
+    test.skipIf(needsEmbed && !!process.env["CI"])(`search parity: "${q}" [${mode}]`, async () => {
       const a = await serverless.search(q, { mode, limit: 10 });
       const b = await server.search(q, { mode, limit: 10 });
 

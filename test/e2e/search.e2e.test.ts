@@ -48,53 +48,53 @@ for (const mode of ["serverless", "server"] as const) {
       expect(results[0].path).toBe("notes/fitness/deadlift-form");
     }, TEST_TIMEOUT);
 
-    // --- Vector: paraphrase queries expect top-3 match ---
+    // --- Vector: paraphrase queries expect top-3 match (skipped in CI: LLM ops disabled) ---
 
-    test("vector top-3: pasta with eggs and cured pork", async () => {
+    test.skipIf(!!process.env["CI"])("vector top-3: pasta with eggs and cured pork", async () => {
       const results = await h.search("pasta with eggs and cured pork cheek cheese", { mode: "vector", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/cooking/pasta-carbonara");
     }, TEST_TIMEOUT);
 
-    test("vector top-3: running a 26 mile race", async () => {
+    test.skipIf(!!process.env["CI"])("vector top-3: running a 26 mile race", async () => {
       const results = await h.search("training plan for running a 26 mile race", { mode: "vector", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/fitness/marathon-training-plan");
     }, TEST_TIMEOUT);
 
-    test("vector top-3: how stars live and die", async () => {
+    test.skipIf(!!process.env["CI"])("vector top-3: how stars live and die", async () => {
       const results = await h.search("how stars are born on the main sequence and die as supernovae", { mode: "vector", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/science/stellar-evolution");
     }, TEST_TIMEOUT);
 
-    test("vector top-3: jazz chord harmony", async () => {
+    test.skipIf(!!process.env["CI"])("vector top-3: jazz chord harmony", async () => {
       const results = await h.search("jazz chord harmony two five one progression voicing", { mode: "vector", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/music/jazz-ii-v-i-voicings");
     }, TEST_TIMEOUT);
 
-    test("vector top-3: ground fault outlet wiring", async () => {
+    test.skipIf(!!process.env["CI"])("vector top-3: ground fault outlet wiring", async () => {
       const results = await h.search("wiring an outlet with ground fault protection for bathroom", { mode: "vector", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/home/gfci-outlet-wiring");
     }, TEST_TIMEOUT);
 
-    // --- Hybrid: mixed keyword + semantic queries ---
+    // --- Hybrid: mixed keyword + semantic queries (skipped in CI: LLM ops disabled) ---
 
-    test("hybrid top-3: tokio green threads", async () => {
+    test.skipIf(!!process.env["CI"])("hybrid top-3: tokio green threads", async () => {
       const results = await h.search("tokio green threads cooperative scheduling", { mode: "hybrid", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/programming/rust-async-runtime");
     }, TEST_TIMEOUT);
 
-    test("hybrid top-3: quantum Bell pairs non-locality", async () => {
+    test.skipIf(!!process.env["CI"])("hybrid top-3: quantum Bell pairs non-locality", async () => {
       const results = await h.search("quantum Bell pairs nonlocality entanglement", { mode: "hybrid", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/science/quantum-entanglement");
     }, TEST_TIMEOUT);
 
-    test("hybrid top-3: sweep picking arpeggios", async () => {
+    test.skipIf(!!process.env["CI"])("hybrid top-3: sweep picking arpeggios", async () => {
       const results = await h.search("sweep picking arpeggios guitar", { mode: "hybrid", limit: 5 });
       const paths = results.slice(0, 3).map((r) => r.path);
       expect(paths).toContain("notes/music/guitar-sweep-picking");

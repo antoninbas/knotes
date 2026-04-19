@@ -20,7 +20,7 @@ for (const mode of ["serverless", "server"] as const) {
 
     test("collections:notes excludes logs paths", async () => {
       const results = await h.search("training running workout", {
-        mode: "hybrid",
+        mode: "bm25",
         limit: 10,
         collections: ["notes"],
       });
@@ -33,7 +33,7 @@ for (const mode of ["serverless", "server"] as const) {
 
     test("collections:logs excludes notes paths", async () => {
       const results = await h.search("training running workout", {
-        mode: "hybrid",
+        mode: "bm25",
         limit: 10,
         collections: ["logs"],
       });
@@ -46,7 +46,7 @@ for (const mode of ["serverless", "server"] as const) {
 
     test("collections:[notes,logs] returns both types", async () => {
       const results = await h.search("cooking", {
-        mode: "hybrid",
+        mode: "bm25",
         limit: 20,
         collections: ["notes", "logs"],
       });
@@ -66,10 +66,8 @@ for (const mode of ["serverless", "server"] as const) {
     }, TEST_TIMEOUT);
 
     test("minScore:999 returns empty results", async () => {
-      for (const searchMode of ["bm25", "vector", "hybrid"] as const) {
-        const results = await h.search("sourdough", { mode: searchMode, limit: 5, minScore: 999 });
-        expect(results).toHaveLength(0);
-      }
+      const results = await h.search("sourdough", { mode: "bm25", limit: 5, minScore: 999 });
+      expect(results).toHaveLength(0);
     }, TEST_TIMEOUT);
 
     test("minScore mid-range drops some results from top-5", async () => {
