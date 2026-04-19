@@ -89,6 +89,40 @@ test("search results for files with spaces/punctuation can be opened", async () 
   expect(punct.title).toBe("Parens And Punctuation");
 }, 60_000);
 
+test("collections option restricts results to the requested collections", async () => {
+  const { createNote } = await import("../src/core/notes.ts");
+  const { createLog, addEntry } = await import("../src/core/logs.ts");
+  const { search, updateIndex } = await import("../src/core/search.ts");
+
+  await createNote("notes/ornithopter", {
+    title: "Ornithopter Notes",
+    content: "Flapping-wing aircraft design constraints and historical attempts.",
+  });
+  await createLog("logs/ornithopter", "Ornithopter Journal", undefined);
+  await addEntry("logs/ornithopter", "First flapping-wing test flight scheduled.");
+  await updateIndex();
+
+  const both = await search("ornithopter flapping", { mode: "bm25", limit: 10 });
+  expect(both.some((r) => r.path.startsWith("notes/"))).toBe(true);
+  expect(both.some((r) => r.path.startsWith("logs/"))).toBe(true);
+
+  const onlyNotes = await search("ornithopter flapping", {
+    mode: "bm25",
+    limit: 10,
+    collections: ["notes"],
+  });
+  expect(onlyNotes.every((r) => r.path.startsWith("notes/"))).toBe(true);
+  expect(onlyNotes.some((r) => r.path.startsWith("logs/"))).toBe(false);
+
+  const onlyLogs = await search("ornithopter flapping", {
+    mode: "bm25",
+    limit: 10,
+    collections: ["logs"],
+  });
+  expect(onlyLogs.every((r) => r.path.startsWith("logs/"))).toBe(true);
+  expect(onlyLogs.some((r) => r.path.startsWith("notes/"))).toBe(false);
+}, 60_000);
+
 test("search reindexes after an out-of-band file deletion", async () => {
   const { createNote } = await import("../src/core/notes.ts");
   const { search, updateIndex } = await import("../src/core/search.ts");

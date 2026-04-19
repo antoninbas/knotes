@@ -229,6 +229,9 @@ export async function search(
 
   const store = await getStore();
   const limit = options?.limit ?? 10;
+  const collections = options?.collections && options.collections.length > 0
+    ? options.collections
+    : undefined;
 
   let results: any[];
 
@@ -239,12 +242,14 @@ export async function search(
       queries: [{ type: "lex", query }],
       limit,
       rerank: false,
+      ...(collections ? { collections } : {}),
     });
   } else if (options?.mode === "vector") {
     results = await store.search({
       queries: [{ type: "vec", query }],
       limit,
       rerank: false,
+      ...(collections ? { collections } : {}),
     });
   } else {
     const config = getConfig();
@@ -252,7 +257,12 @@ export async function search(
     const queryExpand = options?.queryExpand ?? config.queryExpand;
     if (queryExpand) {
       // Full hybrid: LLM query expansion + BM25 + vector + optional reranking
-      results = await store.search({ query, limit, rerank });
+      results = await store.search({
+        query,
+        limit,
+        rerank,
+        ...(collections ? { collections } : {}),
+      });
     } else {
       // Fast hybrid: BM25 + vector, no LLM query expansion, optional reranking
       results = await store.search({
@@ -262,6 +272,7 @@ export async function search(
         ],
         limit,
         rerank,
+        ...(collections ? { collections } : {}),
       });
     }
   }

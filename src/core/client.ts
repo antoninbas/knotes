@@ -147,13 +147,14 @@ export async function deleteEntry(path: string, entryId: string): Promise<void> 
 
 export async function search(
   query: string,
-  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean }
+  opts?: { limit?: number; mode?: SearchMode; rerank?: boolean; queryExpand?: boolean; collections?: ("notes" | "logs")[] }
 ): Promise<SearchResult[]> {
   const params = new URLSearchParams({ q: query });
   if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
   if (opts?.mode) params.set("mode", opts.mode);
   if (opts?.rerank !== undefined) params.set("rerank", String(opts.rerank));
   if (opts?.queryExpand !== undefined) params.set("queryExpand", String(opts.queryExpand));
+  if (opts?.collections && opts.collections.length > 0) params.set("collections", opts.collections.join(","));
   return request<SearchResult[]>(`/search?${params}`);
 }
 

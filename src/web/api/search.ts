@@ -21,6 +21,18 @@ searchApi.get("/", async (c) => {
   const mode = c.req.query("mode") as "hybrid" | "bm25" | "vector" | undefined;
   const rerankParam = c.req.query("rerank");
   const queryExpandParam = c.req.query("queryExpand");
+  const collectionsParam = c.req.query("collections");
+
+  let collections: ("notes" | "logs")[] | undefined;
+  if (collectionsParam) {
+    const parts = collectionsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const p of parts) {
+      if (p !== "notes" && p !== "logs") {
+        return c.json({ error: `Invalid collection: ${p}. Allowed: notes, logs` }, 400);
+      }
+    }
+    collections = parts as ("notes" | "logs")[];
+  }
 
   try {
     const results = await search(query, {
@@ -28,6 +40,7 @@ searchApi.get("/", async (c) => {
       mode,
       rerank: rerankParam !== undefined ? rerankParam === "true" : undefined,
       queryExpand: queryExpandParam !== undefined ? queryExpandParam === "true" : undefined,
+      ...(collections ? { collections } : {}),
     });
     return c.json(results);
   } catch (err: any) {

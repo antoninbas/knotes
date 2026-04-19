@@ -145,9 +145,13 @@ export function registerTools(
         .boolean()
         .optional()
         .describe("Enable LLM query expansion for broader recall (hybrid mode only, slow on CPU)"),
+      collections: z
+        .array(z.enum(["notes", "logs"]))
+        .optional()
+        .describe("Restrict results to specific collections (notes, logs). Defaults to both."),
     },
-    async ({ query, limit, mode, rerank, queryExpand }) => {
-      const results = await search(query, { limit, mode, rerank, queryExpand });
+    async ({ query, limit, mode, rerank, queryExpand, collections }) => {
+      const results = await search(query, { limit, mode, rerank, queryExpand, collections });
       if (results.length === 0) return text("No results found.");
 
       const lines = results.map(
