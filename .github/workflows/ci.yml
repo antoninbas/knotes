@@ -53,7 +53,10 @@ jobs:
         with:
           path: ~/.cache/qmd/models
           key: qmd-models-v1
+      # qmd refuses LLM ops when CI=true. Override so embed/vector/hybrid run.
       - run: npx vitest run --config vitest.e2e.config.ts
+        env:
+          CI: ""
 
   install-npm-global:
     name: Test npm global install
