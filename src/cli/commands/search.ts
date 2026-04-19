@@ -14,12 +14,28 @@ export function registerSearchCommand(program: Command): void {
     )
     .option("--rerank", "Enable LLM reranking (hybrid mode only, slow)")
     .option("--expand", "Enable LLM query expansion (hybrid mode only, slow)")
+    .option(
+      "-c, --collection <collection...>",
+      "Restrict to collections: notes, logs (repeatable)"
+    )
     .action(async (query: string, opts) => {
+      let collections: ("notes" | "logs")[] | undefined;
+      if (opts.collection) {
+        const raw = Array.isArray(opts.collection) ? opts.collection : [opts.collection];
+        for (const c of raw) {
+          if (c !== "notes" && c !== "logs") {
+            throw new Error(`Invalid collection: ${c}. Allowed: notes, logs`);
+          }
+        }
+        collections = raw;
+      }
+
       const results = await search(query, {
         limit: parseInt(opts.limit, 10),
         mode: opts.mode as "hybrid" | "bm25" | "vector",
         rerank: opts.rerank ? true : undefined,
         queryExpand: opts.expand ? true : undefined,
+        ...(collections ? { collections } : {}),
       });
 
       if (results.length === 0) {
