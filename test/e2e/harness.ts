@@ -1,27 +1,8 @@
-import { mkdtemp, rm, cp } from "node:fs/promises";
-import { join, dirname } from "node:path";
-import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
-import { createServer } from "node:net";
-import type { ChildProcess } from "node:child_process";
 import type { SearchMode, SearchResult, NoteResult, ListEntry, LogEntry } from "../../src/core/types.ts";
-import { PINNED_CONFIG } from "./fixtures/pinned-config.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const CORPUS_DIR = join(__dirname, "corpus");
-const PROJECT_ROOT = join(__dirname, "../..");
-
-function getFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = createServer();
-    srv.listen(0, "127.0.0.1", () => {
-      const addr = srv.address() as { port: number };
-      srv.close(() => resolve(addr.port));
-    });
-    srv.on("error", reject);
-  });
-}
+// Memoize embed per-mode across test files that share this worker. For workers
+// that don't share module state, qmd's incremental embed handles idempotency.
+const embedPromises = new Map<"serverless" | "server", Promise<void>>();
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const resp = await fetch(url, init);
@@ -34,121 +15,63 @@ export class Harness {
   mode!: "serverless" | "server";
   home!: string;
   private baseUrl: string | null = null;
-  private serverProcess: ChildProcess | null = null;
 
-  async start(mode: "serverless" | "server"): Promise<void> {
+  async attach(mode: "serverless" | "server"): Promise<void> {
     this.mode = mode;
-    this.home = await mkdtemp(join(tmpdir(), `knotes-e2e-${mode}-`));
-
-    process.env["KNOTES_HOME"] = this.home;
-
-    const { resetConfigCache, ensureHome, saveConfig } = await import("../../src/core/config.ts");
-    const { resetDb } = await import("../../src/core/db.ts");
-    const { resetStore } = await import("../../src/core/search.ts");
-
-    resetConfigCache();
-    resetDb();
-    resetStore();
-    await ensureHome();
-
-    await saveConfig({
-      serverless: mode === "serverless",
-      rerank: PINNED_CONFIG.rerank,
-      queryExpand: PINNED_CONFIG.queryExpand,
-      embedInterval: PINNED_CONFIG.embedInterval,
-      embedModel: PINNED_CONFIG.embedModel,
-    });
-
-    await cp(join(CORPUS_DIR, "notes"), join(this.home, "notes"), { recursive: true });
-    await cp(join(CORPUS_DIR, "logs"), join(this.home, "logs"), { recursive: true });
-
     if (mode === "serverless") {
-      const { updateIndex, embed } = await import("../../src/core/search.ts");
-      await updateIndex();
-      await embed({ trigger: "on-demand" });
+      const home = process.env["E2E_SERVERLESS_HOME"];
+      if (!home) throw new Error("E2E_SERVERLESS_HOME not set — globalSetup did not run?");
+      this.home = home;
     } else {
-      // Release the DB before spawning so subprocess can open it
-      resetDb();
-      resetStore();
-      delete process.env["KNOTES_HOME"];
-
-      const port = await getFreePort();
+      const home = process.env["E2E_SERVER_HOME"];
+      const port = process.env["E2E_SERVER_PORT"];
+      if (!home || !port) throw new Error("E2E_SERVER_HOME / E2E_SERVER_PORT not set — globalSetup did not run?");
+      this.home = home;
       this.baseUrl = `http://127.0.0.1:${port}`;
-
-      this.serverProcess = spawn("npx", ["tsx", "src/main.ts", "server", "--port", String(port)], {
-        env: { ...process.env, KNOTES_HOME: this.home },
-        cwd: PROJECT_ROOT,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-
-      this.serverProcess.stdout?.on("data", () => {});
-      this.serverProcess.stderr?.on("data", () => {});
-
-      await this._waitForServer();
-      await this._waitForEmbed();
     }
   }
 
-  private async _waitForServer(): Promise<void> {
-    const deadline = Date.now() + 20_000;
-    while (Date.now() < deadline) {
-      try {
-        const resp = await fetch(`${this.baseUrl}/api/health`);
-        if (resp.ok) return;
-      } catch {}
-      await new Promise((r) => setTimeout(r, 200));
+  async ensureEmbedded(): Promise<void> {
+    if (!embedPromises.has(this.mode)) {
+      embedPromises.set(this.mode, this._doEmbed());
     }
-    throw new Error("E2E server did not start within 20 seconds");
+    return embedPromises.get(this.mode)!;
   }
 
-  private async _waitForEmbed(): Promise<void> {
+  private async _doEmbed(): Promise<void> {
+    if (this.mode === "serverless") {
+      await this._ensureEnv();
+      const { embed } = await import("../../src/core/search.ts");
+      await embed({ trigger: "on-demand" });
+      return;
+    }
+    const resp = await fetch(`${this.baseUrl}/api/search/embed`, { method: "POST" });
+    if (!resp.ok) throw new Error(`POST /api/search/embed failed: ${resp.status}`);
     const deadline = Date.now() + 300_000;
     while (Date.now() < deadline) {
-      try {
-        const resp = await fetch(`${this.baseUrl}/api/search/embed/status`);
-        const data = (await resp.json()) as { lastJob: { status: string; error?: string } | null };
-        const s = data.lastJob?.status;
-        if (s === "completed") return;
-        if (s === "failed") throw new Error(`Embed failed: ${data.lastJob?.error ?? "unknown"}`);
-      } catch (err: any) {
-        if (err.message?.startsWith("Embed failed:")) throw err;
-      }
+      const statusResp = await fetch(`${this.baseUrl}/api/search/embed/status`);
+      const data = (await statusResp.json()) as { lastJob: { status: string; error?: string } | null };
+      const s = data.lastJob?.status;
+      if (s === "completed") return;
+      if (s === "failed") throw new Error(`Embed failed: ${data.lastJob?.error ?? "unknown"}`);
       await new Promise((r) => setTimeout(r, 1000));
     }
     throw new Error("E2E embed did not complete within 300 seconds");
   }
 
-  async stop(): Promise<void> {
-    if (this.serverProcess) {
-      this.serverProcess.kill("SIGTERM");
-      // Wait for process to fully exit and release the port
-      await new Promise<void>((resolve) => {
-        this.serverProcess!.once("exit", () => resolve());
-        setTimeout(resolve, 3000);
-      });
-      this.serverProcess = null;
-    }
-
-    if (this.mode === "serverless" || process.env["KNOTES_HOME"] === this.home) {
-      const { resetDb } = await import("../../src/core/db.ts");
-      const { resetStore } = await import("../../src/core/search.ts");
-      resetDb();
-      resetStore();
-      delete process.env["KNOTES_HOME"];
-    }
-
-    await rm(this.home, { recursive: true, force: true });
-  }
-
-  // Ensure this harness's KNOTES_HOME is active (needed for serverless when two harnesses exist)
+  // Point the serverless singletons at this harness's home. Needed when two
+  // harnesses (e.g. the parity test) alternate serverless calls between
+  // different homes within the same worker.
   private async _ensureEnv(): Promise<void> {
     if (this.mode !== "serverless") return;
     if (process.env["KNOTES_HOME"] !== this.home) {
       process.env["KNOTES_HOME"] = this.home;
       const { resetDb } = await import("../../src/core/db.ts");
       const { resetStore } = await import("../../src/core/search.ts");
+      const { resetConfigCache } = await import("../../src/core/config.ts");
       resetDb();
       resetStore();
+      resetConfigCache();
     }
   }
 

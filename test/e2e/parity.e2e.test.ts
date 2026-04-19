@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll } from "vitest";
 import { Harness } from "./harness.ts";
 
 const SETUP_TIMEOUT = 360_000;
@@ -9,15 +9,11 @@ describe("parity e2e [serverless vs server]", () => {
   const server = new Harness();
 
   beforeAll(async () => {
-    // Start both modes; do them sequentially to avoid env var conflicts
-    await serverless.start("serverless");
-    await server.start("server");
-  }, SETUP_TIMEOUT * 2);
-
-  afterAll(async () => {
-    await serverless.stop();
-    await server.stop();
-  });
+    await serverless.attach("serverless");
+    await server.attach("server");
+    await serverless.ensureEmbedded();
+    await server.ensureEmbedded();
+  }, SETUP_TIMEOUT);
 
   const searchQueries = [
     { q: "carbonara recipe guanciale pecorino", mode: "bm25" as const },

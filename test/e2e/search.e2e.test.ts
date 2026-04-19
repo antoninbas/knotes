@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll } from "vitest";
 import { Harness } from "./harness.ts";
 
 const SETUP_TIMEOUT = 360_000;
@@ -9,12 +9,9 @@ for (const mode of ["serverless", "server"] as const) {
     const h = new Harness();
 
     beforeAll(async () => {
-      await h.start(mode);
+      await h.attach(mode);
+      await h.ensureEmbedded();
     }, SETUP_TIMEOUT);
-
-    afterAll(async () => {
-      await h.stop();
-    });
 
     // --- BM25: keyword-heavy queries expect rank-1 match ---
 

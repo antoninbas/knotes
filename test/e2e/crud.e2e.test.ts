@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeAll, afterAll } from "vitest";
+import { describe, test, expect, beforeAll } from "vitest";
 import { Harness } from "./harness.ts";
 
-const SETUP_TIMEOUT = 360_000;
+const SETUP_TIMEOUT = 30_000;
 const TEST_TIMEOUT = 30_000;
 
 for (const mode of ["serverless", "server"] as const) {
@@ -9,12 +9,8 @@ for (const mode of ["serverless", "server"] as const) {
     const h = new Harness();
 
     beforeAll(async () => {
-      await h.start(mode);
+      await h.attach(mode);
     }, SETUP_TIMEOUT);
-
-    afterAll(async () => {
-      await h.stop();
-    });
 
     // --- Note CRUD ---
 
