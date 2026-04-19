@@ -228,6 +228,14 @@ export async function search(
     mode?: "hybrid" | "bm25" | "vector";
     rerank?: boolean;
     queryExpand?: boolean;
+    /**
+     * Drop results whose score is below this floor. Scale is mode-dependent:
+     *   bm25   — sigmoid of BM25 in [0, 1); ~0.3 weak, ~0.6 medium, ~0.9 strong
+     *   vector — cosine similarity in [0, 1]; ~0.3 noise floor, ~0.5 related
+     *   hybrid — fused RRF score, much smaller: ~0.02–0.08 for good matches
+     * Default 0 (no filtering).
+     */
+    minScore?: number;
   }
 ): Promise<SearchResult[]> {
   const home = getHome();
@@ -257,32 +265,45 @@ export async function search(
   // two collections, so restrict only when the caller picked exactly one.
   const singleCollection = collections?.length === 1 ? collections[0] : undefined;
 
+  const minScore = options?.minScore;
+
   let results: any[];
 
   if (options?.mode === "bm25") {
     // Direct BM25: raw scores in [0, 1), no chunking, single SQL statement.
+    // searchLex has no minScore option in qmd, so filter post-hoc.
     results = await store.searchLex(query, {
       limit,
       ...(singleCollection ? { collection: singleCollection } : {}),
     });
+    if (minScore !== undefined && minScore > 0) {
+      results = results.filter((r: any) => (r.score ?? 0) >= minScore);
+    }
   } else if (options?.mode === "vector") {
     // Direct vector search: raw cosine similarity, no reranking.
+    // searchVector has no minScore option in qmd, so filter post-hoc.
     results = await store.searchVector(query, {
       limit,
       ...(singleCollection ? { collection: singleCollection } : {}),
     });
+    if (minScore !== undefined && minScore > 0) {
+      results = results.filter((r: any) => (r.score ?? 0) >= minScore);
+    }
   } else {
     const config = getConfig();
     const rerank = options?.rerank ?? config.rerank;
     const queryExpand = options?.queryExpand ?? config.queryExpand;
     // `explain: true` attaches the real RRF score (weighted fusion + top-rank
     // bonus) so we can surface it instead of qmd's 1/rank position score.
+    // qmd applies minScore against the fused RRF score *before* that overwrite,
+    // so passing it through here filters on real relevance.
     if (queryExpand) {
       results = await store.search({
         query,
         limit,
         rerank,
         explain: true,
+        ...(minScore !== undefined ? { minScore } : {}),
         ...(collections ? { collections } : {}),
       });
     } else {
@@ -294,6 +315,7 @@ export async function search(
         limit,
         rerank,
         explain: true,
+        ...(minScore !== undefined ? { minScore } : {}),
         ...(collections ? { collections } : {}),
       });
     }

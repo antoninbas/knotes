@@ -12,6 +12,7 @@ export default function SearchView(props: Props) {
   const [mode, setMode] = createSignal<SearchMode>("hybrid");
   const [withRerank, setWithRerank] = createSignal(false);
   const [withExpand, setWithExpand] = createSignal(false);
+  const [minScoreInput, setMinScoreInput] = createSignal("");
   const [results, setResults] = createSignal<SearchResult[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [searched, setSearched] = createSignal(false);
@@ -20,9 +21,32 @@ export default function SearchView(props: Props) {
 
   onMount(() => inputRef?.focus());
 
+  const minScoreHint = () => {
+    switch (mode()) {
+      case "bm25":
+        return "BM25 sigmoid score in [0, 1). ~0.3 weak, ~0.6 medium, ~0.9 strong.";
+      case "vector":
+        return "Cosine similarity in [0, 1]. ~0.3 noise floor, ~0.5 semantically related.";
+      case "hybrid":
+        return "Fused RRF score. Much smaller: ~0.02–0.08 for good matches.";
+    }
+  };
+
   async function doSearch() {
     const q = query().trim();
     if (!q) return;
+
+    let minScore: number | undefined;
+    const raw = minScoreInput().trim();
+    if (raw !== "") {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        setError("Min score must be a non-negative number.");
+        return;
+      }
+      minScore = parsed;
+    }
+
     setLoading(true);
     setError(null);
     setSearched(true);
@@ -32,6 +56,7 @@ export default function SearchView(props: Props) {
         opts.rerank = withRerank();
         opts.queryExpand = withExpand();
       }
+      if (minScore !== undefined) opts.minScore = minScore;
       const res = await searchApi.search(q, opts);
       setResults(res);
     } catch (err: any) {
@@ -166,6 +191,38 @@ export default function SearchView(props: Props) {
               <span class="text-xs" style={{ color: "var(--color-text-muted)" }}>(slow)</span>
             </label>
           </Show>
+
+          {/* Min score filter */}
+          <label
+            class="flex items-center gap-1.5 text-sm select-none"
+            style={{ color: "var(--color-text-secondary)" }}
+            title={`Drop results below this score. Default empty = off. ${minScoreHint()}`}
+          >
+            Min score
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={minScoreInput()}
+              onInput={(e) => setMinScoreInput(e.currentTarget.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") doSearch(); }}
+              placeholder="off"
+              class="w-20 px-2 py-1 rounded border text-sm outline-none"
+              style={{
+                "background-color": "var(--color-bg-primary)",
+                "border-color": "var(--color-border)",
+                color: "var(--color-text-primary)",
+              }}
+            />
+          </label>
+        </div>
+
+        {/* Mode-specific min-score hint */}
+        <div
+          class="text-xs mt-2"
+          style={{ color: "var(--color-text-muted)" }}
+        >
+          {minScoreHint()} Leave empty to return all results.
         </div>
       </div>
 

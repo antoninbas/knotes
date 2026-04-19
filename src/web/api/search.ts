@@ -18,6 +18,7 @@ searchApi.get("/", async (c) => {
   const rerankParam = c.req.query("rerank");
   const queryExpandParam = c.req.query("queryExpand");
   const collectionsParam = c.req.query("collections");
+  const minScoreParam = c.req.query("minScore");
 
   let collections: ("notes" | "logs")[] | undefined;
   if (collectionsParam) {
@@ -30,6 +31,15 @@ searchApi.get("/", async (c) => {
     collections = parts as ("notes" | "logs")[];
   }
 
+  let minScore: number | undefined;
+  if (minScoreParam !== undefined) {
+    const parsed = Number(minScoreParam);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return c.json({ error: `Invalid minScore: ${minScoreParam}. Expected a non-negative number.` }, 400);
+    }
+    minScore = parsed;
+  }
+
   try {
     const results = await search(query, {
       limit: limit ? parseInt(limit, 10) : undefined,
@@ -37,6 +47,7 @@ searchApi.get("/", async (c) => {
       rerank: rerankParam !== undefined ? rerankParam === "true" : undefined,
       queryExpand: queryExpandParam !== undefined ? queryExpandParam === "true" : undefined,
       ...(collections ? { collections } : {}),
+      ...(minScore !== undefined ? { minScore } : {}),
     });
     return c.json(results);
   } catch (err: any) {
