@@ -385,8 +385,7 @@ test("GET /api/search/embed/status returns status", async () => {
 
 test("search finds created notes after indexing", async () => {
   await post("/api/notes", { path: "notes/searchable", title: "Unique Searchable Title", content: "This is very specific content for search testing" });
-  // Force a full index rebuild to ensure the note is picked up
-  await post("/api/search/index", { force: true });
+  await post("/api/search/index", {});
 
   const res = await api("/api/search?q=searchable&mode=bm25");
   expect(res.status).toBe(200);
@@ -538,13 +537,6 @@ test("PUT /api/logs/entries returns 400 for missing entryId", async () => {
 
 test("PUT /api/logs/entries returns 400 for missing content", async () => {
   const res = await put("/api/logs/entries", { path: "logs/foo", entryId: "e-0001" });
-  expect(res.status).toBe(400);
-  const body = await json(res);
-  expect(body.error).toBeTruthy();
-});
-
-test("POST /api/search/index returns 400 for non-boolean force", async () => {
-  const res = await post("/api/search/index", { force: "yes" });
   expect(res.status).toBe(400);
   const body = await json(res);
   expect(body.error).toBeTruthy();

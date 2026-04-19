@@ -60,12 +60,9 @@ export function registerSearchCommand(program: Command): void {
   program
     .command("index")
     .description("Update the search index")
-    .option("--force", "Force full reindex instead of incremental")
-    .action(async (opts) => {
-      console.log(
-        opts.force ? "Rebuilding search index..." : "Updating search index..."
-      );
-      await updateIndex({ force: opts.force });
+    .action(async () => {
+      console.log("Updating search index...");
+      await updateIndex();
       console.log("Index updated.");
     });
 

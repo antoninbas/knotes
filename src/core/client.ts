@@ -158,11 +158,8 @@ export async function search(
   return request<SearchResult[]>(`/search?${params}`);
 }
 
-export async function updateIndex(opts?: { force?: boolean }): Promise<void> {
-  await request("/search/index", {
-    method: "POST",
-    body: JSON.stringify({ force: opts?.force }),
-  });
+export async function updateIndex(): Promise<void> {
+  await request("/search/index", { method: "POST", body: "{}" });
 }
 
 export async function embed(opts?: { force?: boolean }): Promise<void> {

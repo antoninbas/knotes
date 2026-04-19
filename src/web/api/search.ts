@@ -3,10 +3,6 @@ import { z } from "zod";
 import { search, updateIndex, embed } from "../../core/search.ts";
 import { getLastJob } from "../../core/db.ts";
 
-const IndexSchema = z.object({
-  force: z.boolean().optional(),
-});
-
 const EmbedSchema = z.object({
   force: z.boolean().optional(),
 });
@@ -48,15 +44,10 @@ searchApi.get("/", async (c) => {
   }
 });
 
-// Trigger index update
+// Trigger index update (always incremental; qmd hashes unchanged files)
 searchApi.post("/index", async (c) => {
-  const raw = await c.req.json().catch(() => ({}));
-  const parsed = IndexSchema.safeParse(raw);
-  if (!parsed.success) {
-    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
-  }
   try {
-    await updateIndex({ force: parsed.data.force });
+    await updateIndex();
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
