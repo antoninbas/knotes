@@ -7,12 +7,15 @@ interface Props {
   onSelect: (note: NoteResult) => void;
 }
 
+type CollectionFilter = "all" | "notes" | "logs";
+
 export default function SearchView(props: Props) {
   const [query, setQuery] = createSignal("");
   const [mode, setMode] = createSignal<SearchMode>("hybrid");
   const [withRerank, setWithRerank] = createSignal(false);
   const [withExpand, setWithExpand] = createSignal(false);
   const [minScoreInput, setMinScoreInput] = createSignal("");
+  const [collection, setCollection] = createSignal<CollectionFilter>("all");
   const [results, setResults] = createSignal<SearchResult[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [searched, setSearched] = createSignal(false);
@@ -57,6 +60,7 @@ export default function SearchView(props: Props) {
         opts.queryExpand = withExpand();
       }
       if (minScore !== undefined) opts.minScore = minScore;
+      if (collection() !== "all") opts.collections = [collection() as "notes" | "logs"];
       const res = await searchApi.search(q, opts);
       setResults(res);
     } catch (err: any) {
@@ -79,6 +83,11 @@ export default function SearchView(props: Props) {
   const modeActive = (m: SearchMode) => ({
     background: mode() === m ? "var(--color-accent)" : "var(--color-bg-surface)",
     color: mode() === m ? "#fff" : "var(--color-text-secondary)",
+  });
+
+  const collectionActive = (c: CollectionFilter) => ({
+    background: collection() === c ? "var(--color-accent)" : "var(--color-bg-surface)",
+    color: collection() === c ? "#fff" : "var(--color-text-secondary)",
   });
 
   return (
@@ -159,6 +168,35 @@ export default function SearchView(props: Props) {
               title="Combined BM25 + vector (default)"
             >
               Hybrid
+            </button>
+          </div>
+
+          {/* Collection filter */}
+          <div
+            class="flex rounded-lg overflow-hidden border text-sm shrink-0"
+            style={{ "border-color": "var(--color-border)" }}
+            title="Restrict results to notes, logs, or both"
+          >
+            <button
+              onClick={() => setCollection("all")}
+              class="px-3 py-1.5 cursor-pointer transition-colors"
+              style={{ ...collectionActive("all"), "border-right": "1px solid var(--color-border)" }}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setCollection("notes")}
+              class="px-3 py-1.5 cursor-pointer transition-colors"
+              style={{ ...collectionActive("notes"), "border-right": "1px solid var(--color-border)" }}
+            >
+              Notes
+            </button>
+            <button
+              onClick={() => setCollection("logs")}
+              class="px-3 py-1.5 cursor-pointer transition-colors"
+              style={collectionActive("logs")}
+            >
+              Logs
             </button>
           </div>
 
