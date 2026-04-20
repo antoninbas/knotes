@@ -41,6 +41,15 @@ export default function App() {
     setSidebarRefresh((n) => n + 1);
   }
 
+  function handleHome() {
+    setCurrentNote(null);
+    setViewMode("view");
+    setShowSearch(false);
+    setSidebarOpen(false);
+    setShowAbout(false);
+    setShowJobs(false);
+  }
+
   function handleDeleteActive(path: string) {
     if (currentNote()?.path === path) {
       setCurrentNote(null);
@@ -138,6 +147,7 @@ export default function App() {
           readOnly={readOnly()}
           onDeleteActive={handleDeleteActive}
           onRename={handleRename}
+          onHome={handleHome}
         />
       </div>
 
