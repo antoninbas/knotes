@@ -10,6 +10,7 @@ interface Props {
   readOnly: boolean;
   onDeleteActive?: (path: string) => void;
   onRename?: (oldPath: string, newPath: string) => void;
+  onHome?: () => void;
 }
 
 type CreateMode = null | "note" | "folder" | "log";
@@ -266,9 +267,21 @@ export default function Sidebar(props: Props) {
         class="flex items-center justify-between px-4 py-3 border-b"
         style={{ "border-color": "var(--color-border)" }}
       >
-        <h1 class="text-lg font-bold" style={{ color: "var(--color-accent)" }}>
+        <button
+          onClick={() => {
+            setPathStack([]);
+            setEditingContext(false);
+            setCreateMode(null);
+            setContextMenu(null);
+            loadEntries();
+            props.onHome?.();
+          }}
+          class="text-lg font-bold cursor-pointer bg-transparent border-0 p-0"
+          style={{ color: "var(--color-accent)" }}
+          title="Go to the welcome page"
+        >
           Knotes
-        </h1>
+        </button>
         <div class="flex items-center gap-1">
           <Show when={canCreateFolder()}>
             <button
