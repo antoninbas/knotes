@@ -1,5 +1,12 @@
 import { createSignal, createEffect, For, Show } from "solid-js";
+import { marked } from "marked";
+import DOMPurify from "dompurify";
 import { logs, type LogEntry, type NoteResult } from "../lib/api.ts";
+
+function renderMarkdown(md: string): string {
+  const raw = marked.parse(md, { async: false }) as string;
+  return DOMPurify.sanitize(raw);
+}
 
 interface Props {
   note: NoteResult;
@@ -267,12 +274,11 @@ export default function LogView(props: Props) {
               <Show
                 when={editingId() === entry.id}
                 fallback={
-                  <div
-                    class="text-sm whitespace-pre-wrap"
+                  <article
+                    class="prose prose-sm"
                     style={{ color: "var(--color-text-primary)" }}
-                  >
-                    {entry.content}
-                  </div>
+                    innerHTML={renderMarkdown(entry.content)}
+                  />
                 }
               >
                 <textarea
