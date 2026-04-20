@@ -57,7 +57,7 @@ npx tsx src/main.ts note create notes/hello --title "Hello World"
 npx tsx src/main.ts note show notes/hello
 npx tsx src/main.ts note edit notes/hello          # opens in $EDITOR
 
-npx tsx src/main.ts log create logs/daily --title "Daily Log"
+npx tsx src/main.ts log create-journal logs/daily --title "Daily Log"
 npx tsx src/main.ts log add logs/daily -m "Started using Knotes"
 npx tsx src/main.ts log list logs/daily
 
@@ -79,7 +79,7 @@ In serverless mode, CLI commands and the MCP server access the data files direct
 ```bash
 knotes note create <path> [-t <title>] [--tags <tags>] [-e]   # create (optionally open in editor)
 knotes note edit <path>                                        # open in $EDITOR
-knotes note show <path>                                        # display content
+knotes note get <path>                                         # display content (alias: show)
 knotes note delete <path>                                      # delete
 knotes note list [prefix]                                      # list notes/directories
 knotes note mkdir <path>                                       # create a folder
@@ -87,20 +87,34 @@ knotes note mkdir <path>                                       # create a folder
 
 ### Logs
 
+Journals (the log document itself):
+
 ```bash
-knotes log create <path> [-t <title>]                    # create a new log
-knotes log add <path> [-m <message>]                     # add entry (opens $EDITOR if no -m)
-knotes log list <path> [-l <limit>]                      # list entries
-knotes log update <path> <entry-id> [-m <message>]       # update entry
-knotes log delete <path> <entry-id>                      # delete entry
+knotes log create-journal <path> [-t <title>] [-d <description>]   # create a journal
+knotes log list-journals [prefix]                                   # list journals
+knotes log update-journal <path> [-t <title>] [-d <description>]    # update title/description
+knotes log delete-journal <path>                                    # delete a journal
+```
+
+Entries inside a journal:
+
+```bash
+knotes log add <path> [-m <message>]                               # add entry ($EDITOR if no -m)
+knotes log list <path> [-l <limit>] [--since <date>] [--before <date>]   # list entries
+knotes log update <path> <entry-id> [-m <message>]                 # update entry
+knotes log delete <path> <entry-id>                                # delete entry
 ```
 
 ### Search
 
 ```bash
-knotes search <query> [-l <limit>] [-m <mode>]    # search (mode: hybrid, bm25, vector)
-knotes index [--force]                             # update search index
-knotes embed [--force]                             # generate embeddings for vector search
+knotes search <query> [-l <limit>] [-m <mode>]                     # search (hybrid, bm25, vector)
+                     [-c notes] [-c logs]                          # restrict collections (repeatable)
+                     [--min-score <n>]                             # drop results below this score
+                     [--rerank]                                    # LLM reranking (hybrid only, slow on CPU)
+                     [--expand]                                    # LLM query expansion (hybrid only, slow)
+knotes index [--force]                                             # update search index
+knotes embed [--force]                                             # generate embeddings for vector search
 ```
 
 The search index is updated automatically on every note/log operation. Embeddings need to be generated separately via `knotes embed` or the web UI. The server runs a background embed job periodically (default: every 5 minutes, configurable).
@@ -162,6 +176,25 @@ For use with Claude Desktop, Cursor, and other MCP-compatible clients. Example C
 }
 ```
 
+### Search context hints
+
+Context hints are short descriptions attached to folders or journals. qmd
+uses them to bias search relevance for items in that path.
+
+```bash
+knotes context list                       # list all hints
+knotes context get <path>                 # show the hint for a path
+knotes context set <path> <description>   # set a hint
+knotes context remove <path>              # clear the hint
+```
+
+Example:
+
+```bash
+knotes context set notes/projects "Engineering project notes and design docs"
+knotes context set logs/standup "Daily standup notes from the infra team"
+```
+
 ### Configuration
 
 ```bash
@@ -180,6 +213,11 @@ Configuration keys:
 | `theme` | `system` | Web UI theme (`light`, `dark`, `system`) |
 | `embedInterval` | `300` | Background embed interval in seconds |
 | `serverless` | `false` | Skip server, access files directly |
+| `embedModel` | `""` (qmd default) | HuggingFace GGUF URI for the embedding model |
+| `queryExpansionModel` | `""` (qmd default) | HuggingFace GGUF URI for the query-expansion LLM |
+| `rerankModel` | `""` (qmd default) | HuggingFace GGUF URI for the reranker |
+| `rerank` | `false` | Enable LLM reranking in hybrid search (slow on CPU) |
+| `queryExpand` | `false` | Enable LLM query expansion in hybrid search (slow on CPU) |
 
 ## Storage
 
@@ -201,14 +239,14 @@ Notes and logs are plain markdown files with YAML frontmatter (`title`, `created
 
 ### Log entry format
 
-Log entries are stored as H2 headings with an ISO timestamp and a short hex ID:
+Log entries are stored as H2 headings with an ISO timestamp and a 16-hex ID:
 
 ```markdown
-## 2026-04-10T21:00:00Z {#e-3f7a}
+## 2026-04-10T21:00:00Z {#e-3f7a9c1d2e4b6a80}
 
 Entry content here. Free-form markdown.
 
-## 2026-04-10T14:30:00Z {#e-2b4c}
+## 2026-04-10T14:30:00Z {#e-2b4c1f3a8d5e7012}
 
 Older entry. Newest first.
 ```
@@ -231,17 +269,18 @@ src/main.ts           # Single entrypoint, dispatches to CLI/MCP/server
 src/core/             # Shared business logic
   router.ts           # Routes to server (HTTP) or direct (core) based on mode
   client.ts           # HTTP client, mirrors core API
-  db.ts               # SQLite state DB (config, heartbeat, jobs)
+  db.ts               # SQLite state DB (config, heartbeat, jobs, contexts)
   config.ts           # Config resolution
   notes.ts            # Note CRUD
   logs.ts             # Log entry CRUD
   search.ts           # Search facade over qmd
+  context.ts          # Per-path search context hints
   importer.ts         # markitdown subprocess wrapper
 src/cli/              # Commander-based CLI
 src/mcp/              # MCP server (stdio transport)
 src/web/
   server.ts           # Hono server, heartbeat, background embed
-  api/                # REST routes (notes, logs, search)
+  api/                # REST routes (notes, logs, search, context)
   app/                # SolidJS + Tailwind CSS v4 frontend (built with Vite)
 ```
 
