@@ -9,6 +9,7 @@ import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from "@codemirror/language";
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { theme } from "../lib/theme.ts";
+import TagInput from "./TagInput.tsx";
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -62,6 +63,7 @@ export default function Editor(props: Props) {
   let containerRef: HTMLDivElement | undefined;
   let editorView: EditorView | undefined;
   const [title, setTitle] = createSignal(props.note.title);
+  const [tags, setTags] = createSignal<string[]>(props.note.tags);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [saveStatus, setSaveStatus] = createSignal<"saved" | "saving" | "unsaved">("saved");
@@ -85,7 +87,7 @@ export default function Editor(props: Props) {
     isDirty = false;
     setSaveStatus("saving");
     try {
-      await notes.update(props.note.path, { title: title(), content: currentContent });
+      await notes.update(props.note.path, { title: title(), content: currentContent, tags: tags() });
       setSaveStatus("saved");
     } catch {
       isDirty = true;
@@ -115,6 +117,7 @@ export default function Editor(props: Props) {
       const updated = await notes.update(props.note.path, {
         title: title(),
         content: currentContent,
+        tags: tags(),
       });
       setSaveStatus("saved");
       props.onSave(updated);
@@ -195,7 +198,9 @@ export default function Editor(props: Props) {
     // Flush any pending auto-save when navigating away
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; }
     if (isDirty) {
-      notes.update(props.note.path, { title: title(), content: currentContent }).catch(() => {});
+      notes
+        .update(props.note.path, { title: title(), content: currentContent, tags: tags() })
+        .catch(() => {});
     }
     editorView?.destroy();
   });
@@ -214,6 +219,13 @@ export default function Editor(props: Props) {
             e.preventDefault();
             handleSave();
           }
+        }}
+      />
+      <TagInput
+        tags={tags()}
+        onChange={(next) => {
+          setTags(next);
+          scheduleSave();
         }}
       />
       <div class="flex gap-2">
