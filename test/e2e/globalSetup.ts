@@ -54,8 +54,14 @@ export async function setup() {
   await prepareHome(serverHome, false);
 
   const port = await getFreePort();
-  const serverProcess = spawn("npx", ["tsx", "src/main.ts", "server", "--port", String(port)], {
-    env: { ...process.env, KNOTES_HOME: serverHome },
+  const tsxBin = join(PROJECT_ROOT, "node_modules/.bin/tsx");
+  const supervisorPath = join(__dirname, "server-supervisor.ts");
+  const serverProcess = spawn(tsxBin, [supervisorPath, "--port", String(port)], {
+    env: {
+      ...process.env,
+      KNOTES_HOME: serverHome,
+      KNOTES_E2E_ANCHOR_PID: String(process.pid),
+    },
     cwd: PROJECT_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
