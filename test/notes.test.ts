@@ -32,8 +32,45 @@ test("createNote creates a markdown file with frontmatter", async () => {
   expect(result.type).toBe("note");
 
   const raw = await readFile(join(testHome, "notes/test.md"), "utf-8");
-  expect(raw).toContain('title: "Test Note"');
+  expect(raw).toMatch(/title:\s*['"]?Test Note['"]?/);
   expect(raw).toContain("type: note");
+});
+
+test("createNote survives tricky title characters", async () => {
+  const { createNote, getNote } = await import("../src/core/notes.ts");
+  const tricky = `Weird: "quoted", new\nline & colon`;
+  await createNote("notes/tricky", { title: tricky, content: "body" });
+  const note = await getNote("notes/tricky");
+  expect(note.title).toBe(tricky);
+  expect(note.content).toBe("body");
+});
+
+test("updateNote preserves description and extra frontmatter fields", async () => {
+  const { writeMarkdownFile, updateNote, getNote } = await import("../src/core/notes.ts");
+  await writeMarkdownFile("notes/keep-extras", {
+    title: "Has Extras",
+    content: "Initial body",
+    description: "This description must survive updates",
+  });
+
+  // Manually inject an extra field to mimic user-added frontmatter
+  const { readFile, writeFile } = await import("fs/promises");
+  const raw = await readFile(join(testHome, "notes/keep-extras.md"), "utf-8");
+  await writeFile(
+    join(testHome, "notes/keep-extras.md"),
+    raw.replace("---\n\n", "status: draft\n---\n\n")
+  );
+
+  await updateNote("notes/keep-extras", { content: "Updated body" });
+  const raw2 = await readFile(join(testHome, "notes/keep-extras.md"), "utf-8");
+
+  expect(raw2).toContain("description:");
+  expect(raw2).toContain("This description must survive updates");
+  expect(raw2).toContain("status: draft");
+
+  const note = await getNote("notes/keep-extras");
+  expect(note.description).toBe("This description must survive updates");
+  expect(note.content).toBe("Updated body");
 });
 
 test("createNote rejects paths not under notes/", async () => {

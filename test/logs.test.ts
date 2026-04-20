@@ -25,7 +25,7 @@ test("createLog creates a log file", async () => {
   const { createLog } = await import("../src/core/logs.ts");
   await createLog("logs/daily", "Daily Log");
   const raw = await readFile(join(testHome, "logs/daily.md"), "utf-8");
-  expect(raw).toContain('title: "Daily Log"');
+  expect(raw).toMatch(/title:\s*['"]?Daily Log['"]?/);
   expect(raw).toContain("type: log");
 });
 
