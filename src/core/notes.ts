@@ -38,20 +38,8 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function buildFrontmatter(meta: NoteMeta): string {
-  const lines = [
-    "---",
-    `title: "${meta.title}"`,
-    `created: ${meta.created}`,
-    `modified: ${meta.modified}`,
-    `tags: [${meta.tags.map((t) => `"${t}"`).join(", ")}]`,
-    `type: ${meta.type}`,
-  ];
-  if (meta.description) {
-    lines.push(`description: "${meta.description.replace(/"/g, '\\"')}"`);
-  }
-  lines.push("---");
-  return lines.join("\n");
+function buildFrontmatter(data: Record<string, unknown>): string {
+  return matter.stringify("", data).trim();
 }
 
 function parseNote(filePath: string, raw: string): NoteResult {
@@ -179,20 +167,18 @@ export async function updateNote(
 
   const raw = await readFile(filePath, "utf-8");
   const parsed = matter(raw);
-  const data = parsed.data as Partial<NoteMeta>;
+  const data = { ...(parsed.data as Record<string, unknown>) };
 
-  const now = nowISO();
-  const meta: NoteMeta = {
-    title: options.title || (data.title as string) || basename(logicalPath),
-    created: (data.created as string) || now,
-    modified: now,
-    tags: options.tags || (data.tags as string[]) || [],
-    type: (data.type as "note" | "log") || "note",
-  };
+  if (options.title !== undefined) data["title"] = options.title;
+  if (options.tags !== undefined) data["tags"] = options.tags;
+  if (!data["title"]) data["title"] = basename(logicalPath);
+  if (!data["created"]) data["created"] = nowISO();
+  if (!data["type"]) data["type"] = "note";
+  data["modified"] = nowISO();
 
   const content =
     options.content !== undefined ? options.content : parsed.content.trim();
-  const fileContent = buildFrontmatter(meta) + "\n\n" + content + "\n";
+  const fileContent = buildFrontmatter(data) + "\n\n" + content + "\n";
   await writeFile(filePath, fileContent);
 
   const result = parseNote(filePath, fileContent);
