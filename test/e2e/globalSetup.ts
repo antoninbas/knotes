@@ -58,6 +58,7 @@ export async function setup() {
     env: { ...process.env, KNOTES_HOME: serverHome },
     cwd: PROJECT_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
   serverProcess.stdout?.on("data", () => {});
   serverProcess.stderr?.on("data", () => {});
@@ -81,12 +82,16 @@ export async function setup() {
   process.env["E2E_SERVER_PORT"] = String(port);
 
   return async () => {
-    if (!serverProcess.killed) serverProcess.kill("SIGTERM");
+    const pgid = serverProcess.pid;
+    const killGroup = (sig: NodeJS.Signals) => {
+      if (pgid == null) return;
+      try { process.kill(-pgid, sig); } catch {}
+    };
+    killGroup("SIGTERM");
     await new Promise<void>((resolve) => {
-      const onExit = () => resolve();
-      serverProcess.once("exit", onExit);
+      serverProcess.once("exit", () => resolve());
       setTimeout(() => {
-        if (!serverProcess.killed) serverProcess.kill("SIGKILL");
+        killGroup("SIGKILL");
         setTimeout(resolve, 500);
       }, 2000);
     });
