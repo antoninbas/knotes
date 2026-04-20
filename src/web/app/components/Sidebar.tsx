@@ -1,5 +1,6 @@
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { notes, logs, contextApi, type ListEntry, type NoteResult } from "../lib/api.ts";
+import MoveDialog from "./MoveDialog.tsx";
 
 interface Props {
   onSelect: (note: NoteResult) => void;
@@ -30,6 +31,7 @@ export default function Sidebar(props: Props) {
   const [inputTitle, setInputTitle] = createSignal("");
   const [createError, setCreateError] = createSignal<string | null>(null);
   const [contextMenu, setContextMenu] = createSignal<ContextMenu | null>(null);
+  const [moveTarget, setMoveTarget] = createSignal<ListEntry | null>(null);
 
   // Folder context state
   const [folderContext, setFolderContext] = createSignal<string>("");
@@ -175,6 +177,11 @@ export default function Sidebar(props: Props) {
     } catch (err: any) {
       alert(`Failed to delete: ${err.message}`);
     }
+  }
+
+  function handleMove(entry: ListEntry) {
+    setContextMenu(null);
+    setMoveTarget(entry);
   }
 
   async function handleRename(entry: ListEntry) {
@@ -580,6 +587,18 @@ export default function Sidebar(props: Props) {
                   Rename
                 </button>
               </Show>
+              {/* Move — non-top-level entries only */}
+              <Show when={!isTopLevel() && !props.readOnly}>
+                <button
+                  class="w-full text-left px-3 py-1.5 cursor-pointer"
+                  style={{ color: "var(--color-text-primary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={() => handleMove(entry())}
+                >
+                  Move…
+                </button>
+              </Show>
               {/* Delete — non-top-level entries only */}
               <Show when={!isTopLevel() && !props.readOnly}>
                 <button
@@ -595,6 +614,20 @@ export default function Sidebar(props: Props) {
             </div>
           );
         }}
+      </Show>
+
+      {/* Move dialog */}
+      <Show when={moveTarget()}>
+        {(target) => (
+          <MoveDialog
+            entry={target()}
+            onClose={() => setMoveTarget(null)}
+            onMoved={(oldPath, newPath) => {
+              props.onRename?.(oldPath, newPath);
+              loadEntries(browsePath());
+            }}
+          />
+        )}
       </Show>
     </aside>
   );
