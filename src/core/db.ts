@@ -285,6 +285,32 @@ export function removeContextValue(path: string): void {
   db.prepare("DELETE FROM contexts WHERE path = ?").run(path);
 }
 
+/**
+ * Migrate context entries from an old prefix to a new prefix.
+ * Matches both the exact path and any path under `oldPath/`.
+ * Used when a note/journal/folder is renamed.
+ */
+export function renameContextPath(oldPath: string, newPath: string): void {
+  if (oldPath === newPath) return;
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT path, context FROM contexts WHERE path = ? OR path LIKE ?")
+    .all(oldPath, `${oldPath}/%`) as ContextEntry[];
+  if (rows.length === 0) return;
+
+  const tx = db.transaction((items: ContextEntry[]) => {
+    for (const row of items) {
+      const newKey =
+        row.path === oldPath ? newPath : newPath + row.path.slice(oldPath.length);
+      db.prepare("DELETE FROM contexts WHERE path = ?").run(row.path);
+      db.prepare(
+        "INSERT INTO contexts (path, context) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET context = ?"
+      ).run(newKey, row.context, row.context);
+    }
+  });
+  tx(rows);
+}
+
 // --- Job operations ---
 
 export function getJobs(options?: { page?: number; pageSize?: number; type?: string }): PaginatedJobs {

@@ -81,6 +81,7 @@ knotes note create <path> [-t <title>] [--tags <tags>] [-e]   # create (optional
 knotes note edit <path>                                        # open in $EDITOR
 knotes note get <path>                                         # display content (alias: show)
 knotes note delete <path>                                      # delete
+knotes note rename <from> <to> [--folder]                      # rename/move (same top-level)
 knotes note list [prefix]                                      # list notes/directories
 knotes note mkdir <path>                                       # create a folder
 ```
@@ -93,6 +94,7 @@ Journals (the log document itself):
 knotes log create-journal <path> [-t <title>] [-d <description>]   # create a journal
 knotes log list-journals [prefix]                                   # list journals
 knotes log update-journal <path> [-t <title>] [-d <description>]    # update title/description
+knotes log rename-journal <from> <to>                               # rename/move a journal (under logs/)
 knotes log delete-journal <path>                                    # delete a journal
 ```
 

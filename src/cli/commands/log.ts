@@ -10,6 +10,7 @@ import {
   getEntry,
   updateEntry,
   deleteEntry,
+  renameNote,
 } from "../../core/router.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
@@ -89,6 +90,16 @@ export function registerLogCommands(program: Command): void {
     .action(async (path: string) => {
       await deleteLog(path);
       console.log(`Deleted journal: ${path}`);
+    });
+
+  log
+    .command("rename-journal")
+    .description("Rename or move a journal (must stay under logs/)")
+    .argument("<from>", "Current logical path")
+    .argument("<to>", "New logical path")
+    .action(async (from: string, to: string) => {
+      const result = await renameNote(from, to);
+      console.log(`Renamed journal: ${from} → ${result.path}`);
     });
 
   log

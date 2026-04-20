@@ -53,6 +53,18 @@ export const notes = {
     request<{ ok: boolean }>(`/notes/folder?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
     }),
+
+  rename: (oldPath: string, newPath: string) =>
+    request<NoteResult>("/notes/rename", {
+      method: "POST",
+      body: JSON.stringify({ oldPath, newPath }),
+    }),
+
+  renameFolder: (oldPath: string, newPath: string) =>
+    request<{ ok: boolean }>("/notes/folder/rename", {
+      method: "POST",
+      body: JSON.stringify({ oldPath, newPath }),
+    }),
 };
 
 // Logs API

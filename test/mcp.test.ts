@@ -287,6 +287,37 @@ test("knotes_log_list filters by date range", async () => {
   expect(text).not.toContain("Too new");
 });
 
+// ─── knotes_rename ───────────────────────────────────────────────
+
+test("knotes_rename renames a note and migrates context hint", async () => {
+  await callTool("knotes_note_create", { path: "notes/old-name", title: "Old" });
+  await callTool("knotes_context_set", {
+    path: "notes/old-name",
+    context: "Old context",
+  });
+
+  const text = await callTool("knotes_rename", {
+    oldPath: "notes/old-name",
+    newPath: "notes/new-name",
+  });
+  expect(text).toContain("notes/new-name");
+
+  const getText = await callTool("knotes_note_get", { path: "notes/new-name" });
+  expect(getText).toContain("Old");
+
+  const ctxText = await callTool("knotes_context_get", { path: "notes/new-name" });
+  expect(ctxText).toBe("Old context");
+});
+
+test("knotes_rename rejects cross-zone rename", async () => {
+  await callTool("knotes_note_create", { path: "notes/cross" });
+  const result = await client.callTool({
+    name: "knotes_rename",
+    arguments: { oldPath: "notes/cross", newPath: "logs/cross" },
+  });
+  expect(result.isError).toBe(true);
+});
+
 test("knotes_log_list returns empty message when date filter excludes all entries", async () => {
   await callTool("knotes_log_create", { path: "logs/mcp-filter-empty" });
   await writeFile(join(testHome, "logs/mcp-filter-empty.md"), [
@@ -337,6 +368,7 @@ test("write tools are not registered in read-only mode", async () => {
   expect(names).not.toContain("knotes_log_add");
   expect(names).not.toContain("knotes_context_set");
   expect(names).not.toContain("knotes_context_remove");
+  expect(names).not.toContain("knotes_rename");
 
   await roClient.close();
   await roServer.close();

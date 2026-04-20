@@ -9,6 +9,7 @@ interface Props {
   currentPath: () => string | undefined;
   readOnly: boolean;
   onDeleteActive?: (path: string) => void;
+  onRename?: (oldPath: string, newPath: string) => void;
 }
 
 type CreateMode = null | "note" | "folder" | "log";
@@ -172,6 +173,39 @@ export default function Sidebar(props: Props) {
       loadEntries(browsePath());
     } catch (err: any) {
       alert(`Failed to delete: ${err.message}`);
+    }
+  }
+
+  async function handleRename(entry: ListEntry) {
+    setContextMenu(null);
+    const segments = entry.path.split("/");
+    const currentName = segments[segments.length - 1] ?? entry.path;
+    const parent = segments.slice(0, -1).join("/");
+    const label =
+      entry.type === "directory"
+        ? "folder"
+        : entry.type === "log"
+          ? "journal"
+          : "note";
+    const input = prompt(`Rename this ${label} (new name):`, currentName);
+    if (input === null) return;
+    const trimmed = input.trim();
+    if (!trimmed || trimmed === currentName) return;
+    if (trimmed.includes("/")) {
+      alert("Name cannot contain '/'. Use rename within the same folder.");
+      return;
+    }
+    const newPath = parent ? `${parent}/${trimmed}` : trimmed;
+    try {
+      if (entry.type === "directory") {
+        await notes.renameFolder(entry.path, newPath);
+      } else {
+        await notes.rename(entry.path, newPath);
+      }
+      props.onRename?.(entry.path, newPath);
+      loadEntries(browsePath());
+    } catch (err: any) {
+      alert(`Failed to rename: ${err.message}`);
     }
   }
 
@@ -519,6 +553,18 @@ export default function Sidebar(props: Props) {
                   }}
                 >
                   Edit
+                </button>
+              </Show>
+              {/* Rename — non-top-level entries only */}
+              <Show when={!isTopLevel() && !props.readOnly}>
+                <button
+                  class="w-full text-left px-3 py-1.5 cursor-pointer"
+                  style={{ color: "var(--color-text-primary)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--color-bg-hover)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+                  onClick={() => handleRename(entry())}
+                >
+                  Rename
                 </button>
               </Show>
               {/* Delete — non-top-level entries only */}

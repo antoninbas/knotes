@@ -7,6 +7,8 @@ import {
   deleteNote,
   listNotes,
   createFolder,
+  renameNote,
+  renameFolder,
   createLog,
   updateLog,
   deleteLog,
@@ -285,6 +287,27 @@ export function registerTools(
     async ({ path }) => {
       await createFolder(path);
       return text(`Created folder: ${path}`);
+    }
+  );
+
+  server.tool(
+    "knotes_rename",
+    "Rename or move a note, journal, or folder. Source and target must share the same top-level (notes/→notes/, logs/→logs/).",
+    {
+      oldPath: z.string().describe("Current logical path (e.g. notes/projects/foo)"),
+      newPath: z.string().describe("New logical path (e.g. notes/projects/bar)"),
+      folder: z
+        .boolean()
+        .optional()
+        .describe("Rename a folder instead of a note/journal"),
+    },
+    async ({ oldPath, newPath, folder }) => {
+      if (folder) {
+        await renameFolder(oldPath, newPath);
+        return text(`Renamed folder: ${oldPath} → ${newPath}`);
+      }
+      const result = await renameNote(oldPath, newPath);
+      return text(`Renamed: ${oldPath} → ${result.path}`);
     }
   );
 
