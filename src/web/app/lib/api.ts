@@ -100,13 +100,23 @@ export const logs = {
 
 // Search API
 export const searchApi = {
-  search: (query: string, opts?: { limit?: number; mode?: string; rerank?: boolean; queryExpand?: boolean; minScore?: number }) => {
+  search: (query: string, opts?: {
+    limit?: number;
+    mode?: string;
+    rerank?: boolean;
+    queryExpand?: boolean;
+    minScore?: number;
+    collections?: ("notes" | "logs")[];
+  }) => {
     const params = new URLSearchParams({ q: query });
     if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
     if (opts?.mode) params.set("mode", opts.mode);
     if (opts?.rerank !== undefined) params.set("rerank", String(opts.rerank));
     if (opts?.queryExpand !== undefined) params.set("queryExpand", String(opts.queryExpand));
     if (opts?.minScore !== undefined) params.set("minScore", String(opts.minScore));
+    if (opts?.collections && opts.collections.length > 0) {
+      params.set("collections", opts.collections.join(","));
+    }
     return request<SearchResult[]>(`/search?${params}`);
   },
 
