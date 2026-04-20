@@ -326,6 +326,8 @@ test("write tools are not registered in read-only mode", async () => {
   expect(names).toContain("knotes_note_get");
   expect(names).toContain("knotes_note_list");
   expect(names).toContain("knotes_log_list");
+  expect(names).toContain("knotes_context_list");
+  expect(names).toContain("knotes_context_get");
 
   // Write tools should be absent
   expect(names).not.toContain("knotes_note_create");
@@ -333,6 +335,8 @@ test("write tools are not registered in read-only mode", async () => {
   expect(names).not.toContain("knotes_note_delete");
   expect(names).not.toContain("knotes_log_create");
   expect(names).not.toContain("knotes_log_add");
+  expect(names).not.toContain("knotes_context_set");
+  expect(names).not.toContain("knotes_context_remove");
 
   await roClient.close();
   await roServer.close();
