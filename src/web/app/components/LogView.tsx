@@ -275,8 +275,7 @@ export default function LogView(props: Props) {
                 when={editingId() === entry.id}
                 fallback={
                   <article
-                    class="prose prose-sm"
-                    style={{ color: "var(--color-text-primary)" }}
+                    class="markdown-body"
                     innerHTML={renderMarkdown(entry.content)}
                   />
                 }

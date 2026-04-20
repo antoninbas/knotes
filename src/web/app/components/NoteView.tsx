@@ -29,8 +29,7 @@ export default function NoteView(props: Props) {
         </span>
       </div>
       <article
-        class="prose"
-        style={{ color: "var(--color-text-primary)" }}
+        class="markdown-body"
         innerHTML={renderMarkdown(props.note.content)}
       />
     </div>
