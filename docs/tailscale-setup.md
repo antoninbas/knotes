@@ -2,6 +2,13 @@
 
 Access the Knotes web app from a Windows desktop over a Tailscale VPN. The web server binds to `127.0.0.1` only — Tailscale Funnel or subnet routing is not needed; we use Tailscale's peer-to-peer connectivity combined with SSH forwarding or Tailscale Serve.
 
+> **Security note.** Knotes does not yet have any authentication layer on its
+> web API. Whatever transport you choose, anything on the other side of it has
+> full read/write access to your notes. Tailscale Serve in particular exposes
+> the port to every device on your tailnet — if multiple devices or people
+> share that tailnet, prefer Option B (SSH forwarding) or a tagged-identity
+> ACL that restricts the `knotes` service to a single device.
+
 ## Option A: Tailscale Serve (recommended)
 
 Tailscale Serve exposes a local port to your tailnet without SSH. This is the simplest approach.
@@ -23,7 +30,7 @@ tailscale ip -4
 
 ```sh
 # Start the web app (binds to 127.0.0.1:7713)
-knotes web &
+knotes server &
 
 # Expose port 7713 to your tailnet on port 7713
 sudo tailscale serve --bg 7713
@@ -71,7 +78,7 @@ If you skip this, ensure the Linux server has a standard SSH server running (`su
 ### 3. Start Knotes on the server
 
 ```sh
-knotes web
+knotes server
 ```
 
 ### 4. Create an SSH tunnel from Windows
