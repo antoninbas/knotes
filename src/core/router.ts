@@ -61,6 +61,16 @@ export async function deleteFolder(path: string): Promise<void> {
   return directNotes.deleteFolder(path);
 }
 
+export async function renameNote(oldPath: string, newPath: string): Promise<NoteResult> {
+  if (useServer()) return client.renameNote(oldPath, newPath);
+  return directNotes.renameNote(oldPath, newPath);
+}
+
+export async function renameFolder(oldPath: string, newPath: string): Promise<void> {
+  if (useServer()) return client.renameFolder(oldPath, newPath);
+  return directNotes.renameFolder(oldPath, newPath);
+}
+
 // --- Logs ---
 
 export async function listJournals(prefix?: string): Promise<ListEntry[]> {

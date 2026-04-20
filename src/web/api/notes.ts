@@ -9,6 +9,8 @@ import {
   updateNote,
   deleteNote,
   listNotes,
+  renameNote,
+  renameFolder,
 } from "../../core/notes.ts";
 import { importDocument, checkMarkitdown } from "../../core/importer.ts";
 import { basename } from "path";
@@ -31,6 +33,11 @@ const UpdateNoteSchema = z.object({
 
 const CreateFolderSchema = z.object({
   path: z.string().min(1, "path is required"),
+});
+
+const RenameSchema = z.object({
+  oldPath: z.string().min(1, "oldPath is required"),
+  newPath: z.string().min(1, "newPath is required"),
 });
 
 const ImportDocumentSchema = z.object({
@@ -112,6 +119,38 @@ notesApi.put("/", async (c) => {
     return c.json(note);
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
+  }
+});
+
+// Rename a note or journal
+notesApi.post("/rename", async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = RenameSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { oldPath, newPath } = parsed.data;
+  try {
+    const note = await renameNote(oldPath, newPath);
+    return c.json(note);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+// Rename a folder
+notesApi.post("/folder/rename", async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = RenameSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues.map((i) => i.message).join(", ") }, 400);
+  }
+  const { oldPath, newPath } = parsed.data;
+  try {
+    await renameFolder(oldPath, newPath);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
   }
 });
 

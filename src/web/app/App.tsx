@@ -49,6 +49,28 @@ export default function App() {
     setSidebarRefresh((n) => n + 1);
   }
 
+  async function handleRename(oldPath: string, newPath: string) {
+    if (currentNote()?.path === oldPath) {
+      try {
+        const updated = await notes.get(newPath);
+        setCurrentNote(updated);
+      } catch {
+        setCurrentNote(null);
+        setViewMode("view");
+      }
+    } else if (currentNote()?.path.startsWith(oldPath + "/")) {
+      const rebased = newPath + currentNote()!.path.slice(oldPath.length);
+      try {
+        const updated = await notes.get(rebased);
+        setCurrentNote(updated);
+      } catch {
+        setCurrentNote(null);
+        setViewMode("view");
+      }
+    }
+    setSidebarRefresh((n) => n + 1);
+  }
+
   async function handleUpdateJournal() {
     // Reload current note to pick up updated frontmatter (description etc.)
     const path = currentNote()?.path;
@@ -115,6 +137,7 @@ export default function App() {
           currentPath={currentPath}
           readOnly={readOnly()}
           onDeleteActive={handleDeleteActive}
+          onRename={handleRename}
         />
       </div>
 

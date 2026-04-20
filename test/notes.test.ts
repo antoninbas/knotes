@@ -159,3 +159,94 @@ test("createNote auto-creates parent directories", async () => {
   const note = await getNote("notes/deep/nested/note");
   expect(note.title).toBe("Deep");
 });
+
+test("renameNote moves the file and preserves created timestamp", async () => {
+  const { createNote, renameNote, getNote } = await import("../src/core/notes.ts");
+  const before = await createNote("notes/before", {
+    title: "Before",
+    content: "Some body",
+  });
+
+  const renamed = await renameNote("notes/before", "notes/after");
+  expect(renamed.path).toBe("notes/after");
+  expect(renamed.title).toBe("Before");
+  expect(renamed.content).toBe("Some body");
+  expect(renamed.created).toBe(before.created);
+
+  expect(existsSync(join(testHome, "notes/before.md"))).toBe(false);
+  expect(existsSync(join(testHome, "notes/after.md"))).toBe(true);
+
+  const reread = await getNote("notes/after");
+  expect(reread.content).toBe("Some body");
+  await expect(getNote("notes/before")).rejects.toThrow("not found");
+});
+
+test("renameNote rejects cross-zone renames", async () => {
+  const { createNote, renameNote } = await import("../src/core/notes.ts");
+  await createNote("notes/local");
+  await expect(renameNote("notes/local", "logs/oops")).rejects.toThrow(
+    "same top-level"
+  );
+});
+
+test("renameNote rejects collision with existing file", async () => {
+  const { createNote, renameNote } = await import("../src/core/notes.ts");
+  await createNote("notes/a");
+  await createNote("notes/b");
+  await expect(renameNote("notes/a", "notes/b")).rejects.toThrow("already exists");
+});
+
+test("renameNote migrates the context hint for the path", async () => {
+  const { createNote, renameNote } = await import("../src/core/notes.ts");
+  const { setContext, getContext } = await import("../src/core/context.ts");
+  await createNote("notes/with-context");
+  setContext("notes/with-context", "Project notes");
+
+  await renameNote("notes/with-context", "notes/renamed-context");
+
+  expect(getContext("notes/with-context")).toBeUndefined();
+  expect(getContext("notes/renamed-context")).toBe("Project notes");
+});
+
+test("renameFolder moves the directory and migrates prefix context hints", async () => {
+  const { createNote, createFolder, renameFolder, getNote } = await import(
+    "../src/core/notes.ts"
+  );
+  const { setContext, getContext } = await import("../src/core/context.ts");
+
+  await createFolder("notes/projects");
+  await createNote("notes/projects/alpha", { title: "Alpha" });
+  await createNote("notes/projects/deep/beta", { title: "Beta" });
+  setContext("notes/projects", "All projects");
+  setContext("notes/projects/alpha", "Alpha specifics");
+
+  await renameFolder("notes/projects", "notes/work");
+
+  expect(existsSync(join(testHome, "notes/projects"))).toBe(false);
+  expect(existsSync(join(testHome, "notes/work/alpha.md"))).toBe(true);
+  expect(existsSync(join(testHome, "notes/work/deep/beta.md"))).toBe(true);
+
+  const alpha = await getNote("notes/work/alpha");
+  expect(alpha.title).toBe("Alpha");
+
+  expect(getContext("notes/projects")).toBeUndefined();
+  expect(getContext("notes/projects/alpha")).toBeUndefined();
+  expect(getContext("notes/work")).toBe("All projects");
+  expect(getContext("notes/work/alpha")).toBe("Alpha specifics");
+});
+
+test("renameFolder rejects top-level rename", async () => {
+  const { renameFolder } = await import("../src/core/notes.ts");
+  await expect(renameFolder("notes", "notes/foo")).rejects.toThrow(
+    "top-level directory"
+  );
+});
+
+test("renameFolder rejects collision with existing directory", async () => {
+  const { createFolder, renameFolder } = await import("../src/core/notes.ts");
+  await createFolder("notes/src");
+  await createFolder("notes/dst");
+  await expect(renameFolder("notes/src", "notes/dst")).rejects.toThrow(
+    "already exists"
+  );
+});

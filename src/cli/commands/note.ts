@@ -7,6 +7,8 @@ import {
   deleteNote,
   listNotes,
   createFolder,
+  renameNote,
+  renameFolder,
 } from "../../core/router.ts";
 import { openInEditor } from "../editor.ts";
 import { tmpdir } from "os";
@@ -84,6 +86,22 @@ export function registerNoteCommands(program: Command): void {
     .action(async (path: string) => {
       await deleteNote(path);
       console.log(`Deleted: ${path}`);
+    });
+
+  note
+    .command("rename")
+    .description("Rename or move a note, journal, or folder (same top-level)")
+    .argument("<from>", "Current logical path")
+    .argument("<to>", "New logical path")
+    .option("--folder", "Rename a folder instead of a note/journal")
+    .action(async (from: string, to: string, opts: { folder?: boolean }) => {
+      if (opts.folder) {
+        await renameFolder(from, to);
+        console.log(`Renamed folder: ${from} → ${to}`);
+      } else {
+        const result = await renameNote(from, to);
+        console.log(`Renamed: ${from} → ${result.path}`);
+      }
     });
 
   note

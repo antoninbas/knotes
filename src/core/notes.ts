@@ -1,9 +1,10 @@
-import { mkdir, unlink, readdir, stat, readFile, writeFile, rm } from "fs/promises";
+import { mkdir, unlink, readdir, stat, readFile, writeFile, rm, rename } from "fs/promises";
 import { existsSync, readdirSync } from "fs";
-import { dirname, join, basename } from "path";
+import { dirname, join, basename, resolve } from "path";
 import matter from "gray-matter";
 import { resolvePath, toLogicalPath, getHome } from "./config.ts";
 import { updateIndex } from "./search.ts";
+import { renameContextPath } from "./db.ts";
 
 /**
  * Mirror of qmd's handelize() for a single path segment. qmd lowercases and
@@ -38,7 +39,7 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-function buildFrontmatter(data: Record<string, unknown>): string {
+function buildFrontmatter(data: object): string {
   return matter.stringify("", data).trim();
 }
 
@@ -184,6 +185,114 @@ export async function updateNote(
   const result = parseNote(filePath, fileContent);
   await updateIndex();
   return result;
+}
+
+/** Resolve a folder path, guarding against traversal outside KNOTES_HOME. */
+function resolveFolderPath(logicalPath: string): string {
+  const home = getHome();
+  const resolvedHome = resolve(home);
+  const fullPath = resolve(join(home, logicalPath));
+  if (fullPath !== resolvedHome && !fullPath.startsWith(resolvedHome + "/")) {
+    throw new Error(`Path traversal detected: "${logicalPath}" escapes KNOTES_HOME`);
+  }
+  return fullPath;
+}
+
+function topLevel(path: string): string {
+  return path.split("/")[0] ?? "";
+}
+
+/**
+ * Rename a note or journal file (same top-level only: notes/→notes/, logs/→logs/).
+ * Preserves the `created` timestamp and all frontmatter / content; updates `modified`.
+ * Migrates any context hint keyed at the old path.
+ */
+export async function renameNote(
+  oldLogicalPath: string,
+  newLogicalPath: string
+): Promise<NoteResult> {
+  const oldTop = topLevel(oldLogicalPath);
+  const newTop = topLevel(newLogicalPath);
+  if ((oldTop !== "notes" && oldTop !== "logs") || oldTop !== newTop) {
+    throw new Error(
+      `Rename must stay within the same top-level (notes/ or logs/). Got: ${oldLogicalPath} → ${newLogicalPath}`
+    );
+  }
+  if (oldLogicalPath === newLogicalPath) {
+    throw new Error(`Source and destination paths are identical: ${oldLogicalPath}`);
+  }
+
+  const oldFilePath = resolveExistingPath(oldLogicalPath);
+  if (!oldFilePath) throw new Error(`Note not found: ${oldLogicalPath}`);
+
+  const newFilePath = resolvePath(newLogicalPath);
+  if (existsSync(newFilePath)) {
+    throw new Error(`Target already exists: ${newLogicalPath}`);
+  }
+
+  const raw = await readFile(oldFilePath, "utf-8");
+  const parsed = matter(raw);
+  const data = { ...(parsed.data as Record<string, unknown>) };
+  data["modified"] = nowISO();
+  const fileContent = buildFrontmatter(data) + "\n\n" + parsed.content.trim() + "\n";
+
+  await mkdir(dirname(newFilePath), { recursive: true });
+  await writeFile(newFilePath, fileContent);
+  await unlink(oldFilePath);
+
+  renameContextPath(oldLogicalPath, newLogicalPath);
+  await updateIndex();
+
+  return parseNote(newFilePath, fileContent);
+}
+
+/**
+ * Rename a folder (same top-level only). Migrates any context hints whose
+ * key matches or starts with oldPath/.
+ */
+export async function renameFolder(
+  oldLogicalPath: string,
+  newLogicalPath: string
+): Promise<void> {
+  const oldTop = topLevel(oldLogicalPath);
+  const newTop = topLevel(newLogicalPath);
+  if ((oldTop !== "notes" && oldTop !== "logs") || oldTop !== newTop) {
+    throw new Error(
+      `Rename must stay within the same top-level (notes/ or logs/). Got: ${oldLogicalPath} → ${newLogicalPath}`
+    );
+  }
+  if (oldLogicalPath === newLogicalPath) {
+    throw new Error(`Source and destination paths are identical: ${oldLogicalPath}`);
+  }
+  if (oldLogicalPath === "notes" || oldLogicalPath === "logs") {
+    throw new Error(`Cannot rename top-level directory: ${oldLogicalPath}`);
+  }
+  if (newLogicalPath === "notes" || newLogicalPath === "logs") {
+    throw new Error(`Cannot rename onto a top-level directory: ${newLogicalPath}`);
+  }
+
+  const oldDir = resolveFolderPath(oldLogicalPath);
+  const newDir = resolveFolderPath(newLogicalPath);
+
+  try {
+    const s = await stat(oldDir);
+    if (!s.isDirectory()) {
+      throw new Error(`Not a folder: ${oldLogicalPath}`);
+    }
+  } catch (err: any) {
+    if (err.code === "ENOENT") throw new Error(`Folder not found: ${oldLogicalPath}`);
+    throw err;
+  }
+
+  if (existsSync(newDir)) {
+    throw new Error(`Target already exists: ${newLogicalPath}`);
+  }
+
+  await mkdir(dirname(newDir), { recursive: true });
+  await rename(oldDir, newDir);
+
+  renameContextPath(oldLogicalPath, newLogicalPath);
+  await updateIndex();
 }
 
 /** Create a folder with a .keep file for git tracking. */

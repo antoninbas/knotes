@@ -90,6 +90,20 @@ export async function deleteFolder(path: string): Promise<void> {
   await request(`/notes/folder?path=${encodeURIComponent(path)}`, { method: "DELETE" });
 }
 
+export async function renameNote(oldPath: string, newPath: string): Promise<NoteResult> {
+  return request<NoteResult>("/notes/rename", {
+    method: "POST",
+    body: JSON.stringify({ oldPath, newPath }),
+  });
+}
+
+export async function renameFolder(oldPath: string, newPath: string): Promise<void> {
+  await request("/notes/folder/rename", {
+    method: "POST",
+    body: JSON.stringify({ oldPath, newPath }),
+  });
+}
+
 // --- Logs ---
 
 export async function listJournals(prefix?: string): Promise<ListEntry[]> {
