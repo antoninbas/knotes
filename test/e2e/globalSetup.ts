@@ -54,10 +54,22 @@ export async function setup() {
   await prepareHome(serverHome, false);
 
   const port = await getFreePort();
-  const serverProcess = spawn("npx", ["tsx", "src/main.ts", "server", "--port", String(port)], {
-    env: { ...process.env, KNOTES_HOME: serverHome },
+  const tsxBin = join(PROJECT_ROOT, "node_modules/.bin/tsx");
+  // stdio[0] is a real pipe (not "ignore") so the server can detect our death
+  // via EOF on stdin — see installStdinWatchdog in src/cli/commands/server.ts.
+  // The kernel closes the write end the moment this process exits for any
+  // reason (clean teardown, SIGKILL, OOM), so the server can never miss it.
+  // detached:true puts the server in its own process group so we can tear
+  // the whole subtree (tsx wrapper + server) down in one signal on teardown.
+  const serverProcess = spawn(tsxBin, ["src/main.ts", "server", "--port", String(port)], {
+    env: {
+      ...process.env,
+      KNOTES_HOME: serverHome,
+      KNOTES_E2E_WATCH_STDIN: "1",
+    },
     cwd: PROJECT_ROOT,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
+    detached: true,
   });
   serverProcess.stdout?.on("data", () => {});
   serverProcess.stderr?.on("data", () => {});
@@ -81,12 +93,20 @@ export async function setup() {
   process.env["E2E_SERVER_PORT"] = String(port);
 
   return async () => {
-    if (!serverProcess.killed) serverProcess.kill("SIGTERM");
+    const pgid = serverProcess.pid;
+    const killGroup = (sig: NodeJS.Signals) => {
+      if (pgid == null) return;
+      try { process.kill(-pgid, sig); } catch {}
+    };
+    // Closing stdin triggers the server's EOF watchdog (clean exit path).
+    // The SIGTERM/SIGKILL fallbacks below cover anything that wasn't
+    // listening on stdin (e.g. the tsx wrapper between us and the server).
+    serverProcess.stdin?.end();
+    killGroup("SIGTERM");
     await new Promise<void>((resolve) => {
-      const onExit = () => resolve();
-      serverProcess.once("exit", onExit);
+      serverProcess.once("exit", () => resolve());
       setTimeout(() => {
-        if (!serverProcess.killed) serverProcess.kill("SIGKILL");
+        killGroup("SIGKILL");
         setTimeout(resolve, 500);
       }, 2000);
     });
