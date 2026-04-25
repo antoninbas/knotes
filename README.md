@@ -197,6 +197,81 @@ knotes context set notes/projects "Engineering project notes and design docs"
 knotes context set logs/standup "Daily standup notes from the infra team"
 ```
 
+### GitHub integration
+
+Connect a log journal to one or more GitHub accounts (github.com or
+self-hosted GHES). The connected journal is filled in automatically with
+log entries for opened/merged/closed PRs you authored, opened issues, and
+PR reviews you submitted. Filters narrow activity by org or repo.
+
+```bash
+knotes github auth login [--host HOST] [--method pat|gh|device]
+                         [--token T] [--client-id ID]
+knotes github auth list
+knotes github auth logout <host> <login>
+
+knotes github connect <log-path>
+                      --account <host>:<login>
+                      --monitor opened-prs,merged-prs,issues,reviews
+                      [--include-org ORG ...] [--exclude-repo OWNER/REPO ...]
+                      [--since YYYY-MM-DD]                  # default: now - 7d
+                      [--body title|full|first-paragraph|first-chars:N]
+                                                            # default: title
+knotes github list [<log-path>]
+knotes github disconnect <connection-id>
+
+knotes github sync [<log-path>] [--connection ID]   # one-off sync
+knotes github status [--limit N]                     # recent sync jobs
+knotes github cron-install [--interval MIN]         # serverless schedule snippet
+```
+
+Authentication:
+
+- **`--method pat` (default).** Paste a Personal Access Token via
+  `--token` or stdin. Works on github.com and any GHES instance.
+- **`--method gh`.** Reuse credentials from your `gh` CLI install (shells
+  out to `gh auth token --hostname HOST`). Zero-setup if your `gh` is
+  already authenticated for that host.
+- **`--method device`.** Standard GitHub Device Flow; works headless / over
+  SSH. **Requires an OAuth App `--client-id`** because Device Flow needs a
+  registered OAuth App on the host:
+  - On **github.com**, knotes does not (yet) ship a built-in client_id, so
+    you must register your own OAuth App at
+    https://github.com/settings/applications/new (enable "Device Flow" on
+    the app's settings page) and pass its id with `--client-id`.
+  - On **GHES**, every instance must have its own OAuth App registered by
+    an admin or by the user. Register one at
+    `https://<your-ghes-host>/settings/applications/new` and pass
+    `--client-id` to knotes.
+
+  Multi-account on the same host is supported: re-run `auth login` for
+  each identity. Two device-flow accounts on the same host can use
+  different `--client-id`s (e.g. a personal App vs. an org-owned App).
+  The `client_id` is stored per account.
+
+Tokens are stored as plaintext in `$KNOTES_HOME/.data/knotes.sqlite` and
+the file is `chmod 0600` on first open. Anyone with read access to that
+file can read the tokens — back it up accordingly.
+
+In server mode, the running server polls every `githubSyncInterval`
+seconds (default 600). In serverless mode, run `knotes github sync` from
+a cron job / launchd plist / systemd timer; `knotes github cron-install`
+prints a ready-to-paste snippet for your platform.
+
+`--body` controls how much of each PR / issue description ends up in the
+log entry:
+
+- `title` (default) — title and metadata only.
+- `full` — entire body, quoted as a markdown blockquote.
+- `first-paragraph` — body up to the first blank line, with a `> …`
+  marker if anything was trimmed.
+- `first-chars:N` — at most N characters, ellipsis if truncated.
+
+Changing `--body` on an existing connection (re-run `knotes github
+connect …`) will rewrite all matching entries on the next sync (the
+state hash changes). Editing a PR or issue body on GitHub also rewrites
+the corresponding entry on the next sync.
+
 ### Configuration
 
 ```bash
@@ -220,6 +295,8 @@ Configuration keys:
 | `rerankModel` | `""` (qmd default) | HuggingFace GGUF URI for the reranker |
 | `rerank` | `false` | Enable LLM reranking in hybrid search (slow on CPU) |
 | `queryExpand` | `false` | Enable LLM query expansion in hybrid search (slow on CPU) |
+| `githubEnabled` | `true` | Enable the background GitHub sync loop |
+| `githubSyncInterval` | `600` | GitHub sync interval in seconds (server mode) |
 
 ## Storage
 

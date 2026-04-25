@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { createSignal, createEffect, Show } from "solid-js";
 import Sidebar from "./components/Sidebar.tsx";
 import NoteView from "./components/NoteView.tsx";
 import Editor from "./components/Editor.tsx";
@@ -11,9 +11,32 @@ import { notes, searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
 
+const LAST_NOTE_KEY = "knotes:lastNotePath";
+
 export default function App() {
   const [currentNote, setCurrentNote] = createSignal<NoteResult | null>(null);
   const [viewMode, setViewMode] = createSignal<ViewMode>("view");
+
+  // Restore last-selected note across page reloads. Best-effort: a 404 on
+  // the saved path silently lands the user on the welcome screen. If the
+  // user has already interacted (clicked a note, opened search) before the
+  // fetch resolves, we drop the restored value to avoid stomping their pick.
+  (async () => {
+    try {
+      const saved = sessionStorage.getItem(LAST_NOTE_KEY);
+      if (!saved) return;
+      const note = await notes.get(saved);
+      if (currentNote() === null) setCurrentNote(note);
+    } catch {
+      sessionStorage.removeItem(LAST_NOTE_KEY);
+    }
+  })();
+
+  createEffect(() => {
+    const note = currentNote();
+    if (note) sessionStorage.setItem(LAST_NOTE_KEY, note.path);
+    else sessionStorage.removeItem(LAST_NOTE_KEY);
+  });
   const [showSearch, setShowSearch] = createSignal(false);
   const [sidebarRefresh, setSidebarRefresh] = createSignal(0);
   const [readOnly, setReadOnly] = createSignal(false);

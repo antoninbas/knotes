@@ -8,6 +8,7 @@ import { registerMcpCommand } from "./commands/mcp.ts";
 import { registerConfigCommand } from "./commands/config.ts";
 import { registerServiceCommand } from "./commands/service.ts";
 import { registerContextCommands } from "./commands/context.ts";
+import { registerGithubCommands } from "./commands/github.ts";
 import { getVersion } from "../core/version.ts";
 
 export const program = new Command();
@@ -26,3 +27,4 @@ registerMcpCommand(program);
 registerConfigCommand(program);
 registerServiceCommand(program);
 registerContextCommands(program);
+registerGithubCommands(program);

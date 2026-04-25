@@ -5,6 +5,7 @@
 
 import { getServerInfo, isServerAlive } from "./db.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
+import type { GhAccount, GhBodyMode, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
 function getBaseUrl(): string {
   const info = getServerInfo();
@@ -216,5 +217,96 @@ export async function importDocument(filePath: string, opts?: { to?: string }): 
   return request<NoteResult>("/notes/import", {
     method: "POST",
     body: JSON.stringify({ filePath, to: opts?.to }),
+  });
+}
+
+// --- GitHub ---
+
+export async function listGithubAccounts(): Promise<GhAccount[]> {
+  return request<GhAccount[]>("/github/accounts");
+}
+
+export async function logoutGithub(host: string, login: string): Promise<void> {
+  await request("/github/accounts", {
+    method: "DELETE",
+    body: JSON.stringify({ host, login }),
+  });
+}
+
+export async function loginGithubPat(host: string, token: string): Promise<GhAccount> {
+  return request<GhAccount>("/github/auth/pat", {
+    method: "POST",
+    body: JSON.stringify({ host, token }),
+  });
+}
+
+export async function loginGithubGhCli(host: string): Promise<GhAccount> {
+  return request<GhAccount>("/github/auth/gh-cli", {
+    method: "POST",
+    body: JSON.stringify({ host }),
+  });
+}
+
+export async function listGithubConnections(logPath?: string): Promise<GhConnection[]> {
+  const q = logPath ? `?logPath=${encodeURIComponent(logPath)}` : "";
+  return request<GhConnection[]>(`/github/connections${q}`);
+}
+
+export interface AddGithubConnectionInput {
+  logPath: string;
+  host: string;
+  login: string;
+  monitors: GhMonitor[];
+  includeOrgs?: string[];
+  excludeOrgs?: string[];
+  includeRepos?: string[];
+  excludeRepos?: string[];
+  since?: string;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {
+  const res = await request<{ connection: GhConnection; syncResult: unknown }>(
+    "/github/connections",
+    { method: "POST", body: JSON.stringify(input) }
+  );
+  return res.connection;
+}
+
+export interface UpdateGithubConnectionInput {
+  monitors?: GhMonitor[];
+  includeOrgs?: string[] | null;
+  excludeOrgs?: string[] | null;
+  includeRepos?: string[] | null;
+  excludeRepos?: string[] | null;
+  since?: string;
+  enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export async function updateGithubConnection(
+  id: number,
+  patch: UpdateGithubConnectionInput
+): Promise<GhConnection> {
+  const res = await request<{ connection: GhConnection; syncResult: unknown }>(
+    `/github/connections/${id}`,
+    { method: "PUT", body: JSON.stringify(patch) }
+  );
+  return res.connection;
+}
+
+export async function removeGithubConnection(id: number): Promise<void> {
+  await request(`/github/connections/${id}`, { method: "DELETE" });
+}
+
+export async function syncGithub(opts?: {
+  logPath?: string;
+  connectionId?: number;
+}): Promise<GhSyncResult[]> {
+  return request<GhSyncResult[]>("/github/sync", {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
   });
 }

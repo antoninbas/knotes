@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, chmodSync } from "node:fs";
 import Database from "better-sqlite3";
 
 type DatabaseInstance = InstanceType<typeof Database>;
@@ -54,6 +54,58 @@ const migrations: Migration[] = [
       )
     `);
   },
+  // Migration 4: GitHub integration tables
+  (db) => {
+    db.exec(`
+      CREATE TABLE github_accounts (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        host         TEXT NOT NULL,
+        login        TEXT NOT NULL,
+        user_node_id TEXT NOT NULL,
+        auth_method  TEXT NOT NULL,
+        token        TEXT,
+        token_scopes TEXT,
+        client_id    TEXT,
+        created_at   TEXT NOT NULL,
+        last_used_at TEXT,
+        UNIQUE(host, login)
+      )
+    `);
+    db.exec(`
+      CREATE TABLE github_connections (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        log_path        TEXT NOT NULL,
+        account_id      INTEGER NOT NULL REFERENCES github_accounts(id) ON DELETE CASCADE,
+        monitors        TEXT NOT NULL,
+        include_orgs    TEXT,
+        exclude_orgs    TEXT,
+        include_repos   TEXT,
+        exclude_repos   TEXT,
+        since           TEXT NOT NULL,
+        last_synced_at  TEXT,
+        enabled         INTEGER NOT NULL DEFAULT 1,
+        body_mode       TEXT NOT NULL DEFAULT 'title',
+        body_max_chars  INTEGER,
+        created_at      TEXT NOT NULL,
+        UNIQUE(log_path, account_id)
+      )
+    `);
+    db.exec(`CREATE INDEX idx_gh_conn_log ON github_connections(log_path)`);
+    db.exec(`
+      CREATE TABLE github_synced_events (
+        connection_id INTEGER NOT NULL REFERENCES github_connections(id) ON DELETE CASCADE,
+        event_id      TEXT NOT NULL,
+        entry_id      TEXT NOT NULL,
+        timestamp     TEXT NOT NULL,
+        state_hash    TEXT NOT NULL,
+        url           TEXT,
+        created_at    TEXT NOT NULL,
+        updated_at    TEXT NOT NULL,
+        PRIMARY KEY(connection_id, event_id)
+      )
+    `);
+    db.exec(`CREATE INDEX idx_gh_evt_entry ON github_synced_events(entry_id)`);
+  },
 ];
 
 function runMigrations(db: DatabaseInstance): void {
@@ -97,6 +149,12 @@ export function getDb(): DatabaseInstance {
   db.exec("PRAGMA foreign_keys = ON");
 
   runMigrations(db);
+
+  try {
+    chmodSync(dbPath, 0o600);
+  } catch {
+    // best-effort; non-POSIX FS or read-only mount
+  }
 
   return db;
 }

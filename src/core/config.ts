@@ -25,6 +25,8 @@ export function getConfig(): KnotesConfig {
     rerankModel: getConfigValue("rerankModel") || "",
     rerank: getConfigValue("rerank") === "true",
     queryExpand: getConfigValue("queryExpand") === "true",
+    githubEnabled: getConfigValue("githubEnabled") !== "false",
+    githubSyncInterval: parseInt(getConfigValue("githubSyncInterval") || "600", 10),
   };
 }
 
@@ -47,6 +49,8 @@ export async function saveConfig(
   if (updates.rerankModel !== undefined) setConfigValue("rerankModel", updates.rerankModel);
   if (updates.rerank !== undefined) setConfigValue("rerank", String(updates.rerank));
   if (updates.queryExpand !== undefined) setConfigValue("queryExpand", String(updates.queryExpand));
+  if (updates.githubEnabled !== undefined) setConfigValue("githubEnabled", String(updates.githubEnabled));
+  if (updates.githubSyncInterval !== undefined) setConfigValue("githubSyncInterval", String(updates.githubSyncInterval));
 }
 
 /**

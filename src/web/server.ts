@@ -11,7 +11,9 @@ import { searchApi } from "./api/search.ts";
 import { jobsApi } from "./api/jobs.ts";
 import { configApi } from "./api/config.ts";
 import { contextApi } from "./api/context.ts";
+import { githubApi } from "./api/github.ts";
 import { updateIndex, embed } from "../core/search.ts";
+import { syncAll as githubSyncAll } from "../core/github/sync.ts";
 import { getVersion } from "../core/version.ts";
 import { getConfig } from "../core/config.ts";
 import {
@@ -68,6 +70,7 @@ export function createApp(): Hono {
   app.route("/api/jobs", jobsApi);
   app.route("/api/config", configApi);
   app.route("/api/context", contextApi);
+  app.route("/api/github", githubApi);
 
   return app;
 }
@@ -145,10 +148,34 @@ export function createWebServer(port: number) {
   backgroundEmbed();
   const embedInterval = setInterval(backgroundEmbed, intervalMs);
 
+  // Background task: GitHub activity sync
+  let ghRunning = false;
+  async function backgroundGithubSync() {
+    const cfg = getConfig();
+    if (!cfg.githubEnabled) return;
+    if (ghRunning) return;
+    ghRunning = true;
+    try {
+      await githubSyncAll({ trigger: "background" });
+    } catch (err) {
+      console.error("GitHub sync failed:", err);
+    } finally {
+      ghRunning = false;
+    }
+  }
+  // Stagger the first run so it doesn't compete with the embed kickoff.
+  const ghStartTimer = setTimeout(backgroundGithubSync, 5_000);
+  const ghInterval = setInterval(
+    backgroundGithubSync,
+    config.githubSyncInterval * 1000
+  );
+
   // Graceful shutdown
   function cleanup() {
     clearInterval(heartbeatInterval);
     clearInterval(embedInterval);
+    clearTimeout(ghStartTimer);
+    clearInterval(ghInterval);
     clearServerInfo();
     server.close();
   }
