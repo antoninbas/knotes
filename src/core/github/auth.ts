@@ -11,15 +11,33 @@ import { createClient, normalizeHost } from "./api.ts";
 import type { GhAccount } from "./types.ts";
 
 /**
- * Public OAuth-App client_id for the knotes Device Flow. Intentionally
- * shipped in source — Device Flow does not require a client secret.
- * Override via KNOTES_GITHUB_CLIENT_ID for self-hosted GHES instances
- * or for development against a different OAuth app.
+ * Built-in OAuth App client_ids for Device Flow, keyed by host. Public —
+ * Device Flow does not use a client secret, so it's safe to ship these in
+ * source. Empty by default: until a knotes-owned OAuth App is registered
+ * on github.com, every device-flow login must pass --client-id explicitly.
+ *
+ * For self-hosted GHES instances, the user always provides their own
+ * client_id (you can't pre-register apps on every GHES install).
  */
-const DEFAULT_GITHUB_CLIENT_ID = "Iv1.PLACEHOLDER";
+const BUILTIN_GITHUB_CLIENT_IDS: Record<string, string> = {
+  // "github.com": "Iv1.xxxxxxxxxxxxxxxx",  // populate after registering the App
+};
 
-function resolveClientId(): string {
-  return process.env["KNOTES_GITHUB_CLIENT_ID"] || DEFAULT_GITHUB_CLIENT_ID;
+function resolveClientId(host: string, override?: string | null): string | null {
+  if (override) return override;
+  return BUILTIN_GITHUB_CLIENT_IDS[host] ?? null;
+}
+
+function clientIdMissingError(host: string): Error {
+  const settingsPath =
+    host === "github.com"
+      ? "https://github.com/settings/applications/new"
+      : `https://${host}/settings/applications/new`;
+  return new Error(
+    `Device flow on ${host} requires an OAuth App client_id. ` +
+    `Register one at ${settingsPath} (enable "Device Flow" on the app's settings page) ` +
+    `and re-run with --client-id <id>. Or use --method pat / --method gh.`
+  );
 }
 
 function deviceCodeUrl(host: string): string {
@@ -55,10 +73,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function startDeviceFlow(
   hostInput: string,
-  scope = "repo read:user read:org"
-): Promise<DeviceCodePayload & { host: string }> {
+  opts?: { clientId?: string | null; scope?: string }
+): Promise<DeviceCodePayload & { host: string; clientId: string }> {
   const host = normalizeHost(hostInput);
-  const clientId = resolveClientId();
+  const clientId = resolveClientId(host, opts?.clientId);
+  if (!clientId) throw clientIdMissingError(host);
+  const scope = opts?.scope ?? "repo read:user read:org";
   const res = await fetch(deviceCodeUrl(host), {
     method: "POST",
     headers: {
@@ -79,15 +99,17 @@ export async function startDeviceFlow(
       `Device flow returned an unexpected payload from ${host}. Use --method pat instead.`
     );
   }
-  return { ...payload, host };
+  return { ...payload, host, clientId };
 }
 
 export async function pollDeviceToken(
   host: string,
   deviceCode: string,
-  intervalSec: number
+  _intervalSec: number,
+  opts?: { clientId?: string | null }
 ): Promise<{ status: "pending" | "ok"; token?: string; scope?: string }> {
-  const clientId = resolveClientId();
+  const clientId = resolveClientId(host, opts?.clientId);
+  if (!clientId) throw clientIdMissingError(host);
   const res = await fetch(accessTokenUrl(host), {
     method: "POST",
     headers: {
@@ -119,9 +141,12 @@ export async function pollDeviceToken(
 
 export async function loginDevice(
   hostInput: string,
-  opts?: { onUserCode?: (info: DeviceCodePayload & { host: string }) => void }
+  opts?: {
+    clientId?: string | null;
+    onUserCode?: (info: DeviceCodePayload & { host: string }) => void;
+  }
 ): Promise<GhAccount> {
-  const startInfo = await startDeviceFlow(hostInput);
+  const startInfo = await startDeviceFlow(hostInput, { clientId: opts?.clientId });
   if (opts?.onUserCode) {
     opts.onUserCode(startInfo);
   } else {
@@ -134,7 +159,9 @@ export async function loginDevice(
 
   while (Date.now() < deadline) {
     await sleep(interval * 1000);
-    const r = await pollDeviceToken(startInfo.host, startInfo.device_code, interval);
+    const r = await pollDeviceToken(startInfo.host, startInfo.device_code, interval, {
+      clientId: startInfo.clientId,
+    });
     if (r.status === "ok" && r.token) {
       const client = createClient({
         authHeader: `token ${r.token}`,
@@ -148,6 +175,7 @@ export async function loginDevice(
         authMethod: "device",
         token: r.token,
         tokenScopes: r.scope ?? viewer.scopes ?? null,
+        clientId: startInfo.clientId,
       });
       const acct = getAccount(startInfo.host, viewer.login);
       if (!acct) throw new Error("Failed to insert account");

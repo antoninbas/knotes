@@ -50,11 +50,13 @@ const CreateConnectionSchema = z.object({
 
 const DeviceStartSchema = z.object({
   host: z.string().min(1),
+  clientId: z.string().optional(),
 });
 
 const DevicePollSchema = z.object({
   host: z.string().min(1),
   device_code: z.string().min(1),
+  clientId: z.string().optional(),
   interval: z.number().int().positive().optional(),
 });
 
@@ -127,7 +129,9 @@ githubApi.post("/auth/device/start", async (c) => {
     );
   }
   try {
-    const info = await startDeviceFlow(parsed.data.host);
+    const info = await startDeviceFlow(parsed.data.host, {
+      clientId: parsed.data.clientId,
+    });
     return c.json(info);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
@@ -149,7 +153,8 @@ githubApi.post("/auth/device/poll", async (c) => {
     const result = await pollDeviceToken(
       host,
       parsed.data.device_code,
-      parsed.data.interval ?? 5
+      parsed.data.interval ?? 5,
+      { clientId: parsed.data.clientId }
     );
     if (result.status === "pending") return c.json({ status: "pending" });
     const client = createClient({
@@ -164,6 +169,7 @@ githubApi.post("/auth/device/poll", async (c) => {
       authMethod: "device",
       token: result.token!,
       tokenScopes: result.scope ?? viewer.scopes ?? null,
+      clientId: parsed.data.clientId ?? null,
     });
     const acct = getAccount(host, viewer.login)!;
     return c.json({ status: "ok", account: acct });

@@ -103,6 +103,10 @@ const migrations: Migration[] = [
     `);
     db.exec(`CREATE INDEX idx_gh_evt_entry ON github_synced_events(entry_id)`);
   },
+  // Migration 5: per-account OAuth App client_id for device flow
+  (db) => {
+    db.exec(`ALTER TABLE github_accounts ADD COLUMN client_id TEXT`);
+  },
 ];
 
 function runMigrations(db: DatabaseInstance): void {

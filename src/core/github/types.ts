@@ -13,6 +13,8 @@ export interface GhAccount {
   userNodeId: string;
   authMethod: GhAuthMethod;
   tokenScopes: string | null;
+  /** OAuth App client_id used to authenticate this account (device flow only). */
+  clientId: string | null;
   createdAt: string;
   lastUsedAt: string | null;
 }

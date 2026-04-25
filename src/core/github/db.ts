@@ -15,6 +15,7 @@ interface AccountRow {
   auth_method: string;
   token: string | null;
   token_scopes: string | null;
+  client_id: string | null;
   created_at: string;
   last_used_at: string | null;
 }
@@ -53,6 +54,7 @@ function rowToAccount(row: AccountRow): GhAccount {
     userNodeId: row.user_node_id,
     authMethod: row.auth_method as GhAuthMethod,
     tokenScopes: row.token_scopes,
+    clientId: row.client_id,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,
   };
@@ -102,6 +104,7 @@ export interface InsertAccountInput {
   authMethod: GhAuthMethod;
   token: string | null;
   tokenScopes?: string | null;
+  clientId?: string | null;
 }
 
 export function insertAccount(input: InsertAccountInput): number {
@@ -109,13 +112,15 @@ export function insertAccount(input: InsertAccountInput): number {
   const now = new Date().toISOString();
   const result = db
     .prepare(
-      `INSERT INTO github_accounts (host, login, user_node_id, auth_method, token, token_scopes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO github_accounts
+         (host, login, user_node_id, auth_method, token, token_scopes, client_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(host, login) DO UPDATE SET
          user_node_id = excluded.user_node_id,
          auth_method = excluded.auth_method,
          token = excluded.token,
-         token_scopes = excluded.token_scopes`
+         token_scopes = excluded.token_scopes,
+         client_id = excluded.client_id`
     )
     .run(
       input.host,
@@ -124,6 +129,7 @@ export function insertAccount(input: InsertAccountInput): number {
       input.authMethod,
       input.token,
       input.tokenScopes ?? null,
+      input.clientId ?? null,
       now
     );
   if (result.lastInsertRowid) return Number(result.lastInsertRowid);

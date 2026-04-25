@@ -205,7 +205,8 @@ log entries for opened/merged/closed PRs you authored, opened issues, and
 PR reviews you submitted. Filters narrow activity by org or repo.
 
 ```bash
-knotes github auth login [--host HOST] [--method device|pat|gh] [--token T]
+knotes github auth login [--host HOST] [--method pat|gh|device]
+                         [--token T] [--client-id ID]
 knotes github auth list
 knotes github auth logout <host> <login>
 
@@ -224,13 +225,27 @@ knotes github cron-install [--interval MIN]         # serverless schedule snippe
 
 Authentication:
 
-- `--method device` (default for `github.com`) opens a one-time browser
-  prompt and works headless. Same flow as `gh auth login`.
-- `--method pat` accepts a Personal Access Token via `--token` or stdin.
-  Required for GHES instances that have device flow disabled.
-- `--method gh` reuses credentials from your `gh` CLI install
-  (`gh auth token --hostname HOST`). Zero-setup if `gh` is already
-  authenticated.
+- **`--method pat` (default).** Paste a Personal Access Token via
+  `--token` or stdin. Works on github.com and any GHES instance.
+- **`--method gh`.** Reuse credentials from your `gh` CLI install (shells
+  out to `gh auth token --hostname HOST`). Zero-setup if your `gh` is
+  already authenticated for that host.
+- **`--method device`.** Standard GitHub Device Flow; works headless / over
+  SSH. **Requires an OAuth App `--client-id`** because Device Flow needs a
+  registered OAuth App on the host:
+  - On **github.com**, knotes does not (yet) ship a built-in client_id, so
+    you must register your own OAuth App at
+    https://github.com/settings/applications/new (enable "Device Flow" on
+    the app's settings page) and pass its id with `--client-id`.
+  - On **GHES**, every instance must have its own OAuth App registered by
+    an admin or by the user. Register one at
+    `https://<your-ghes-host>/settings/applications/new` and pass
+    `--client-id` to knotes.
+
+  Multi-account on the same host is supported: re-run `auth login` for
+  each identity. Two device-flow accounts on the same host can use
+  different `--client-id`s (e.g. a personal App vs. an org-owned App).
+  The `client_id` is stored per account.
 
 Tokens are stored as plaintext in `$KNOTES_HOME/.data/knotes.sqlite` and
 the file is `chmod 0600` on first open. Anyone with read access to that

@@ -91,8 +91,12 @@ export function registerGithubCommands(program: Command): void {
     .command("login")
     .description("Authenticate with a GitHub host")
     .option("--host <host>", "GitHub host (e.g. github.com or ghe.example.com)", "github.com")
-    .option("--method <method>", "Authentication method: device | pat | gh", "device")
+    .option("--method <method>", "Authentication method: pat | gh | device", "pat")
     .option("--token <token>", "PAT (when --method pat)")
+    .option(
+      "--client-id <id>",
+      "OAuth App client_id (--method device). Required for GHES; required for github.com until knotes ships a built-in App."
+    )
     .action(async (opts) => {
       await ensureHome();
       const host = opts.host as string;
@@ -117,7 +121,7 @@ export function registerGithubCommands(program: Command): void {
         const acct = await loginGithubGhCli(host);
         console.log(`Authenticated as ${acct.login} on ${acct.host} (method: gh-cli)`);
       } else if (method === "device") {
-        const acct = await loginDevice(host);
+        const acct = await loginDevice(host, { clientId: opts.clientId as string | undefined });
         console.log(`Authenticated as ${acct.login} on ${acct.host} (method: device)`);
       } else {
         console.error(`Unknown method: ${method}. Use pat or gh.`);
