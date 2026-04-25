@@ -1,5 +1,8 @@
 import type { Command } from "commander";
-import { ensureHome } from "../../core/config.ts";
+import { platform } from "node:os";
+import { execSync } from "node:child_process";
+import { ensureHome, getConfig } from "../../core/config.ts";
+import { getJobs } from "../../core/db.ts";
 import {
   listGithubAccounts,
   loginGithubPat,
@@ -228,6 +231,98 @@ export function registerGithubCommands(program: Command): void {
           `connection ${r.connectionId} ${r.logPath}: pulled=${r.pulled} written=${r.written} updated=${r.updated} skipped=${r.skipped}${tail}`
         );
       }
+    });
+
+  gh
+    .command("status")
+    .description("Show recent GitHub sync jobs and their results")
+    .option("--limit <n>", "Max jobs to show", "10")
+    .action(async (opts) => {
+      const limit = parseInt(opts.limit, 10);
+      const { jobs } = getJobs({ pageSize: limit, type: "github:sync" });
+      if (jobs.length === 0) {
+        console.log("No GitHub sync jobs recorded.");
+        return;
+      }
+      for (const j of jobs) {
+        const meta = j.metadata || "";
+        const err = j.error ? ` error=${j.error}` : "";
+        const dur = j.duration_ms !== null ? ` (${j.duration_ms}ms)` : "";
+        console.log(`[${j.started_at}] ${j.type} ${j.status}${dur} ${meta}${err}`);
+      }
+    });
+
+  gh
+    .command("cron-install")
+    .description("Print a snippet to schedule periodic GitHub sync (cron / launchd / systemd timer)")
+    .option("--interval <minutes>", "Sync frequency in minutes", "10")
+    .action((opts) => {
+      const minutes = parseInt(opts.interval, 10);
+      if (Number.isNaN(minutes) || minutes < 1) {
+        console.error(`Invalid --interval: ${opts.interval}`);
+        process.exit(1);
+      }
+      const knotesPath = (() => {
+        try {
+          return execSync("command -v knotes", { encoding: "utf-8" }).trim() || "knotes";
+        } catch {
+          return "knotes";
+        }
+      })();
+      const os = platform();
+      console.log(`# Run \`knotes github sync\` every ${minutes} minute(s).`);
+      console.log(`# Knotes binary: ${knotesPath}`);
+      console.log("");
+      if (os === "darwin") {
+        console.log("# macOS — launchd (recommended). Save as");
+        console.log(`#   ~/Library/LaunchAgents/com.knotes.github-sync.plist`);
+        console.log("# then: launchctl load ~/Library/LaunchAgents/com.knotes.github-sync.plist");
+        console.log("");
+        console.log(`<?xml version="1.0" encoding="UTF-8"?>`);
+        console.log(`<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">`);
+        console.log(`<plist version="1.0">`);
+        console.log(`  <dict>`);
+        console.log(`    <key>Label</key><string>com.knotes.github-sync</string>`);
+        console.log(`    <key>ProgramArguments</key>`);
+        console.log(`    <array>`);
+        console.log(`      <string>${knotesPath}</string>`);
+        console.log(`      <string>github</string>`);
+        console.log(`      <string>sync</string>`);
+        console.log(`    </array>`);
+        console.log(`    <key>StartInterval</key><integer>${minutes * 60}</integer>`);
+        console.log(`    <key>RunAtLoad</key><true/>`);
+        console.log(`  </dict>`);
+        console.log(`</plist>`);
+        console.log("");
+        console.log("# Or, for cron (less idiomatic on macOS):");
+      } else if (os === "linux") {
+        console.log(`# Linux — systemd user timer (recommended). Create:`);
+        console.log(`#   ~/.config/systemd/user/knotes-github-sync.service`);
+        console.log(`#   ~/.config/systemd/user/knotes-github-sync.timer`);
+        console.log("# then: systemctl --user enable --now knotes-github-sync.timer");
+        console.log("");
+        console.log("# knotes-github-sync.service:");
+        console.log("[Unit]");
+        console.log("Description=Knotes GitHub activity sync");
+        console.log("[Service]");
+        console.log("Type=oneshot");
+        console.log(`ExecStart=${knotesPath} github sync`);
+        console.log("");
+        console.log("# knotes-github-sync.timer:");
+        console.log("[Unit]");
+        console.log("Description=Run knotes GitHub sync periodically");
+        console.log("[Timer]");
+        console.log(`OnUnitActiveSec=${minutes}min`);
+        console.log("OnBootSec=1min");
+        console.log("[Install]");
+        console.log("WantedBy=timers.target");
+        console.log("");
+        console.log("# Or, for cron:");
+      }
+      console.log(`*/${minutes} * * * * ${knotesPath} github sync >/dev/null 2>&1`);
+      console.log("");
+      console.log(`# Note: in server mode the running knotes server already syncs every ${getConfig().githubSyncInterval}s.`);
+      console.log(`# This snippet is intended for serverless mode or as a backstop.`);
     });
 
   gh

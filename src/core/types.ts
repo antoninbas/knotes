@@ -17,6 +17,10 @@ export interface KnotesConfig {
   rerank: boolean;
   /** Enable LLM query expansion in hybrid search (default: false — slow on CPU). */
   queryExpand: boolean;
+  /** Enable the background GitHub sync loop (default: true). */
+  githubEnabled: boolean;
+  /** Interval in seconds for the background GitHub sync loop (default: 600). */
+  githubSyncInterval: number;
 }
 
 export interface NoteMeta {

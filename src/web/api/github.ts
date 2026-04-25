@@ -11,6 +11,7 @@ import {
 } from "../../core/github/connections.ts";
 import { loginPat, loginGhCli } from "../../core/github/auth.ts";
 import { syncAll, syncConnection, syncForLog } from "../../core/github/sync.ts";
+import { getJobs } from "../../core/db.ts";
 
 const MonitorSchema = z.enum([
   "opened_prs",
@@ -162,6 +163,12 @@ githubApi.put("/connections/:id", async (c) => {
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
   }
+});
+
+githubApi.get("/sync/status", async (c) => {
+  const limit = parseInt(c.req.query("limit") || "20", 10);
+  const { jobs } = getJobs({ pageSize: limit, type: "github:sync" });
+  return c.json(jobs);
 });
 
 githubApi.post("/sync", async (c) => {

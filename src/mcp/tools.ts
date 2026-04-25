@@ -25,7 +25,11 @@ import {
   getContext,
   setContext,
   removeContext,
+  listGithubAccounts,
+  listGithubConnections,
+  syncGithub,
 } from "../core/router.ts";
+import { getJobs } from "../core/db.ts";
 
 function text(content: string) {
   return { content: [{ type: "text" as const, text: content }] };
@@ -226,9 +230,92 @@ export function registerTools(
     }
   );
 
+  server.tool(
+    "knotes_github_account_list",
+    "List authenticated GitHub accounts",
+    {},
+    async () => {
+      const accounts = await listGithubAccounts();
+      if (accounts.length === 0) return text("No GitHub accounts configured.");
+      const lines = accounts.map(
+        (a) =>
+          `${a.host}:${a.login} (method: ${a.authMethod}${a.lastUsedAt ? `, last_used=${a.lastUsedAt}` : ""})`
+      );
+      return text(lines.join("\n"));
+    }
+  );
+
+  server.tool(
+    "knotes_github_connections_list",
+    "List GitHub connections, optionally filtered by log journal path",
+    {
+      logPath: z
+        .string()
+        .optional()
+        .describe("Optional log journal path to filter by"),
+    },
+    async ({ logPath }) => {
+      const conns = await listGithubConnections(logPath);
+      if (conns.length === 0) return text("No GitHub connections found.");
+      const lines = conns.map((c) => {
+        const filters = [
+          c.includeOrgs && `include-org=${c.includeOrgs.join(",")}`,
+          c.excludeOrgs && `exclude-org=${c.excludeOrgs.join(",")}`,
+          c.includeRepos && `include-repo=${c.includeRepos.join(",")}`,
+          c.excludeRepos && `exclude-repo=${c.excludeRepos.join(",")}`,
+        ]
+          .filter(Boolean)
+          .join(" ");
+        return `#${c.id} ${c.logPath} account=${c.accountId} monitors=${c.monitors.join(",")} since=${c.since}${c.lastSyncedAt ? ` last_synced=${c.lastSyncedAt}` : ""}${filters ? " " + filters : ""}`;
+      });
+      return text(lines.join("\n"));
+    }
+  );
+
+  server.tool(
+    "knotes_github_sync_status",
+    "Show recent GitHub sync jobs (read-only)",
+    {
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Max jobs to return (default 20)"),
+    },
+    async ({ limit }) => {
+      const { jobs } = getJobs({ pageSize: limit ?? 20, type: "github:sync" });
+      if (jobs.length === 0) return text("No GitHub sync jobs recorded.");
+      const lines = jobs.map((j) => {
+        const meta = j.metadata ? ` ${j.metadata}` : "";
+        const err = j.error ? ` error=${j.error}` : "";
+        return `[${j.started_at}] ${j.type} ${j.status}${j.duration_ms !== null ? ` (${j.duration_ms}ms)` : ""}${meta}${err}`;
+      });
+      return text(lines.join("\n"));
+    }
+  );
+
   // --- Write tools (only in read-write mode) ---
 
   if (readOnly) return;
+
+  server.tool(
+    "knotes_github_sync_now",
+    "Trigger a GitHub activity sync immediately",
+    {
+      logPath: z.string().optional().describe("Sync only this journal"),
+      connectionId: z.number().int().positive().optional().describe("Sync only this connection"),
+    },
+    async ({ logPath, connectionId }) => {
+      const results = await syncGithub({ logPath, connectionId });
+      if (results.length === 0) return text("No connections to sync.");
+      const lines = results.map(
+        (r) =>
+          `connection ${r.connectionId} ${r.logPath}: pulled=${r.pulled} written=${r.written} updated=${r.updated} skipped=${r.skipped}${r.rateLimited ? " (RATE LIMITED)" : ""}`
+      );
+      return text(lines.join("\n"));
+    }
+  );
 
   server.tool(
     "knotes_note_create",
