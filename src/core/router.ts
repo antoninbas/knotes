@@ -11,7 +11,10 @@ import * as directLogs from "./logs.ts";
 import * as directSearch from "./search.ts";
 import * as directImporter from "./importer.ts";
 import * as directContext from "./context.ts";
+import * as directGhConnections from "./github/connections.ts";
+import * as directGhAuth from "./github/auth.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
+import type { GhAccount, GhConnection, GhMonitor } from "./github/types.ts";
 
 function useServer(): boolean {
   const config = getConfig();
@@ -162,6 +165,55 @@ export async function setContext(path: string, context: string): Promise<void> {
 export async function removeContext(path: string): Promise<void> {
   if (useServer()) return client.removeContext(path);
   return directContext.removeContext(path);
+}
+
+// --- GitHub ---
+
+export async function listGithubAccounts(): Promise<GhAccount[]> {
+  if (useServer()) return client.listGithubAccounts();
+  return directGhConnections.listAccounts();
+}
+
+export async function loginGithubPat(host: string, token: string): Promise<GhAccount> {
+  if (useServer()) return client.loginGithubPat(host, token);
+  return directGhAuth.loginPat(host, token);
+}
+
+export async function loginGithubGhCli(host: string): Promise<GhAccount> {
+  if (useServer()) return client.loginGithubGhCli(host);
+  return directGhAuth.loginGhCli(host);
+}
+
+export async function logoutGithub(host: string, login: string): Promise<void> {
+  if (useServer()) return client.logoutGithub(host, login);
+  return directGhConnections.logout(host, login);
+}
+
+export async function listGithubConnections(logPath?: string): Promise<GhConnection[]> {
+  if (useServer()) return client.listGithubConnections(logPath);
+  return directGhConnections.listConnections(logPath);
+}
+
+export interface AddGithubConnectionInput {
+  logPath: string;
+  host: string;
+  login: string;
+  monitors: GhMonitor[];
+  includeOrgs?: string[];
+  excludeOrgs?: string[];
+  includeRepos?: string[];
+  excludeRepos?: string[];
+  since?: string;
+}
+
+export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {
+  if (useServer()) return client.addGithubConnection(input);
+  return directGhConnections.addConnection(input);
+}
+
+export async function removeGithubConnection(id: number): Promise<void> {
+  if (useServer()) return client.removeGithubConnection(id);
+  return directGhConnections.removeConnection(id);
 }
 
 // --- Import ---

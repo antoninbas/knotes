@@ -5,6 +5,7 @@
 
 import { getServerInfo, isServerAlive } from "./db.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
+import type { GhAccount, GhConnection, GhMonitor } from "./github/types.ts";
 
 function getBaseUrl(): string {
   const info = getServerInfo();
@@ -217,4 +218,59 @@ export async function importDocument(filePath: string, opts?: { to?: string }): 
     method: "POST",
     body: JSON.stringify({ filePath, to: opts?.to }),
   });
+}
+
+// --- GitHub ---
+
+export async function listGithubAccounts(): Promise<GhAccount[]> {
+  return request<GhAccount[]>("/github/accounts");
+}
+
+export async function logoutGithub(host: string, login: string): Promise<void> {
+  await request("/github/accounts", {
+    method: "DELETE",
+    body: JSON.stringify({ host, login }),
+  });
+}
+
+export async function loginGithubPat(host: string, token: string): Promise<GhAccount> {
+  return request<GhAccount>("/github/auth/pat", {
+    method: "POST",
+    body: JSON.stringify({ host, token }),
+  });
+}
+
+export async function loginGithubGhCli(host: string): Promise<GhAccount> {
+  return request<GhAccount>("/github/auth/gh-cli", {
+    method: "POST",
+    body: JSON.stringify({ host }),
+  });
+}
+
+export async function listGithubConnections(logPath?: string): Promise<GhConnection[]> {
+  const q = logPath ? `?logPath=${encodeURIComponent(logPath)}` : "";
+  return request<GhConnection[]>(`/github/connections${q}`);
+}
+
+export interface AddGithubConnectionInput {
+  logPath: string;
+  host: string;
+  login: string;
+  monitors: GhMonitor[];
+  includeOrgs?: string[];
+  excludeOrgs?: string[];
+  includeRepos?: string[];
+  excludeRepos?: string[];
+  since?: string;
+}
+
+export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {
+  return request<GhConnection>("/github/connections", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function removeGithubConnection(id: number): Promise<void> {
+  await request(`/github/connections/${id}`, { method: "DELETE" });
 }

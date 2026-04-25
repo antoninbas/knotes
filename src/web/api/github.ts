@@ -1,0 +1,170 @@
+import { Hono } from "hono";
+import { z } from "zod";
+import { ensureHome } from "../../core/config.ts";
+import {
+  addConnection,
+  listConnections,
+  removeConnection,
+  updateConnection,
+  listAccounts,
+  logout,
+} from "../../core/github/connections.ts";
+import { loginPat, loginGhCli } from "../../core/github/auth.ts";
+
+const MonitorSchema = z.enum([
+  "opened_prs",
+  "merged_prs",
+  "opened_issues",
+  "pr_reviews",
+]);
+
+const PatLoginSchema = z.object({
+  host: z.string().min(1),
+  token: z.string().min(1),
+});
+
+const GhCliLoginSchema = z.object({
+  host: z.string().min(1),
+});
+
+const LogoutSchema = z.object({
+  host: z.string().min(1),
+  login: z.string().min(1),
+});
+
+const CreateConnectionSchema = z.object({
+  logPath: z.string().min(1),
+  host: z.string().min(1),
+  login: z.string().min(1),
+  monitors: z.array(MonitorSchema).min(1),
+  includeOrgs: z.array(z.string()).optional(),
+  excludeOrgs: z.array(z.string()).optional(),
+  includeRepos: z.array(z.string()).optional(),
+  excludeRepos: z.array(z.string()).optional(),
+  since: z.string().optional(),
+});
+
+const UpdateConnectionSchema = z.object({
+  monitors: z.array(MonitorSchema).optional(),
+  includeOrgs: z.array(z.string()).nullable().optional(),
+  excludeOrgs: z.array(z.string()).nullable().optional(),
+  includeRepos: z.array(z.string()).nullable().optional(),
+  excludeRepos: z.array(z.string()).nullable().optional(),
+  since: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+
+export const githubApi = new Hono();
+
+githubApi.get("/accounts", async (c) => {
+  await ensureHome();
+  const accounts = await listAccounts();
+  return c.json(accounts);
+});
+
+githubApi.delete("/accounts", async (c) => {
+  const raw = await c.req.json().catch(() => null);
+  const parsed = LogoutSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    await logout(parsed.data.host, parsed.data.login);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+githubApi.post("/auth/pat", async (c) => {
+  await ensureHome();
+  const raw = await c.req.json().catch(() => null);
+  const parsed = PatLoginSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    const acct = await loginPat(parsed.data.host, parsed.data.token);
+    return c.json(acct, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+githubApi.post("/auth/gh-cli", async (c) => {
+  await ensureHome();
+  const raw = await c.req.json().catch(() => null);
+  const parsed = GhCliLoginSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    const acct = await loginGhCli(parsed.data.host);
+    return c.json(acct, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+githubApi.get("/connections", async (c) => {
+  const logPath = c.req.query("logPath");
+  const conns = await listConnections(logPath || undefined);
+  return c.json(conns);
+});
+
+githubApi.post("/connections", async (c) => {
+  await ensureHome();
+  const raw = await c.req.json().catch(() => null);
+  const parsed = CreateConnectionSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    const conn = await addConnection(parsed.data);
+    return c.json(conn, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+githubApi.put("/connections/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  if (Number.isNaN(id)) return c.json({ error: "Invalid connection id" }, 400);
+  const raw = await c.req.json().catch(() => null);
+  const parsed = UpdateConnectionSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    const conn = await updateConnection(id, parsed.data);
+    return c.json(conn);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
+
+githubApi.delete("/connections/:id", async (c) => {
+  const id = parseInt(c.req.param("id"), 10);
+  if (Number.isNaN(id)) return c.json({ error: "Invalid connection id" }, 400);
+  try {
+    await removeConnection(id);
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 404);
+  }
+});
