@@ -447,16 +447,14 @@ test("two concurrent syncConnection calls coalesce; entries are not duplicated",
     },
   ];
   const { syncConnection } = await import("../src/core/github/sync.ts");
-  // Two clients firing in the same tick.
+  // Two clients firing in the same tick. The mutex coalesces both callers
+  // onto the same in-flight Promise, so they receive the same result object.
   const [r1, r2] = await Promise.all([
     syncConnection(cid, makeStubClient(prs)),
     syncConnection(cid, makeStubClient(prs)),
   ]);
-  // The two callers may receive the same coalesced result or one written + one
-  // skipped (depending on timing); the invariant is that there's exactly one
-  // entry on disk.
-  const total = (r1.written + r2.written) + (r1.skipped + r2.skipped);
-  expect(total).toBeGreaterThan(0);
+  expect(r1).toBe(r2);
+  expect(r1.written).toBe(1);
 
   const { listEntries } = await import("../src/core/logs.ts");
   const entries = await listEntries("logs/work/activity");
