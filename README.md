@@ -197,6 +197,50 @@ knotes context set notes/projects "Engineering project notes and design docs"
 knotes context set logs/standup "Daily standup notes from the infra team"
 ```
 
+### GitHub integration
+
+Connect a log journal to one or more GitHub accounts (github.com or
+self-hosted GHES). The connected journal is filled in automatically with
+log entries for opened/merged/closed PRs you authored, opened issues, and
+PR reviews you submitted. Filters narrow activity by org or repo.
+
+```bash
+knotes github auth login [--host HOST] [--method device|pat|gh] [--token T]
+knotes github auth list
+knotes github auth logout <host> <login>
+
+knotes github connect <log-path>
+                      --account <host>:<login>
+                      --monitor opened-prs,merged-prs,issues,reviews
+                      [--include-org ORG ...] [--exclude-repo OWNER/REPO ...]
+                      [--since YYYY-MM-DD]                  # default: now - 7d
+knotes github list [<log-path>]
+knotes github disconnect <connection-id>
+
+knotes github sync [<log-path>] [--connection ID]   # one-off sync
+knotes github status [--limit N]                     # recent sync jobs
+knotes github cron-install [--interval MIN]         # serverless schedule snippet
+```
+
+Authentication:
+
+- `--method device` (default for `github.com`) opens a one-time browser
+  prompt and works headless. Same flow as `gh auth login`.
+- `--method pat` accepts a Personal Access Token via `--token` or stdin.
+  Required for GHES instances that have device flow disabled.
+- `--method gh` reuses credentials from your `gh` CLI install
+  (`gh auth token --hostname HOST`). Zero-setup if `gh` is already
+  authenticated.
+
+Tokens are stored as plaintext in `$KNOTES_HOME/.data/knotes.sqlite` and
+the file is `chmod 0600` on first open. Anyone with read access to that
+file can read the tokens — back it up accordingly.
+
+In server mode, the running server polls every `githubSyncInterval`
+seconds (default 600). In serverless mode, run `knotes github sync` from
+a cron job / launchd plist / systemd timer; `knotes github cron-install`
+prints a ready-to-paste snippet for your platform.
+
 ### Configuration
 
 ```bash
@@ -220,6 +264,8 @@ Configuration keys:
 | `rerankModel` | `""` (qmd default) | HuggingFace GGUF URI for the reranker |
 | `rerank` | `false` | Enable LLM reranking in hybrid search (slow on CPU) |
 | `queryExpand` | `false` | Enable LLM query expansion in hybrid search (slow on CPU) |
+| `githubEnabled` | `true` | Enable the background GitHub sync loop |
+| `githubSyncInterval` | `600` | GitHub sync interval in seconds (server mode) |
 
 ## Storage
 

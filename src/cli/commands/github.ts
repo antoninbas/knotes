@@ -13,6 +13,7 @@ import {
   removeGithubConnection,
   syncGithub,
 } from "../../core/router.ts";
+import { loginDevice } from "../../core/github/auth.ts";
 import type { GhMonitor } from "../../core/github/types.ts";
 
 const MONITOR_ALIASES: Record<string, GhMonitor> = {
@@ -90,7 +91,7 @@ export function registerGithubCommands(program: Command): void {
     .command("login")
     .description("Authenticate with a GitHub host")
     .option("--host <host>", "GitHub host (e.g. github.com or ghe.example.com)", "github.com")
-    .option("--method <method>", "Authentication method: pat | gh (device flow coming in milestone 6)", "pat")
+    .option("--method <method>", "Authentication method: device | pat | gh", "device")
     .option("--token <token>", "PAT (when --method pat)")
     .action(async (opts) => {
       await ensureHome();
@@ -116,8 +117,8 @@ export function registerGithubCommands(program: Command): void {
         const acct = await loginGithubGhCli(host);
         console.log(`Authenticated as ${acct.login} on ${acct.host} (method: gh-cli)`);
       } else if (method === "device") {
-        console.error("Device flow is not yet implemented (milestone 6). Use --method pat or --method gh.");
-        process.exit(1);
+        const acct = await loginDevice(host);
+        console.log(`Authenticated as ${acct.login} on ${acct.host} (method: device)`);
       } else {
         console.error(`Unknown method: ${method}. Use pat or gh.`);
         process.exit(1);

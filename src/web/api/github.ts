@@ -9,7 +9,9 @@ import {
   listAccounts,
   logout,
 } from "../../core/github/connections.ts";
-import { loginPat, loginGhCli } from "../../core/github/auth.ts";
+import { loginPat, loginGhCli, startDeviceFlow, pollDeviceToken } from "../../core/github/auth.ts";
+import { createClient, normalizeHost } from "../../core/github/api.ts";
+import { insertAccount, getAccount } from "../../core/github/db.ts";
 import { syncAll, syncConnection, syncForLog } from "../../core/github/sync.ts";
 import { getJobs } from "../../core/db.ts";
 
@@ -44,6 +46,16 @@ const CreateConnectionSchema = z.object({
   includeRepos: z.array(z.string()).optional(),
   excludeRepos: z.array(z.string()).optional(),
   since: z.string().optional(),
+});
+
+const DeviceStartSchema = z.object({
+  host: z.string().min(1),
+});
+
+const DevicePollSchema = z.object({
+  host: z.string().min(1),
+  device_code: z.string().min(1),
+  interval: z.number().int().positive().optional(),
 });
 
 const SyncSchema = z.object({
@@ -99,6 +111,62 @@ githubApi.post("/auth/pat", async (c) => {
   try {
     const acct = await loginPat(parsed.data.host, parsed.data.token);
     return c.json(acct, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+githubApi.post("/auth/device/start", async (c) => {
+  await ensureHome();
+  const raw = await c.req.json().catch(() => null);
+  const parsed = DeviceStartSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    const info = await startDeviceFlow(parsed.data.host);
+    return c.json(info);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 400);
+  }
+});
+
+githubApi.post("/auth/device/poll", async (c) => {
+  await ensureHome();
+  const raw = await c.req.json().catch(() => null);
+  const parsed = DevicePollSchema.safeParse(raw);
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  const host = normalizeHost(parsed.data.host);
+  try {
+    const result = await pollDeviceToken(
+      host,
+      parsed.data.device_code,
+      parsed.data.interval ?? 5
+    );
+    if (result.status === "pending") return c.json({ status: "pending" });
+    const client = createClient({
+      authHeader: `token ${result.token}`,
+      host,
+    });
+    const viewer = await client.resolveViewer();
+    insertAccount({
+      host,
+      login: viewer.login,
+      userNodeId: viewer.nodeId,
+      authMethod: "device",
+      token: result.token!,
+      tokenScopes: result.scope ?? viewer.scopes ?? null,
+    });
+    const acct = getAccount(host, viewer.login)!;
+    return c.json({ status: "ok", account: acct });
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
   }
