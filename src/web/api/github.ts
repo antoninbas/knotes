@@ -55,6 +55,7 @@ const CreateConnectionSchema = z.object({
   since: z.string().optional(),
   bodyMode: BodyModeSchema.optional(),
   bodyMaxChars: z.number().int().positive().nullable().optional(),
+  syncNow: z.boolean().optional(),
 });
 
 const DeviceStartSchema = z.object({
@@ -84,6 +85,7 @@ const UpdateConnectionSchema = z.object({
   enabled: z.boolean().optional(),
   bodyMode: BodyModeSchema.optional(),
   bodyMaxChars: z.number().int().positive().nullable().optional(),
+  syncNow: z.boolean().optional(),
 });
 
 export const githubApi = new Hono();
@@ -229,8 +231,17 @@ githubApi.post("/connections", async (c) => {
     );
   }
   try {
-    const conn = await addConnection(parsed.data);
-    return c.json(conn, 201);
+    const { syncNow, ...input } = parsed.data;
+    const conn = await addConnection(input);
+    let syncResult = null;
+    if (syncNow) {
+      try {
+        syncResult = await syncConnection(conn.id, undefined, "manual");
+      } catch (err: any) {
+        syncResult = { error: err.message };
+      }
+    }
+    return c.json({ connection: conn, syncResult }, 201);
   } catch (err: any) {
     return c.json({ error: err.message }, 400);
   }
@@ -248,8 +259,17 @@ githubApi.put("/connections/:id", async (c) => {
     );
   }
   try {
-    const conn = await updateConnection(id, parsed.data);
-    return c.json(conn);
+    const { syncNow, ...patch } = parsed.data;
+    const conn = await updateConnection(id, patch);
+    let syncResult = null;
+    if (syncNow) {
+      try {
+        syncResult = await syncConnection(conn.id, undefined, "manual");
+      } catch (err: any) {
+        syncResult = { error: err.message };
+      }
+    }
+    return c.json({ connection: conn, syncResult });
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
   }

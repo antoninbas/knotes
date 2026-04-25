@@ -195,6 +195,7 @@ export function registerGithubCommands(program: Command): void {
       "How much of each PR/issue body to include: title | full | first-paragraph | first-chars:N",
       "title"
     )
+    .option("--sync", "Run a sync immediately after creating/updating the connection")
     .action(async (logPath: string, opts) => {
       const { host, login } = parseAccountSpec(opts.account as string);
       const body = parseBodySpec(opts.body as string);
@@ -212,6 +213,14 @@ export function registerGithubCommands(program: Command): void {
         bodyMaxChars: body.maxChars,
       });
       console.log(`Created connection ${conn.id} for ${logPath} (since ${conn.since}, body=${body.mode}${body.maxChars ? `:${body.maxChars}` : ""})`);
+      if (opts.sync) {
+        const results = await syncGithub({ connectionId: conn.id });
+        for (const r of results) {
+          console.log(
+            `  sync: pulled=${r.pulled} written=${r.written} updated=${r.updated} skipped=${r.skipped}${r.rateLimited ? " (RATE LIMITED)" : ""}`
+          );
+        }
+      }
     });
 
   gh

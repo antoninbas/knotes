@@ -596,3 +596,62 @@ test("GET /api/jobs supports type filter", async () => {
   expect(body2.jobs).toEqual([]);
   expect(body2.total).toBe(0);
 });
+
+test("POST /api/github/connections returns {connection, syncResult: null} when syncNow is omitted", async () => {
+  const { insertAccount } = await import("../src/core/github/db.ts");
+  insertAccount({
+    host: "github.com",
+    login: "alice",
+    userNodeId: "U_1",
+    authMethod: "pat",
+    token: "t",
+  });
+  const { createLog } = await import("../src/core/logs.ts");
+  await createLog("logs/work", "Work");
+
+  const res = await post("/api/github/connections", {
+    logPath: "logs/work",
+    host: "github.com",
+    login: "alice",
+    monitors: ["merged_prs"],
+  });
+  expect(res.status).toBe(201);
+  const body = await json(res);
+  expect(body.connection).toBeDefined();
+  expect(body.connection.logPath).toBe("logs/work");
+  expect(body.syncResult).toBeNull();
+});
+
+test("PUT /api/github/connections/:id with syncNow surfaces the sync error in syncResult", async () => {
+  const { insertAccount } = await import("../src/core/github/db.ts");
+  // Account uses "gh-cli" so getAuthHeader will fail (no `gh` token for this fake host).
+  insertAccount({
+    host: "ghe.test.invalid",
+    login: "alice",
+    userNodeId: "U_1",
+    authMethod: "gh-cli",
+    token: null,
+  });
+  const { createLog } = await import("../src/core/logs.ts");
+  await createLog("logs/work", "Work");
+
+  // First, create the connection without syncing.
+  const create = await post("/api/github/connections", {
+    logPath: "logs/work",
+    host: "ghe.test.invalid",
+    login: "alice",
+    monitors: ["merged_prs"],
+  });
+  expect(create.status).toBe(201);
+  const { connection } = await json(create);
+
+  // Now PUT with syncNow=true; the sync will fail because gh isn't authenticated.
+  const upd = await put(`/api/github/connections/${connection.id}`, {
+    monitors: ["opened_prs", "merged_prs"],
+    syncNow: true,
+  });
+  expect(upd.status).toBe(200);
+  const body = await json(upd);
+  expect(body.connection.monitors).toEqual(["opened_prs", "merged_prs"]);
+  expect(body.syncResult).toMatchObject({ error: expect.stringMatching(/gh CLI/) });
+});

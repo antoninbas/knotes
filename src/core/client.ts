@@ -267,10 +267,11 @@ export interface AddGithubConnectionInput {
 }
 
 export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {
-  return request<GhConnection>("/github/connections", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
+  const res = await request<{ connection: GhConnection; syncResult: unknown }>(
+    "/github/connections",
+    { method: "POST", body: JSON.stringify(input) }
+  );
+  return res.connection;
 }
 
 export async function removeGithubConnection(id: number): Promise<void> {

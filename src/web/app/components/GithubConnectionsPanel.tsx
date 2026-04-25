@@ -13,6 +13,8 @@ import {
 interface Props {
   logPath: string;
   readOnly?: boolean;
+  /** Called after any sync completes — host can refresh entries. */
+  onSync?: () => void;
 }
 
 const MONITOR_OPTIONS: { value: GhMonitor; label: string; help: string }[] = [
@@ -40,6 +42,7 @@ interface FormState {
   bodyMode: GhBodyMode;
   bodyMaxChars: number;
   enabled: boolean;
+  syncAfterSave: boolean;
 }
 
 function emptyForm(): FormState {
@@ -54,6 +57,7 @@ function emptyForm(): FormState {
     bodyMode: "title",
     bodyMaxChars: 500,
     enabled: true,
+    syncAfterSave: true,
   };
 }
 
@@ -152,6 +156,7 @@ export default function GithubConnectionsPanel(props: Props) {
       bodyMode: conn.bodyMode,
       bodyMaxChars: conn.bodyMaxChars ?? 500,
       enabled: conn.enabled,
+      syncAfterSave: true,
     });
     setFormError(null);
     setEditing({ kind: "edit", id: conn.id });
@@ -195,6 +200,7 @@ export default function GithubConnectionsPanel(props: Props) {
     setFormSaving(true);
     setFormError(null);
     try {
+      let response;
       if (mode.kind === "new") {
         const [host, ...loginParts] = f.accountKey.split(":");
         const login = loginParts.join(":");
@@ -210,8 +216,9 @@ export default function GithubConnectionsPanel(props: Props) {
           since: f.since ? new Date(f.since).toISOString() : undefined,
           bodyMode: f.bodyMode,
           bodyMaxChars: f.bodyMode === "first_chars" ? f.bodyMaxChars : null,
+          syncNow: f.syncAfterSave,
         };
-        await githubApi.addConnection(input);
+        response = await githubApi.addConnection(input);
       } else {
         const patch: UpdateGithubConnectionInput = {
           monitors,
@@ -223,10 +230,17 @@ export default function GithubConnectionsPanel(props: Props) {
           enabled: f.enabled,
           bodyMode: f.bodyMode,
           bodyMaxChars: f.bodyMode === "first_chars" ? f.bodyMaxChars : null,
+          syncNow: f.syncAfterSave,
         };
-        await githubApi.updateConnection(mode.id, patch);
+        response = await githubApi.updateConnection(mode.id, patch);
       }
       setEditing(null);
+      if (response.syncResult && "connectionId" in response.syncResult) {
+        setSyncResults([response.syncResult]);
+        props.onSync?.();
+      } else if (response.syncResult && "error" in response.syncResult) {
+        setGlobalError(`Sync failed: ${response.syncResult.error}`);
+      }
       await reload();
     } catch (err: any) {
       setFormError(err.message || "Failed to save connection");
@@ -256,6 +270,7 @@ export default function GithubConnectionsPanel(props: Props) {
     try {
       const results = await githubApi.sync({ connectionId: id });
       setSyncResults(results);
+      props.onSync?.();
       await reload();
     } catch (err: any) {
       setGlobalError(err.message || "Sync failed");
@@ -271,6 +286,7 @@ export default function GithubConnectionsPanel(props: Props) {
     try {
       const results = await githubApi.sync({ logPath: props.logPath });
       setSyncResults(results);
+      props.onSync?.();
       await reload();
     } catch (err: any) {
       setGlobalError(err.message || "Sync failed");
@@ -481,7 +497,7 @@ export default function GithubConnectionsPanel(props: Props) {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label class="block mb-1" style={{ color: "var(--color-text-muted)" }}>Include orgs</label>
               <input
@@ -528,7 +544,7 @@ export default function GithubConnectionsPanel(props: Props) {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <label class="block mb-1" style={{ color: "var(--color-text-muted)" }}>Since (default: 7d ago)</label>
               <input
@@ -579,6 +595,15 @@ export default function GithubConnectionsPanel(props: Props) {
             </label>
           </Show>
 
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form().syncAfterSave}
+              onChange={(e) => setField("syncAfterSave", e.currentTarget.checked)}
+            />
+            <span style={{ color: "var(--color-text-primary)" }}>Sync immediately after saving</span>
+          </label>
+
           <Show when={formError()}>
             <p style={{ color: "#dc2626" }}>{formError()}</p>
           </Show>
@@ -590,7 +615,7 @@ export default function GithubConnectionsPanel(props: Props) {
               class="px-3 py-1 rounded cursor-pointer disabled:opacity-50"
               style={{ background: "var(--color-accent)", color: "#fff" }}
             >
-              {formSaving() ? "Saving…" : "Save"}
+              {formSaving() ? (form().syncAfterSave ? "Saving + syncing…" : "Saving…") : "Save"}
             </button>
             <button
               onClick={cancelEdit}

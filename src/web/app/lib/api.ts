@@ -194,6 +194,7 @@ export interface AddGithubConnectionInput {
   since?: string;
   bodyMode?: GhBodyMode;
   bodyMaxChars?: number | null;
+  syncNow?: boolean;
 }
 
 export interface UpdateGithubConnectionInput {
@@ -206,6 +207,12 @@ export interface UpdateGithubConnectionInput {
   enabled?: boolean;
   bodyMode?: GhBodyMode;
   bodyMaxChars?: number | null;
+  syncNow?: boolean;
+}
+
+export interface SaveConnectionResponse {
+  connection: GhConnection;
+  syncResult: GhSyncResult | { error: string } | null;
 }
 
 export const githubApi = {
@@ -217,13 +224,13 @@ export const githubApi = {
     ),
 
   addConnection: (input: AddGithubConnectionInput) =>
-    request<GhConnection>("/github/connections", {
+    request<SaveConnectionResponse>("/github/connections", {
       method: "POST",
       body: JSON.stringify(input),
     }),
 
   updateConnection: (id: number, patch: UpdateGithubConnectionInput) =>
-    request<GhConnection>(`/github/connections/${id}`, {
+    request<SaveConnectionResponse>(`/github/connections/${id}`, {
       method: "PUT",
       body: JSON.stringify(patch),
     }),

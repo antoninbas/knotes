@@ -193,7 +193,11 @@ export default function LogView(props: Props) {
       </div>
 
       {/* GitHub connections */}
-      <GithubConnectionsPanel logPath={props.note.path} readOnly={props.readOnly} />
+      <GithubConnectionsPanel
+        logPath={props.note.path}
+        readOnly={props.readOnly}
+        onSync={loadEntries}
+      />
 
       {/* Add entry form */}
       <Show when={!props.readOnly}>
