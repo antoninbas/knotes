@@ -173,12 +173,41 @@ test("insertConnection upserts on (logPath, accountId) conflict", async () => {
     accountId: aid,
     monitors: ["opened_issues", "pr_reviews"],
     since: "2026-04-15T00:00:00Z",
+    overwriteSince: true,
   });
   expect(cid2).toBe(cid1);
 
   const conn = getConnection(cid1)!;
   expect(conn.monitors).toEqual(["opened_issues", "pr_reviews"]);
   expect(conn.since).toBe("2026-04-15T00:00:00Z");
+});
+
+test("insertConnection on conflict preserves stored `since` when overwriteSince is omitted", async () => {
+  const { insertAccount, insertConnection, getConnection } = await import(
+    "../src/core/github/db.ts"
+  );
+  const aid = insertAccount({
+    host: "github.com",
+    login: "alice",
+    userNodeId: "U_1",
+    authMethod: "pat",
+    token: "t",
+  });
+  const cid = insertConnection({
+    logPath: "logs/work",
+    accountId: aid,
+    monitors: ["merged_prs"],
+    since: "2026-01-01T00:00:00Z",
+  });
+  insertConnection({
+    logPath: "logs/work",
+    accountId: aid,
+    monitors: ["opened_prs"],
+    since: "2099-12-31T00:00:00Z",
+  });
+  const conn = getConnection(cid)!;
+  expect(conn.since).toBe("2026-01-01T00:00:00Z");
+  expect(conn.monitors).toEqual(["opened_prs"]);
 });
 
 test("updateConnection patches selected fields", async () => {

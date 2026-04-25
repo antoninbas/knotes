@@ -105,9 +105,14 @@ export async function startDeviceFlow(
 export async function pollDeviceToken(
   host: string,
   deviceCode: string,
-  _intervalSec: number,
+  intervalSec: number,
   opts?: { clientId?: string | null }
-): Promise<{ status: "pending" | "ok"; token?: string; scope?: string }> {
+): Promise<{
+  status: "pending" | "ok";
+  token?: string;
+  scope?: string;
+  newInterval?: number;
+}> {
   const clientId = resolveClientId(host, opts?.clientId);
   if (!clientId) throw clientIdMissingError(host);
   const res = await fetch(accessTokenUrl(host), {
@@ -131,8 +136,9 @@ export async function pollDeviceToken(
   }
   if (payload.error === "authorization_pending") return { status: "pending" };
   if (payload.error === "slow_down") {
-    // Caller should respect the new interval; the next poll uses it.
-    return { status: "pending" };
+    // RFC 8628 §3.5: bump interval by GitHub's hint, or by 5s as a safe default.
+    const bump = payload.interval ?? 5;
+    return { status: "pending", newInterval: intervalSec + bump };
   }
   throw new Error(
     payload.error_description || payload.error || "Device flow failed"
@@ -162,6 +168,7 @@ export async function loginDevice(
     const r = await pollDeviceToken(startInfo.host, startInfo.device_code, interval, {
       clientId: startInfo.clientId,
     });
+    if (r.newInterval) interval = r.newInterval;
     if (r.status === "ok" && r.token) {
       const client = createClient({
         authHeader: `token ${r.token}`,

@@ -277,6 +277,70 @@ test("syncConnection rewrites the same entry when a PR title changes (same state
   expect(hashAfter).not.toBe(hashBefore);
 });
 
+test("syncConnection with only merged_prs skips OPEN and CLOSED PRs", async () => {
+  const cid = await setupAccountAndConnection(["merged_prs"]);
+  const prs: PRFixture[] = [
+    {
+      id: "PR_OPEN",
+      number: 1,
+      title: "Open",
+      url: "https://github.com/acme/thing/pull/1",
+      state: "OPEN",
+      isDraft: false,
+      createdAt: "2026-04-22T10:00:00Z",
+      updatedAt: "2026-04-22T10:00:00Z",
+      mergedAt: null,
+      closedAt: null,
+      additions: 1,
+      deletions: 0,
+      baseRefName: "main",
+      repository: REPO,
+    },
+    {
+      id: "PR_MERGED",
+      number: 2,
+      title: "Merged",
+      url: "https://github.com/acme/thing/pull/2",
+      state: "MERGED",
+      isDraft: false,
+      createdAt: "2026-04-22T11:00:00Z",
+      updatedAt: "2026-04-22T11:00:00Z",
+      mergedAt: "2026-04-22T11:00:00Z",
+      closedAt: "2026-04-22T11:00:00Z",
+      additions: 1,
+      deletions: 0,
+      baseRefName: "main",
+      repository: REPO,
+    },
+    {
+      id: "PR_CLOSED",
+      number: 3,
+      title: "Closed",
+      url: "https://github.com/acme/thing/pull/3",
+      state: "CLOSED",
+      isDraft: false,
+      createdAt: "2026-04-22T12:00:00Z",
+      updatedAt: "2026-04-22T12:00:00Z",
+      mergedAt: null,
+      closedAt: "2026-04-22T12:30:00Z",
+      additions: 1,
+      deletions: 0,
+      baseRefName: "main",
+      repository: REPO,
+    },
+  ];
+  const { syncConnection } = await import("../src/core/github/sync.ts");
+  const r = await syncConnection(cid, makeStubClient(prs));
+  expect(r.pulled).toBe(1);
+  expect(r.written).toBe(1);
+
+  const { listEntries } = await import("../src/core/logs.ts");
+  const entries = await listEntries("logs/work/activity");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.content).toContain("**Merged PR**");
+  expect(entries[0]!.content).toContain("acme/thing#2");
+});
+
 test("syncConnection respects exclude-org filter", async () => {
   const cid = await setupAccountAndConnection(["merged_prs"]);
   const { updateConnection } = await import("../src/core/github/connections.ts");
@@ -360,6 +424,43 @@ test("upsertEntryFromSource keeps newest-first order when backfilling old entrie
     const cur = new Date(entries[i]!.timestamp).getTime();
     expect(prev).toBeGreaterThanOrEqual(cur);
   }
+});
+
+test("two concurrent syncConnection calls coalesce; entries are not duplicated", async () => {
+  const cid = await setupAccountAndConnection(["opened_prs", "merged_prs"]);
+  const prs: PRFixture[] = [
+    {
+      id: "PR_RACE",
+      number: 1,
+      title: "Race",
+      url: "https://github.com/acme/thing/pull/1",
+      state: "OPEN",
+      isDraft: false,
+      createdAt: "2026-04-22T10:00:00Z",
+      updatedAt: "2026-04-22T10:00:00Z",
+      mergedAt: null,
+      closedAt: null,
+      additions: 1,
+      deletions: 0,
+      baseRefName: "main",
+      repository: REPO,
+    },
+  ];
+  const { syncConnection } = await import("../src/core/github/sync.ts");
+  // Two clients firing in the same tick.
+  const [r1, r2] = await Promise.all([
+    syncConnection(cid, makeStubClient(prs)),
+    syncConnection(cid, makeStubClient(prs)),
+  ]);
+  // The two callers may receive the same coalesced result or one written + one
+  // skipped (depending on timing); the invariant is that there's exactly one
+  // entry on disk.
+  const total = (r1.written + r2.written) + (r1.skipped + r2.skipped);
+  expect(total).toBeGreaterThan(0);
+
+  const { listEntries } = await import("../src/core/logs.ts");
+  const entries = await listEntries("logs/work/activity");
+  expect(entries).toHaveLength(1);
 });
 
 test("syncConnection adopts an existing entry by gh-event marker when DB row is missing", async () => {

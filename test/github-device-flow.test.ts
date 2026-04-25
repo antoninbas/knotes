@@ -170,6 +170,31 @@ test("loginDevice persists the client_id on the account row (multi-account, diff
   expect(byLogin["bob"]!.clientId).toBe("Iv1.bob_app");
 });
 
+test("pollDeviceToken bumps the interval on slow_down", async () => {
+  globalThis.fetch = vi.fn(async () =>
+    new Response(JSON.stringify({ error: "slow_down", interval: 7 }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })
+  ) as any;
+  const { pollDeviceToken } = await import("../src/core/github/auth.ts");
+  const r = await pollDeviceToken("github.com", "DEV", 5, { clientId: "Iv1.testapp" });
+  expect(r.status).toBe("pending");
+  expect(r.newInterval).toBe(12); // 5 + 7
+});
+
+test("pollDeviceToken slow_down without an explicit interval bumps by the 5s default", async () => {
+  globalThis.fetch = vi.fn(async () =>
+    new Response(JSON.stringify({ error: "slow_down" }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })
+  ) as any;
+  const { pollDeviceToken } = await import("../src/core/github/auth.ts");
+  const r = await pollDeviceToken("github.com", "DEV", 5, { clientId: "Iv1.testapp" });
+  expect(r.newInterval).toBe(10);
+});
+
 test("pollDeviceToken returns ok with the access token on success", async () => {
   globalThis.fetch = vi.fn(async () =>
     new Response(JSON.stringify({ access_token: "ghu_abc", scope: "repo" }), {

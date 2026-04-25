@@ -167,7 +167,12 @@ githubApi.post("/auth/device/poll", async (c) => {
       parsed.data.interval ?? 5,
       { clientId: parsed.data.clientId }
     );
-    if (result.status === "pending") return c.json({ status: "pending" });
+    if (result.status === "pending") {
+      return c.json({
+        status: "pending",
+        ...(result.newInterval ? { newInterval: result.newInterval } : {}),
+      });
+    }
     const client = createClient({
       authHeader: `token ${result.token}`,
       host,

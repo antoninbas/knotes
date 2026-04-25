@@ -113,6 +113,7 @@ export async function addConnection(
     includeRepos: lowercaseAll(input.includeRepos) ?? null,
     excludeRepos: lowercaseAll(input.excludeRepos) ?? null,
     since: input.since || defaultSince(),
+    overwriteSince: !!input.since,
     bodyMode,
     bodyMaxChars: bodyMode === "first_chars" ? (input.bodyMaxChars ?? null) : null,
   });

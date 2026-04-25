@@ -199,7 +199,14 @@ export interface InsertConnectionInput {
   excludeOrgs?: string[] | null;
   includeRepos?: string[] | null;
   excludeRepos?: string[] | null;
+  /** Used on insert. Also overwrites on conflict when overwriteSince=true. */
   since: string;
+  /**
+   * If true (default false), an ON CONFLICT update overwrites the stored
+   * `since` with the new value. Defaults to false so a user re-running
+   * `connect` without `--since` doesn't silently reset their backfill cutoff.
+   */
+  overwriteSince?: boolean;
   enabled?: boolean;
   bodyMode?: GhBodyMode;
   bodyMaxChars?: number | null;
@@ -208,6 +215,7 @@ export interface InsertConnectionInput {
 export function insertConnection(input: InsertConnectionInput): number {
   const db = getDb();
   const now = new Date().toISOString();
+  const sinceClause = input.overwriteSince ? "since = excluded.since," : "";
   const result = db
     .prepare(
       `INSERT INTO github_connections
@@ -219,7 +227,7 @@ export function insertConnection(input: InsertConnectionInput): number {
          exclude_orgs = excluded.exclude_orgs,
          include_repos = excluded.include_repos,
          exclude_repos = excluded.exclude_repos,
-         since = excluded.since,
+         ${sinceClause}
          enabled = excluded.enabled,
          body_mode = excluded.body_mode,
          body_max_chars = excluded.body_max_chars`

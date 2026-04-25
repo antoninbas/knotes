@@ -455,7 +455,30 @@ async function processEvent(
 
 // --- Public entry points ---
 
+/**
+ * Per-connection mutex. The whole syncConnection body reads then writes the
+ * markdown file; two concurrent runs (e.g. background + UI-triggered) would
+ * otherwise read the same pre-image and clobber each other on write.
+ */
+const inflight = new Map<number, Promise<GhSyncResult>>();
+
 export async function syncConnection(
+  connectionId: number,
+  client?: SyncClient,
+  trigger: "manual" | "background" | "cli" = "cli"
+): Promise<GhSyncResult> {
+  const existing = inflight.get(connectionId);
+  if (existing) return existing;
+  const p = syncConnectionImpl(connectionId, client, trigger);
+  inflight.set(connectionId, p);
+  try {
+    return await p;
+  } finally {
+    inflight.delete(connectionId);
+  }
+}
+
+async function syncConnectionImpl(
   connectionId: number,
   client?: SyncClient,
   trigger: "manual" | "background" | "cli" = "cli"
@@ -571,18 +594,10 @@ async function collectEvents(
   if (monitors.has("opened_prs") || monitors.has("merged_prs")) {
     const prs = await fetchPRs(client, cutoff, includeBody);
     for (const pr of prs) {
-      // Filter by monitor selection: if user only wants merged_prs, skip
-      // open / closed PRs; if only opened_prs, include them all (since
-      // every PR was once "opened" — represented as the same entry).
-      if (pr.state === "MERGED" && !monitors.has("merged_prs") && !monitors.has("opened_prs")) {
-        continue;
-      }
-      if (pr.state === "OPEN" && !monitors.has("opened_prs")) {
-        continue;
-      }
-      if (pr.state === "CLOSED" && !monitors.has("opened_prs")) {
-        continue;
-      }
+      // opened_prs tracks PRs through their full lifecycle (OPEN/CLOSED/MERGED);
+      // merged_prs surfaces only landed PRs. With merged_prs alone selected,
+      // skip OPEN and CLOSED-without-merge.
+      if (!monitors.has("opened_prs") && pr.state !== "MERGED") continue;
       const rendered = renderPR(pr, conn.bodyMode, conn.bodyMaxChars);
       events.push({
         eventId: `pr:${pr.id}`,

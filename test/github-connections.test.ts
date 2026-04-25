@@ -139,6 +139,51 @@ test("addConnection rejects empty / invalid monitor lists", async () => {
   ).rejects.toThrow(/Invalid monitor/);
 });
 
+test("addConnection re-run without --since preserves the stored cutoff", async () => {
+  await setupAccountAndJournal();
+  const { addConnection } = await import("../src/core/github/connections.ts");
+  const explicit = "2026-01-01T00:00:00.000Z";
+  const c1 = await addConnection({
+    logPath: "logs/work/activity",
+    host: "github.com",
+    login: "alice",
+    monitors: ["merged_prs"],
+    since: explicit,
+  });
+  expect(c1.since).toBe(explicit);
+
+  // Re-run with no `since` — should keep the stored value, not reset to now-7d.
+  const c2 = await addConnection({
+    logPath: "logs/work/activity",
+    host: "github.com",
+    login: "alice",
+    monitors: ["opened_issues"],
+  });
+  expect(c2.id).toBe(c1.id);
+  expect(c2.since).toBe(explicit);
+});
+
+test("addConnection re-run WITH --since updates the cutoff", async () => {
+  await setupAccountAndJournal();
+  const { addConnection } = await import("../src/core/github/connections.ts");
+  const c1 = await addConnection({
+    logPath: "logs/work/activity",
+    host: "github.com",
+    login: "alice",
+    monitors: ["merged_prs"],
+    since: "2026-01-01T00:00:00.000Z",
+  });
+  const c2 = await addConnection({
+    logPath: "logs/work/activity",
+    host: "github.com",
+    login: "alice",
+    monitors: ["merged_prs"],
+    since: "2026-04-01T00:00:00.000Z",
+  });
+  expect(c2.id).toBe(c1.id);
+  expect(c2.since).toBe("2026-04-01T00:00:00.000Z");
+});
+
 test("addConnection upserts on (logPath, account) — re-running updates filters", async () => {
   await setupAccountAndJournal();
   const { addConnection, listConnections } = await import(
