@@ -216,6 +216,67 @@ test("syncConnection updates the same entry when a PR transitions OPEN → MERGE
   expect(evt!.entryId).toBe(firstId);
 });
 
+test("syncConnection rewrites the same entry when a PR title changes (same state)", async () => {
+  const cid = await setupAccountAndConnection(["opened_prs", "merged_prs"]);
+  const v1: PRFixture[] = [
+    {
+      id: "PR_TITLE",
+      number: 100,
+      title: "Original title",
+      url: "https://github.com/acme/thing/pull/100",
+      state: "OPEN",
+      isDraft: false,
+      createdAt: "2026-04-20T08:00:00Z",
+      updatedAt: "2026-04-20T08:00:00Z",
+      mergedAt: null,
+      closedAt: null,
+      additions: 5,
+      deletions: 1,
+      baseRefName: "main",
+      repository: REPO,
+    },
+  ];
+  // Same node_id, same state, only the title (and updatedAt) changed.
+  const v2: PRFixture[] = [
+    {
+      ...v1[0]!,
+      title: "Renamed title with more detail",
+      updatedAt: "2026-04-23T09:30:00Z",
+    },
+  ];
+
+  const { syncConnection } = await import("../src/core/github/sync.ts");
+  const { listEntries } = await import("../src/core/logs.ts");
+  const { getSyncedEvent } = await import("../src/core/github/db.ts");
+
+  const r1 = await syncConnection(cid, makeStubClient(v1));
+  expect(r1.written).toBe(1);
+  let entries = await listEntries("logs/work/activity");
+  expect(entries).toHaveLength(1);
+  const firstId = entries[0]!.id;
+  expect(entries[0]!.content).toContain("Original title");
+  const hashBefore = getSyncedEvent(cid, "pr:PR_TITLE")!.stateHash;
+
+  const r2 = await syncConnection(cid, makeStubClient(v2));
+  expect(r2.pulled).toBe(1);
+  expect(r2.written).toBe(0);
+  expect(r2.updated).toBe(1);
+  expect(r2.skipped).toBe(0);
+
+  entries = await listEntries("logs/work/activity");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.id).toBe(firstId);
+  expect(entries[0]!.content).toContain("Renamed title with more detail");
+  expect(entries[0]!.content).not.toContain("Original title");
+
+  // State is still OPEN, so the entry's timestamp stays at createdAt — a
+  // title edit isn't "activity that bumps the entry up the journal".
+  expect(entries[0]!.timestamp).toBe("2026-04-20T08:00:00Z");
+
+  const hashAfter = getSyncedEvent(cid, "pr:PR_TITLE")!.stateHash;
+  expect(hashAfter).not.toBe(hashBefore);
+});
+
 test("syncConnection respects exclude-org filter", async () => {
   const cid = await setupAccountAndConnection(["merged_prs"]);
   const { updateConnection } = await import("../src/core/github/connections.ts");
