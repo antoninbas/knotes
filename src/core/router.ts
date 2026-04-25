@@ -219,6 +219,26 @@ export async function removeGithubConnection(id: number): Promise<void> {
   return directGhConnections.removeConnection(id);
 }
 
+export interface UpdateGithubConnectionInput {
+  monitors?: GhMonitor[];
+  includeOrgs?: string[] | null;
+  excludeOrgs?: string[] | null;
+  includeRepos?: string[] | null;
+  excludeRepos?: string[] | null;
+  since?: string;
+  enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export async function updateGithubConnection(
+  id: number,
+  patch: UpdateGithubConnectionInput
+): Promise<GhConnection> {
+  if (useServer()) return client.updateGithubConnection(id, patch);
+  return directGhConnections.updateConnection(id, patch);
+}
+
 export async function syncGithub(opts?: {
   logPath?: string;
   connectionId?: number;

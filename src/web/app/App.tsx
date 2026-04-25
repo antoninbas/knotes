@@ -18,13 +18,15 @@ export default function App() {
   const [viewMode, setViewMode] = createSignal<ViewMode>("view");
 
   // Restore last-selected note across page reloads. Best-effort: a 404 on
-  // the saved path silently lands the user on the welcome screen.
+  // the saved path silently lands the user on the welcome screen. If the
+  // user has already interacted (clicked a note, opened search) before the
+  // fetch resolves, we drop the restored value to avoid stomping their pick.
   (async () => {
     try {
       const saved = sessionStorage.getItem(LAST_NOTE_KEY);
       if (!saved) return;
       const note = await notes.get(saved);
-      setCurrentNote(note);
+      if (currentNote() === null) setCurrentNote(note);
     } catch {
       sessionStorage.removeItem(LAST_NOTE_KEY);
     }

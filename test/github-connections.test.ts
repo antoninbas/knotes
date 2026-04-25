@@ -225,6 +225,31 @@ test("removeConnection deletes by id", async () => {
   expect(await listConnections()).toHaveLength(0);
 });
 
+test("router.updateGithubConnection patches selected fields and returns the updated row", async () => {
+  await setupAccountAndJournal();
+  const { setConfigValue } = await import("../src/core/db.ts");
+  setConfigValue("serverless", "true");
+
+  const { addConnection } = await import("../src/core/github/connections.ts");
+  const conn = await addConnection({
+    logPath: "logs/work/activity",
+    host: "github.com",
+    login: "alice",
+    monitors: ["merged_prs"],
+  });
+
+  const router = await import("../src/core/router.ts");
+  const updated = await router.updateGithubConnection(conn.id, {
+    monitors: ["opened_prs", "pr_reviews"],
+    enabled: false,
+    bodyMode: "first_paragraph",
+  });
+  expect(updated.id).toBe(conn.id);
+  expect(updated.monitors).toEqual(["opened_prs", "pr_reviews"]);
+  expect(updated.enabled).toBe(false);
+  expect(updated.bodyMode).toBe("first_paragraph");
+});
+
 test("removeConnection throws on missing id", async () => {
   const { removeConnection } = await import("../src/core/github/connections.ts");
   await expect(removeConnection(99999)).rejects.toThrow(/not found/);

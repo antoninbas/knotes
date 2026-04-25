@@ -274,6 +274,29 @@ export async function addGithubConnection(input: AddGithubConnectionInput): Prom
   return res.connection;
 }
 
+export interface UpdateGithubConnectionInput {
+  monitors?: GhMonitor[];
+  includeOrgs?: string[] | null;
+  excludeOrgs?: string[] | null;
+  includeRepos?: string[] | null;
+  excludeRepos?: string[] | null;
+  since?: string;
+  enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export async function updateGithubConnection(
+  id: number,
+  patch: UpdateGithubConnectionInput
+): Promise<GhConnection> {
+  const res = await request<{ connection: GhConnection; syncResult: unknown }>(
+    `/github/connections/${id}`,
+    { method: "PUT", body: JSON.stringify(patch) }
+  );
+  return res.connection;
+}
+
 export async function removeGithubConnection(id: number): Promise<void> {
   await request(`/github/connections/${id}`, { method: "DELETE" });
 }

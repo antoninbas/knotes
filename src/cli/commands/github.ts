@@ -10,6 +10,7 @@ import {
   logoutGithub,
   listGithubConnections,
   addGithubConnection,
+  updateGithubConnection,
   removeGithubConnection,
   syncGithub,
 } from "../../core/router.ts";
@@ -213,6 +214,68 @@ export function registerGithubCommands(program: Command): void {
         bodyMaxChars: body.maxChars,
       });
       console.log(`Created connection ${conn.id} for ${logPath} (since ${conn.since}, body=${body.mode}${body.maxChars ? `:${body.maxChars}` : ""})`);
+      if (opts.sync) {
+        const results = await syncGithub({ connectionId: conn.id });
+        for (const r of results) {
+          console.log(
+            `  sync: pulled=${r.pulled} written=${r.written} updated=${r.updated} skipped=${r.skipped}${r.rateLimited ? " (RATE LIMITED)" : ""}`
+          );
+        }
+      }
+    });
+
+  gh
+    .command("edit")
+    .description("Update an existing GitHub connection (only the flags you pass are changed)")
+    .argument("<connection-id>", "Connection id")
+    .option("--monitor <list>", "Comma-separated: opened-prs,merged-prs,issues,reviews", parseMonitors)
+    .option("--include-org <org>", "Replace include-org list (repeat for multiple)", collect, [] as string[])
+    .option("--exclude-org <org>", "Replace exclude-org list (repeat for multiple)", collect, [] as string[])
+    .option("--include-repo <owner/repo>", "Replace include-repo list (repeat for multiple)", collect, [] as string[])
+    .option("--exclude-repo <owner/repo>", "Replace exclude-repo list (repeat for multiple)", collect, [] as string[])
+    .option("--clear-include-orgs", "Clear the include-org list")
+    .option("--clear-exclude-orgs", "Clear the exclude-org list")
+    .option("--clear-include-repos", "Clear the include-repo list")
+    .option("--clear-exclude-repos", "Clear the exclude-repo list")
+    .option("--since <date>", "Update the backfill cutoff (ISO date or datetime)")
+    .option("--body <spec>", "title | full | first-paragraph | first-chars:N")
+    .option("--enabled", "Enable the connection")
+    .option("--disabled", "Disable the connection (no syncs run while disabled)")
+    .option("--sync", "Run a sync after updating")
+    .action(async (idStr: string, opts) => {
+      const id = parseInt(idStr, 10);
+      if (Number.isNaN(id)) {
+        console.error(`Invalid connection id: ${idStr}`);
+        process.exit(1);
+      }
+      const patch: any = {};
+      if (opts.monitor) patch.monitors = opts.monitor;
+      if ((opts.includeOrg as string[]).length > 0) patch.includeOrgs = opts.includeOrg;
+      if (opts.clearIncludeOrgs) patch.includeOrgs = null;
+      if ((opts.excludeOrg as string[]).length > 0) patch.excludeOrgs = opts.excludeOrg;
+      if (opts.clearExcludeOrgs) patch.excludeOrgs = null;
+      if ((opts.includeRepo as string[]).length > 0) patch.includeRepos = opts.includeRepo;
+      if (opts.clearIncludeRepos) patch.includeRepos = null;
+      if ((opts.excludeRepo as string[]).length > 0) patch.excludeRepos = opts.excludeRepo;
+      if (opts.clearExcludeRepos) patch.excludeRepos = null;
+      if (opts.since) patch.since = opts.since;
+      if (opts.body) {
+        const body = parseBodySpec(opts.body as string);
+        patch.bodyMode = body.mode;
+        patch.bodyMaxChars = body.maxChars;
+      }
+      if (opts.enabled && opts.disabled) {
+        console.error("Pass at most one of --enabled / --disabled");
+        process.exit(1);
+      }
+      if (opts.enabled) patch.enabled = true;
+      if (opts.disabled) patch.enabled = false;
+      if (Object.keys(patch).length === 0) {
+        console.error("No changes specified. Pass at least one flag.");
+        process.exit(1);
+      }
+      const conn = await updateGithubConnection(id, patch);
+      console.log(`Updated connection ${conn.id} for ${conn.logPath}`);
       if (opts.sync) {
         const results = await syncGithub({ connectionId: conn.id });
         for (const r of results) {
