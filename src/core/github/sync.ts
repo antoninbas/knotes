@@ -30,55 +30,59 @@ export type SyncClient = GhClient;
 
 // --- GraphQL queries ---
 
-const PR_SEARCH_QUERY = /* GraphQL */ `
-  query SearchPRs($q: String!, $cursor: String) {
-    search(type: ISSUE, query: $q, first: 50, after: $cursor) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        ... on PullRequest {
-          id
-          number
-          title
-          body
-          url
-          state
-          isDraft
-          createdAt
-          updatedAt
-          mergedAt
-          closedAt
-          additions
-          deletions
-          baseRefName
-          repository { name nameWithOwner owner { login } }
+function prSearchQuery(includeBody: boolean): string {
+  return /* GraphQL */ `
+    query SearchPRs($q: String!, $cursor: String) {
+      search(type: ISSUE, query: $q, first: 50, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          ... on PullRequest {
+            id
+            number
+            title
+            ${includeBody ? "body" : ""}
+            url
+            state
+            isDraft
+            createdAt
+            updatedAt
+            mergedAt
+            closedAt
+            additions
+            deletions
+            baseRefName
+            repository { name nameWithOwner owner { login } }
+          }
         }
       }
     }
-  }
-`;
+  `;
+}
 
-const ISSUE_SEARCH_QUERY = /* GraphQL */ `
-  query SearchIssues($q: String!, $cursor: String) {
-    search(type: ISSUE, query: $q, first: 50, after: $cursor) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
-        ... on Issue {
-          id
-          number
-          title
-          body
-          url
-          state
-          createdAt
-          updatedAt
-          closedAt
-          labels(first: 10) { nodes { name } }
-          repository { name nameWithOwner owner { login } }
+function issueSearchQuery(includeBody: boolean): string {
+  return /* GraphQL */ `
+    query SearchIssues($q: String!, $cursor: String) {
+      search(type: ISSUE, query: $q, first: 50, after: $cursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          ... on Issue {
+            id
+            number
+            title
+            ${includeBody ? "body" : ""}
+            url
+            state
+            createdAt
+            updatedAt
+            closedAt
+            labels(first: 10) { nodes { name } }
+            repository { name nameWithOwner owner { login } }
+          }
         }
       }
     }
-  }
-`;
+  `;
+}
 
 const REVIEW_SEARCH_QUERY = /* GraphQL */ `
   query SearchReviewedPRs($q: String!, $cursor: String, $viewer: String!) {
@@ -344,19 +348,21 @@ async function paginatedSearch<T>(
 
 async function fetchPRs(
   client: SyncClient,
-  cutoff: string
+  cutoff: string,
+  includeBody: boolean
 ): Promise<PRNode[]> {
   const q = `is:pr author:@me updated:>=${isoDate(cutoff)}`;
-  const nodes = await paginatedSearch<PRNode>(client, PR_SEARCH_QUERY, q);
+  const nodes = await paginatedSearch<PRNode>(client, prSearchQuery(includeBody), q);
   return nodes.filter((n) => n && n.id);
 }
 
 async function fetchIssues(
   client: SyncClient,
-  cutoff: string
+  cutoff: string,
+  includeBody: boolean
 ): Promise<IssueNode[]> {
   const q = `is:issue author:@me updated:>=${isoDate(cutoff)}`;
-  const nodes = await paginatedSearch<IssueNode>(client, ISSUE_SEARCH_QUERY, q);
+  const nodes = await paginatedSearch<IssueNode>(client, issueSearchQuery(includeBody), q);
   return nodes.filter((n) => n && n.id);
 }
 
@@ -560,9 +566,10 @@ async function collectEvents(
 ): Promise<ProcessedEvent[]> {
   const events: ProcessedEvent[] = [];
   const monitors = new Set<GhMonitor>(conn.monitors);
+  const includeBody = conn.bodyMode !== "title";
 
   if (monitors.has("opened_prs") || monitors.has("merged_prs")) {
-    const prs = await fetchPRs(client, cutoff);
+    const prs = await fetchPRs(client, cutoff, includeBody);
     for (const pr of prs) {
       // Filter by monitor selection: if user only wants merged_prs, skip
       // open / closed PRs; if only opened_prs, include them all (since
@@ -589,7 +596,7 @@ async function collectEvents(
   }
 
   if (monitors.has("opened_issues")) {
-    const issues = await fetchIssues(client, cutoff);
+    const issues = await fetchIssues(client, cutoff, includeBody);
     for (const iss of issues) {
       const rendered = renderIssue(iss, conn.bodyMode, conn.bodyMaxChars);
       events.push({

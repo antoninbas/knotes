@@ -243,6 +243,62 @@ test("changing bodyMode on the connection rewrites existing entries on next sync
   expect(entries[0]!.content).toContain("> Long body that will be revealed later");
 });
 
+test("title-only connections do NOT request `body` over GraphQL", async () => {
+  const cid = await setupConn("title");
+  const queries: string[] = [];
+  const client: GhClient = {
+    async graphql(query: string) {
+      queries.push(query);
+      return {
+        search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+      } as any;
+    },
+    async rest() {
+      throw new Error("not used");
+    },
+    rateLimitInfo() {
+      return { remaining: 5000, resetAt: null };
+    },
+    async resolveViewer() {
+      return { login: "alice", nodeId: "U_1", scopes: null };
+    },
+  };
+  const { syncConnection } = await import("../src/core/github/sync.ts");
+  await syncConnection(cid, client);
+  expect(queries.length).toBeGreaterThan(0);
+  for (const q of queries) {
+    expect(q).not.toMatch(/^\s*body\s*$/m);
+  }
+});
+
+test("non-title connections DO request `body` over GraphQL", async () => {
+  const cid = await setupConn("first_paragraph");
+  const queries: string[] = [];
+  const client: GhClient = {
+    async graphql(query: string) {
+      queries.push(query);
+      return {
+        search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+      } as any;
+    },
+    async rest() {
+      throw new Error("not used");
+    },
+    rateLimitInfo() {
+      return { remaining: 5000, resetAt: null };
+    },
+    async resolveViewer() {
+      return { login: "alice", nodeId: "U_1", scopes: null };
+    },
+  };
+  const { syncConnection } = await import("../src/core/github/sync.ts");
+  await syncConnection(cid, client);
+  // The PR query (only one issued for opened_prs+merged_prs monitors) must
+  // include `body` as its own line.
+  const prQuery = queries.find((q) => q.includes("SearchPRs"))!;
+  expect(prQuery).toMatch(/^\s*body\s*$/m);
+});
+
 test("addConnection rejects bodyMode=first_chars without bodyMaxChars", async () => {
   const { insertAccount } = await import("../src/core/github/db.ts");
   insertAccount({
