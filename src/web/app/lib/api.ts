@@ -1,5 +1,7 @@
 import type { ListEntry, NoteResult, LogEntry, SearchResult } from "../../../core/types.ts";
+import type { GhAccount, GhConnection, GhBodyMode, GhMonitor, GhSyncResult } from "../../../core/github/types.ts";
 export type { ListEntry, NoteResult, LogEntry, SearchResult };
+export type { GhAccount, GhConnection, GhBodyMode, GhMonitor, GhSyncResult };
 
 const BASE = "/api";
 
@@ -177,6 +179,66 @@ export const versionApi = {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.text();
   },
+};
+
+// GitHub API
+export interface AddGithubConnectionInput {
+  logPath: string;
+  host: string;
+  login: string;
+  monitors: GhMonitor[];
+  includeOrgs?: string[];
+  excludeOrgs?: string[];
+  includeRepos?: string[];
+  excludeRepos?: string[];
+  since?: string;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export interface UpdateGithubConnectionInput {
+  monitors?: GhMonitor[];
+  includeOrgs?: string[] | null;
+  excludeOrgs?: string[] | null;
+  includeRepos?: string[] | null;
+  excludeRepos?: string[] | null;
+  since?: string;
+  enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
+}
+
+export const githubApi = {
+  listAccounts: () => request<GhAccount[]>("/github/accounts"),
+
+  listConnections: (logPath?: string) =>
+    request<GhConnection[]>(
+      `/github/connections${logPath ? `?logPath=${encodeURIComponent(logPath)}` : ""}`
+    ),
+
+  addConnection: (input: AddGithubConnectionInput) =>
+    request<GhConnection>("/github/connections", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
+  updateConnection: (id: number, patch: UpdateGithubConnectionInput) =>
+    request<GhConnection>(`/github/connections/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
+
+  removeConnection: (id: number) =>
+    request<{ ok: boolean }>(`/github/connections/${id}`, { method: "DELETE" }),
+
+  sync: (opts?: { logPath?: string; connectionId?: number }) =>
+    request<GhSyncResult[]>("/github/sync", {
+      method: "POST",
+      body: JSON.stringify(opts ?? {}),
+    }),
+
+  syncStatus: (limit = 20) =>
+    request<JobRecord[]>(`/github/sync/status?limit=${limit}`),
 };
 
 // Context API

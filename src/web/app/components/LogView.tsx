@@ -2,6 +2,7 @@ import { createSignal, createEffect, For, Show } from "solid-js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { logs, type LogEntry, type NoteResult } from "../lib/api.ts";
+import GithubConnectionsPanel from "./GithubConnectionsPanel.tsx";
 
 function renderMarkdown(md: string): string {
   const raw = marked.parse(md, { async: false }) as string;
@@ -190,6 +191,9 @@ export default function LogView(props: Props) {
           </div>
         </Show>
       </div>
+
+      {/* GitHub connections */}
+      <GithubConnectionsPanel logPath={props.note.path} readOnly={props.readOnly} />
 
       {/* Add entry form */}
       <Show when={!props.readOnly}>
