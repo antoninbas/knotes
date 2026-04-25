@@ -65,6 +65,7 @@ const migrations: Migration[] = [
         auth_method  TEXT NOT NULL,
         token        TEXT,
         token_scopes TEXT,
+        client_id    TEXT,
         created_at   TEXT NOT NULL,
         last_used_at TEXT,
         UNIQUE(host, login)
@@ -83,6 +84,8 @@ const migrations: Migration[] = [
         since           TEXT NOT NULL,
         last_synced_at  TEXT,
         enabled         INTEGER NOT NULL DEFAULT 1,
+        body_mode       TEXT NOT NULL DEFAULT 'title',
+        body_max_chars  INTEGER,
         created_at      TEXT NOT NULL,
         UNIQUE(log_path, account_id)
       )
@@ -102,17 +105,6 @@ const migrations: Migration[] = [
       )
     `);
     db.exec(`CREATE INDEX idx_gh_evt_entry ON github_synced_events(entry_id)`);
-  },
-  // Migration 5: per-account OAuth App client_id for device flow
-  (db) => {
-    db.exec(`ALTER TABLE github_accounts ADD COLUMN client_id TEXT`);
-  },
-  // Migration 6: per-connection PR/issue body inclusion mode
-  (db) => {
-    db.exec(
-      `ALTER TABLE github_connections ADD COLUMN body_mode TEXT NOT NULL DEFAULT 'title'`
-    );
-    db.exec(`ALTER TABLE github_connections ADD COLUMN body_max_chars INTEGER`);
   },
 ];
 
