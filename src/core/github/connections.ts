@@ -11,7 +11,29 @@ import {
 } from "./db.ts";
 import { logout as authLogout } from "./auth.ts";
 import { normalizeHost } from "./api.ts";
-import type { GhAccount, GhConnection, GhMonitor } from "./types.ts";
+import type { GhAccount, GhBodyMode, GhConnection, GhMonitor } from "./types.ts";
+
+const VALID_BODY_MODES: GhBodyMode[] = [
+  "title",
+  "full",
+  "first_paragraph",
+  "first_chars",
+];
+
+function validateBodyMode(mode: GhBodyMode, maxChars?: number | null): void {
+  if (!VALID_BODY_MODES.includes(mode)) {
+    throw new Error(
+      `Invalid body mode: ${mode}. Valid: ${VALID_BODY_MODES.join(", ")}`
+    );
+  }
+  if (mode === "first_chars") {
+    if (typeof maxChars !== "number" || maxChars <= 0) {
+      throw new Error(
+        `bodyMode "first_chars" requires bodyMaxChars > 0`
+      );
+    }
+  }
+}
 
 const VALID_MONITORS: GhMonitor[] = [
   "opened_prs",
@@ -62,6 +84,8 @@ export interface AddConnectionInput {
   includeRepos?: string[];
   excludeRepos?: string[];
   since?: string;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
 }
 
 export async function addConnection(
@@ -69,6 +93,8 @@ export async function addConnection(
 ): Promise<GhConnection> {
   validateLogPath(input.logPath);
   validateMonitors(input.monitors);
+  const bodyMode = input.bodyMode ?? "title";
+  validateBodyMode(bodyMode, input.bodyMaxChars);
 
   const host = normalizeHost(input.host);
   const acct = getAccount(host, input.login);
@@ -87,6 +113,8 @@ export async function addConnection(
     includeRepos: lowercaseAll(input.includeRepos) ?? null,
     excludeRepos: lowercaseAll(input.excludeRepos) ?? null,
     since: input.since || defaultSince(),
+    bodyMode,
+    bodyMaxChars: bodyMode === "first_chars" ? (input.bodyMaxChars ?? null) : null,
   });
 
   const conn = getConnection(id);
@@ -120,6 +148,8 @@ export interface UpdateConnectionInput {
   excludeRepos?: string[] | null;
   since?: string;
   enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
 }
 
 export async function updateConnection(
@@ -129,6 +159,11 @@ export async function updateConnection(
   const conn = getConnection(id);
   if (!conn) throw new Error(`Connection not found: ${id}`);
   if (patch.monitors !== undefined) validateMonitors(patch.monitors);
+  if (patch.bodyMode !== undefined) {
+    const effectiveMaxChars =
+      patch.bodyMaxChars !== undefined ? patch.bodyMaxChars : conn.bodyMaxChars;
+    validateBodyMode(patch.bodyMode, effectiveMaxChars);
+  }
 
   dbUpdateConnection(id, {
     ...(patch.monitors !== undefined && { monitors: patch.monitors }),
@@ -146,6 +181,8 @@ export async function updateConnection(
     }),
     ...(patch.since !== undefined && { since: patch.since }),
     ...(patch.enabled !== undefined && { enabled: patch.enabled }),
+    ...(patch.bodyMode !== undefined && { bodyMode: patch.bodyMode }),
+    ...(patch.bodyMaxChars !== undefined && { bodyMaxChars: patch.bodyMaxChars }),
   });
 
   const updated = getConnection(id);

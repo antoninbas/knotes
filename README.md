@@ -215,6 +215,8 @@ knotes github connect <log-path>
                       --monitor opened-prs,merged-prs,issues,reviews
                       [--include-org ORG ...] [--exclude-repo OWNER/REPO ...]
                       [--since YYYY-MM-DD]                  # default: now - 7d
+                      [--body title|full|first-paragraph|first-chars:N]
+                                                            # default: title
 knotes github list [<log-path>]
 knotes github disconnect <connection-id>
 
@@ -255,6 +257,20 @@ In server mode, the running server polls every `githubSyncInterval`
 seconds (default 600). In serverless mode, run `knotes github sync` from
 a cron job / launchd plist / systemd timer; `knotes github cron-install`
 prints a ready-to-paste snippet for your platform.
+
+`--body` controls how much of each PR / issue description ends up in the
+log entry:
+
+- `title` (default) — title and metadata only.
+- `full` — entire body, quoted as a markdown blockquote.
+- `first-paragraph` — body up to the first blank line, with a `> …`
+  marker if anything was trimmed.
+- `first-chars:N` — at most N characters, ellipsis if truncated.
+
+Changing `--body` on an existing connection (re-run `knotes github
+connect …`) will rewrite all matching entries on the next sync (the
+state hash changes). Editing a PR or issue body on GitHub also rewrites
+the corresponding entry on the next sync.
 
 ### Configuration
 

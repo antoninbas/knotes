@@ -15,7 +15,7 @@ import * as directGhConnections from "./github/connections.ts";
 import * as directGhAuth from "./github/auth.ts";
 import * as directGhSync from "./github/sync.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
-import type { GhAccount, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
+import type { GhAccount, GhBodyMode, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
 function useServer(): boolean {
   const config = getConfig();
@@ -205,6 +205,8 @@ export interface AddGithubConnectionInput {
   includeRepos?: string[];
   excludeRepos?: string[];
   since?: string;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
 }
 
 export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {

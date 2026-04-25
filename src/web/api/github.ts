@@ -22,6 +22,13 @@ const MonitorSchema = z.enum([
   "pr_reviews",
 ]);
 
+const BodyModeSchema = z.enum([
+  "title",
+  "full",
+  "first_paragraph",
+  "first_chars",
+]);
+
 const PatLoginSchema = z.object({
   host: z.string().min(1),
   token: z.string().min(1),
@@ -46,6 +53,8 @@ const CreateConnectionSchema = z.object({
   includeRepos: z.array(z.string()).optional(),
   excludeRepos: z.array(z.string()).optional(),
   since: z.string().optional(),
+  bodyMode: BodyModeSchema.optional(),
+  bodyMaxChars: z.number().int().positive().nullable().optional(),
 });
 
 const DeviceStartSchema = z.object({
@@ -73,6 +82,8 @@ const UpdateConnectionSchema = z.object({
   excludeRepos: z.array(z.string()).nullable().optional(),
   since: z.string().optional(),
   enabled: z.boolean().optional(),
+  bodyMode: BodyModeSchema.optional(),
+  bodyMaxChars: z.number().int().positive().nullable().optional(),
 });
 
 export const githubApi = new Hono();

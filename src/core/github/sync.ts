@@ -18,6 +18,7 @@ import { createClient, RateLimitError } from "./api.ts";
 import { passesFilters } from "./connections.ts";
 import type {
   GhAccount,
+  GhBodyMode,
   GhConnection,
   GhMonitor,
   GhSyncResult,
@@ -38,6 +39,7 @@ const PR_SEARCH_QUERY = /* GraphQL */ `
           id
           number
           title
+          body
           url
           state
           isDraft
@@ -64,6 +66,7 @@ const ISSUE_SEARCH_QUERY = /* GraphQL */ `
           id
           number
           title
+          body
           url
           state
           createdAt
@@ -105,6 +108,7 @@ interface PRNode {
   id: string;
   number: number;
   title: string;
+  body: string | null;
   url: string;
   state: "OPEN" | "CLOSED" | "MERGED";
   isDraft: boolean;
@@ -122,6 +126,7 @@ interface IssueNode {
   id: string;
   number: number;
   title: string;
+  body: string | null;
   url: string;
   state: "OPEN" | "CLOSED";
   createdAt: string;
@@ -174,15 +179,63 @@ function bold(s: string): string {
   return `**${s}**`;
 }
 
-function renderPR(node: PRNode): { content: string; timestamp: string } {
+/**
+ * Reduce a PR/issue body to the requested shape and emit a quoted block,
+ * or "" if there's nothing to include. Always trims trailing whitespace
+ * and normalizes CRLF to LF before slicing so character counts match what
+ * the user sees.
+ */
+function formatBody(
+  body: string | null | undefined,
+  mode: GhBodyMode,
+  maxChars: number | null
+): string {
+  if (mode === "title" || !body) return "";
+  const normalized = body.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return "";
+
+  let chosen: string;
+  let truncated = false;
+  if (mode === "full") {
+    chosen = normalized;
+  } else if (mode === "first_paragraph") {
+    const idx = normalized.indexOf("\n\n");
+    chosen = idx >= 0 ? normalized.slice(0, idx).trim() : normalized;
+    truncated = idx >= 0 && idx < normalized.length;
+  } else {
+    // first_chars
+    const limit = maxChars ?? 0;
+    if (limit <= 0 || normalized.length <= limit) {
+      chosen = normalized;
+    } else {
+      chosen = normalized.slice(0, limit).trimEnd();
+      truncated = true;
+    }
+  }
+
+  if (!chosen) return "";
+  const quoted = chosen
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+  return "\n\n" + quoted + (truncated ? "\n> …" : "");
+}
+
+function renderPR(
+  node: PRNode,
+  bodyMode: GhBodyMode = "title",
+  bodyMaxChars: number | null = null
+): { content: string; timestamp: string } {
   const link = `[${node.repository.nameWithOwner}#${node.number} — ${node.title}](${node.url})`;
+  const bodyBlock = formatBody(node.body, bodyMode, bodyMaxChars);
   if (node.state === "MERGED") {
     const ts = node.mergedAt ?? node.updatedAt;
     return {
       content:
         `${bold("Merged PR")} ${link}\n\n` +
-        `+${node.additions} / −${node.deletions} into \`${node.baseRefName}\` · merged ${ts}\n\n` +
-        `<!-- gh-event:pr:${node.id} -->`,
+        `+${node.additions} / −${node.deletions} into \`${node.baseRefName}\` · merged ${ts}` +
+        bodyBlock +
+        `\n\n<!-- gh-event:pr:${node.id} -->`,
       timestamp: ts,
     };
   }
@@ -191,8 +244,9 @@ function renderPR(node: PRNode): { content: string; timestamp: string } {
     return {
       content:
         `${bold("Closed PR")} ${link}\n\n` +
-        `State: CLOSED · base \`${node.baseRefName}\` · closed without merging ${ts}\n\n` +
-        `<!-- gh-event:pr:${node.id} -->`,
+        `State: CLOSED · base \`${node.baseRefName}\` · closed without merging ${ts}` +
+        bodyBlock +
+        `\n\n<!-- gh-event:pr:${node.id} -->`,
       timestamp: ts,
     };
   }
@@ -202,16 +256,22 @@ function renderPR(node: PRNode): { content: string; timestamp: string } {
   return {
     content:
       `${bold("Opened PR")} ${link}\n\n` +
-      `State: OPEN${draft} · base \`${node.baseRefName}\` · opened ${ts}\n\n` +
-      `<!-- gh-event:pr:${node.id} -->`,
+      `State: OPEN${draft} · base \`${node.baseRefName}\` · opened ${ts}` +
+      bodyBlock +
+      `\n\n<!-- gh-event:pr:${node.id} -->`,
     timestamp: ts,
   };
 }
 
-function renderIssue(node: IssueNode): { content: string; timestamp: string } {
+function renderIssue(
+  node: IssueNode,
+  bodyMode: GhBodyMode = "title",
+  bodyMaxChars: number | null = null
+): { content: string; timestamp: string } {
   const link = `[${node.repository.nameWithOwner}#${node.number} — ${node.title}](${node.url})`;
   const labels = node.labels.nodes.map((l) => l.name).filter(Boolean).join(", ");
   const labelLine = labels ? `\n\nLabels: ${labels}` : "";
+  const bodyBlock = formatBody(node.body, bodyMode, bodyMaxChars);
   if (node.state === "CLOSED") {
     const ts = node.closedAt ?? node.updatedAt;
     return {
@@ -219,6 +279,7 @@ function renderIssue(node: IssueNode): { content: string; timestamp: string } {
         `${bold("Closed issue")} ${link}\n\n` +
         `State: CLOSED · closed ${ts}` +
         labelLine +
+        bodyBlock +
         `\n\n<!-- gh-event:issue:${node.id} -->`,
       timestamp: ts,
     };
@@ -229,6 +290,7 @@ function renderIssue(node: IssueNode): { content: string; timestamp: string } {
       `${bold("Opened issue")} ${link}\n\n` +
       `State: OPEN · opened ${ts}` +
       labelLine +
+      bodyBlock +
       `\n\n<!-- gh-event:issue:${node.id} -->`,
     timestamp: ts,
   };
@@ -514,7 +576,7 @@ async function collectEvents(
       if (pr.state === "CLOSED" && !monitors.has("opened_prs")) {
         continue;
       }
-      const rendered = renderPR(pr);
+      const rendered = renderPR(pr, conn.bodyMode, conn.bodyMaxChars);
       events.push({
         eventId: `pr:${pr.id}`,
         url: pr.url,
@@ -529,7 +591,7 @@ async function collectEvents(
   if (monitors.has("opened_issues")) {
     const issues = await fetchIssues(client, cutoff);
     for (const iss of issues) {
-      const rendered = renderIssue(iss);
+      const rendered = renderIssue(iss, conn.bodyMode, conn.bodyMaxChars);
       events.push({
         eventId: `issue:${iss.id}`,
         url: iss.url,

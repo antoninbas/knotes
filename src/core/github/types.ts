@@ -6,6 +6,8 @@ export type GhMonitor =
 
 export type GhAuthMethod = "device" | "pat" | "gh-cli";
 
+export type GhBodyMode = "title" | "full" | "first_paragraph" | "first_chars";
+
 export interface GhAccount {
   id: number;
   host: string;
@@ -31,6 +33,10 @@ export interface GhConnection {
   since: string;
   lastSyncedAt: string | null;
   enabled: boolean;
+  /** How much of the PR/issue body to include in each rendered entry. */
+  bodyMode: GhBodyMode;
+  /** Character cap when bodyMode is "first_chars". */
+  bodyMaxChars: number | null;
   createdAt: string;
 }
 

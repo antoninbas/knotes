@@ -14,7 +14,30 @@ import {
   syncGithub,
 } from "../../core/router.ts";
 import { loginDevice } from "../../core/github/auth.ts";
-import type { GhMonitor } from "../../core/github/types.ts";
+import type { GhBodyMode, GhMonitor } from "../../core/github/types.ts";
+
+interface BodySpec {
+  mode: GhBodyMode;
+  maxChars: number | null;
+}
+
+function parseBodySpec(value: string): BodySpec {
+  const v = value.trim().toLowerCase();
+  if (v === "title") return { mode: "title", maxChars: null };
+  if (v === "full") return { mode: "full", maxChars: null };
+  if (v === "first-paragraph" || v === "first_paragraph") {
+    return { mode: "first_paragraph", maxChars: null };
+  }
+  const m = v.match(/^first-chars:(\d+)$/) || v.match(/^first_chars:(\d+)$/);
+  if (m) {
+    const n = parseInt(m[1]!, 10);
+    if (n <= 0) throw new Error("--body first-chars:N requires N > 0");
+    return { mode: "first_chars", maxChars: n };
+  }
+  throw new Error(
+    `Unknown --body value: ${value}. Valid: title, full, first-paragraph, first-chars:N`
+  );
+}
 
 const MONITOR_ALIASES: Record<string, GhMonitor> = {
   "opened-prs": "opened_prs",
@@ -167,8 +190,14 @@ export function registerGithubCommands(program: Command): void {
     .option("--include-repo <owner/repo>", "Include only this repo (repeatable)", collect, [])
     .option("--exclude-repo <owner/repo>", "Exclude this repo (repeatable)", collect, [])
     .option("--since <date>", "Backfill cutoff (ISO date or datetime). Default: now - 7d")
+    .option(
+      "--body <spec>",
+      "How much of each PR/issue body to include: title | full | first-paragraph | first-chars:N",
+      "title"
+    )
     .action(async (logPath: string, opts) => {
       const { host, login } = parseAccountSpec(opts.account as string);
+      const body = parseBodySpec(opts.body as string);
       const conn = await addGithubConnection({
         logPath,
         host,
@@ -179,8 +208,10 @@ export function registerGithubCommands(program: Command): void {
         includeRepos: (opts.includeRepo as string[]).length > 0 ? (opts.includeRepo as string[]) : undefined,
         excludeRepos: (opts.excludeRepo as string[]).length > 0 ? (opts.excludeRepo as string[]) : undefined,
         since: opts.since as string | undefined,
+        bodyMode: body.mode,
+        bodyMaxChars: body.maxChars,
       });
-      console.log(`Created connection ${conn.id} for ${logPath} (since ${conn.since})`);
+      console.log(`Created connection ${conn.id} for ${logPath} (since ${conn.since}, body=${body.mode}${body.maxChars ? `:${body.maxChars}` : ""})`);
     });
 
   gh
@@ -206,8 +237,9 @@ export function registerGithubCommands(program: Command): void {
           c.excludeRepos && `exclude-repo=${c.excludeRepos.join("|")}`,
         ].filter(Boolean).join(" ");
         const last = c.lastSyncedAt ? ` last_synced=${c.lastSyncedAt}` : "";
+        const body = `body=${c.bodyMode}${c.bodyMaxChars ? `:${c.bodyMaxChars}` : ""}`;
         console.log(
-          `${c.id}\t${c.logPath}\t${acct}\tmonitors=${monitors}\tsince=${c.since}${filters ? "\t" + filters : ""}${last}`
+          `${c.id}\t${c.logPath}\t${acct}\tmonitors=${monitors}\tsince=${c.since}\t${body}${filters ? "\t" + filters : ""}${last}`
         );
       }
     });

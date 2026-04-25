@@ -5,7 +5,7 @@
 
 import { getServerInfo, isServerAlive } from "./db.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
-import type { GhAccount, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
+import type { GhAccount, GhBodyMode, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
 function getBaseUrl(): string {
   const info = getServerInfo();
@@ -262,6 +262,8 @@ export interface AddGithubConnectionInput {
   includeRepos?: string[];
   excludeRepos?: string[];
   since?: string;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
 }
 
 export async function addGithubConnection(input: AddGithubConnectionInput): Promise<GhConnection> {

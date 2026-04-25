@@ -2,6 +2,7 @@ import { getDb } from "../db.ts";
 import type {
   GhAccount,
   GhAuthMethod,
+  GhBodyMode,
   GhConnection,
   GhMonitor,
   GhSyncedEvent,
@@ -32,6 +33,8 @@ interface ConnectionRow {
   since: string;
   last_synced_at: string | null;
   enabled: number;
+  body_mode: string;
+  body_max_chars: number | null;
   created_at: string;
 }
 
@@ -78,6 +81,8 @@ function rowToConnection(row: ConnectionRow): GhConnection {
     since: row.since,
     lastSyncedAt: row.last_synced_at,
     enabled: row.enabled === 1,
+    bodyMode: (row.body_mode || "title") as GhBodyMode,
+    bodyMaxChars: row.body_max_chars,
     createdAt: row.created_at,
   };
 }
@@ -196,6 +201,8 @@ export interface InsertConnectionInput {
   excludeRepos?: string[] | null;
   since: string;
   enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
 }
 
 export function insertConnection(input: InsertConnectionInput): number {
@@ -204,8 +211,8 @@ export function insertConnection(input: InsertConnectionInput): number {
   const result = db
     .prepare(
       `INSERT INTO github_connections
-         (log_path, account_id, monitors, include_orgs, exclude_orgs, include_repos, exclude_repos, since, enabled, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (log_path, account_id, monitors, include_orgs, exclude_orgs, include_repos, exclude_repos, since, enabled, body_mode, body_max_chars, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(log_path, account_id) DO UPDATE SET
          monitors = excluded.monitors,
          include_orgs = excluded.include_orgs,
@@ -213,7 +220,9 @@ export function insertConnection(input: InsertConnectionInput): number {
          include_repos = excluded.include_repos,
          exclude_repos = excluded.exclude_repos,
          since = excluded.since,
-         enabled = excluded.enabled`
+         enabled = excluded.enabled,
+         body_mode = excluded.body_mode,
+         body_max_chars = excluded.body_max_chars`
     )
     .run(
       input.logPath,
@@ -225,6 +234,8 @@ export function insertConnection(input: InsertConnectionInput): number {
       input.excludeRepos ? JSON.stringify(input.excludeRepos) : null,
       input.since,
       input.enabled === false ? 0 : 1,
+      input.bodyMode ?? "title",
+      input.bodyMaxChars ?? null,
       now
     );
   if (result.lastInsertRowid) return Number(result.lastInsertRowid);
@@ -279,6 +290,8 @@ export interface UpdateConnectionPatch {
   excludeRepos?: string[] | null;
   since?: string;
   enabled?: boolean;
+  bodyMode?: GhBodyMode;
+  bodyMaxChars?: number | null;
   lastSyncedAt?: string;
 }
 
@@ -317,6 +330,14 @@ export function updateConnection(
   if (patch.enabled !== undefined) {
     sets.push("enabled = ?");
     values.push(patch.enabled ? 1 : 0);
+  }
+  if (patch.bodyMode !== undefined) {
+    sets.push("body_mode = ?");
+    values.push(patch.bodyMode);
+  }
+  if (patch.bodyMaxChars !== undefined) {
+    sets.push("body_max_chars = ?");
+    values.push(patch.bodyMaxChars);
   }
   if (patch.lastSyncedAt !== undefined) {
     sets.push("last_synced_at = ?");

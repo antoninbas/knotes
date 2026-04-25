@@ -107,6 +107,13 @@ const migrations: Migration[] = [
   (db) => {
     db.exec(`ALTER TABLE github_accounts ADD COLUMN client_id TEXT`);
   },
+  // Migration 6: per-connection PR/issue body inclusion mode
+  (db) => {
+    db.exec(
+      `ALTER TABLE github_connections ADD COLUMN body_mode TEXT NOT NULL DEFAULT 'title'`
+    );
+    db.exec(`ALTER TABLE github_connections ADD COLUMN body_max_chars INTEGER`);
+  },
 ];
 
 function runMigrations(db: DatabaseInstance): void {
