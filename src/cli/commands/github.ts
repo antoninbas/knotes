@@ -8,6 +8,7 @@ import {
   listGithubConnections,
   addGithubConnection,
   removeGithubConnection,
+  syncGithub,
 } from "../../core/router.ts";
 import type { GhMonitor } from "../../core/github/types.ts";
 
@@ -199,6 +200,32 @@ export function registerGithubCommands(program: Command): void {
         const last = c.lastSyncedAt ? ` last_synced=${c.lastSyncedAt}` : "";
         console.log(
           `${c.id}\t${c.logPath}\t${acct}\tmonitors=${monitors}\tsince=${c.since}${filters ? "\t" + filters : ""}${last}`
+        );
+      }
+    });
+
+  gh
+    .command("sync")
+    .description("Pull GitHub activity now into the connected log journal(s)")
+    .argument("[log-path]", "Sync only this journal")
+    .option("--connection <id>", "Sync only this connection id")
+    .action(async (logPath: string | undefined, opts) => {
+      const connectionId = opts.connection ? parseInt(opts.connection, 10) : undefined;
+      if (opts.connection && Number.isNaN(connectionId)) {
+        console.error(`Invalid --connection: ${opts.connection}`);
+        process.exit(1);
+      }
+      const results = await syncGithub({ logPath, connectionId });
+      if (results.length === 0) {
+        console.log("No connections to sync.");
+        return;
+      }
+      for (const r of results) {
+        const tail = r.rateLimited
+          ? ` (RATE LIMITED, retry after ${r.nextRetryAt ?? "unknown"})`
+          : "";
+        console.log(
+          `connection ${r.connectionId} ${r.logPath}: pulled=${r.pulled} written=${r.written} updated=${r.updated} skipped=${r.skipped}${tail}`
         );
       }
     });

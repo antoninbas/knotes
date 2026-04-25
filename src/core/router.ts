@@ -13,8 +13,9 @@ import * as directImporter from "./importer.ts";
 import * as directContext from "./context.ts";
 import * as directGhConnections from "./github/connections.ts";
 import * as directGhAuth from "./github/auth.ts";
+import * as directGhSync from "./github/sync.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
-import type { GhAccount, GhConnection, GhMonitor } from "./github/types.ts";
+import type { GhAccount, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
 function useServer(): boolean {
   const config = getConfig();
@@ -214,6 +215,18 @@ export async function addGithubConnection(input: AddGithubConnectionInput): Prom
 export async function removeGithubConnection(id: number): Promise<void> {
   if (useServer()) return client.removeGithubConnection(id);
   return directGhConnections.removeConnection(id);
+}
+
+export async function syncGithub(opts?: {
+  logPath?: string;
+  connectionId?: number;
+}): Promise<GhSyncResult[]> {
+  if (useServer()) return client.syncGithub(opts);
+  if (opts?.connectionId !== undefined) {
+    return [await directGhSync.syncConnection(opts.connectionId)];
+  }
+  if (opts?.logPath) return directGhSync.syncForLog(opts.logPath);
+  return directGhSync.syncAll();
 }
 
 // --- Import ---

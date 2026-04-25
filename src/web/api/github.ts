@@ -10,6 +10,7 @@ import {
   logout,
 } from "../../core/github/connections.ts";
 import { loginPat, loginGhCli } from "../../core/github/auth.ts";
+import { syncAll, syncConnection, syncForLog } from "../../core/github/sync.ts";
 
 const MonitorSchema = z.enum([
   "opened_prs",
@@ -42,6 +43,11 @@ const CreateConnectionSchema = z.object({
   includeRepos: z.array(z.string()).optional(),
   excludeRepos: z.array(z.string()).optional(),
   since: z.string().optional(),
+});
+
+const SyncSchema = z.object({
+  logPath: z.string().optional(),
+  connectionId: z.number().int().positive().optional(),
 });
 
 const UpdateConnectionSchema = z.object({
@@ -155,6 +161,30 @@ githubApi.put("/connections/:id", async (c) => {
     return c.json(conn);
   } catch (err: any) {
     return c.json({ error: err.message }, 404);
+  }
+});
+
+githubApi.post("/sync", async (c) => {
+  const raw = await c.req.json().catch(() => ({}));
+  const parsed = SyncSchema.safeParse(raw ?? {});
+  if (!parsed.success) {
+    return c.json(
+      { error: parsed.error.issues.map((i) => i.message).join(", ") },
+      400
+    );
+  }
+  try {
+    let results;
+    if (parsed.data.connectionId !== undefined) {
+      results = [await syncConnection(parsed.data.connectionId, undefined, "manual")];
+    } else if (parsed.data.logPath) {
+      results = await syncForLog(parsed.data.logPath);
+    } else {
+      results = await syncAll({ trigger: "manual" });
+    }
+    return c.json(results);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
   }
 });
 

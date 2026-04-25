@@ -148,6 +148,79 @@ export async function addEntry(
   return entry;
 }
 
+/**
+ * Insert or update a log entry sourced from an external system (e.g. GitHub).
+ * Caller controls the timestamp; the entry id is provided when updating an
+ * existing entry, otherwise a fresh id is minted. Order is re-sorted on every
+ * call so backfilled and updated entries land in the right slot.
+ */
+export async function upsertEntryFromSource(
+  logicalPath: string,
+  opts: { entryId?: string; timestamp: string; content: string }
+): Promise<LogEntry> {
+  const filePath = resolvePath(logicalPath);
+  if (!existsSync(filePath)) {
+    throw new Error(`Log not found: ${logicalPath}. Create it first.`);
+  }
+
+  const raw = await readFile(filePath, "utf-8");
+  const parsed = matter(raw);
+  const entries = parseEntries(parsed.content);
+
+  let entry: LogEntry;
+  if (opts.entryId) {
+    const existing = entries.find((e) => e.id === opts.entryId);
+    if (existing) {
+      existing.content = opts.content;
+      existing.timestamp = opts.timestamp;
+      entry = existing;
+    } else {
+      entry = { id: opts.entryId, timestamp: opts.timestamp, content: opts.content };
+      entries.push(entry);
+    }
+  } else {
+    entry = { id: generateId(), timestamp: opts.timestamp, content: opts.content };
+    entries.push(entry);
+  }
+
+  entries.sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
+  parsed.data.modified = nowISO();
+  const frontmatter = matter.stringify("", parsed.data).trim();
+  const body = serializeEntries(entries);
+  await writeFile(filePath, frontmatter + "\n\n" + body);
+
+  await updateIndex();
+  return entry;
+}
+
+/**
+ * Scan a log file for entries containing a `<!-- gh-event:<eventId> -->`
+ * marker. Returns a map from eventId to the entry id. Used by the GitHub
+ * sync engine to recover from cases where the markdown was written but the
+ * synced-event DB row was lost (e.g. crash between the two operations).
+ */
+export async function scanGithubMarkers(
+  logicalPath: string
+): Promise<Map<string, string>> {
+  const filePath = resolvePath(logicalPath);
+  if (!existsSync(filePath)) return new Map();
+
+  const raw = await readFile(filePath, "utf-8");
+  const parsed = matter(raw);
+  const entries = parseEntries(parsed.content);
+  const out = new Map<string, string>();
+  const re = /<!--\s*gh-event:([^\s>]+)\s*-->/;
+
+  for (const e of entries) {
+    const m = e.content.match(re);
+    if (m) out.set(m[1]!, e.id);
+  }
+  return out;
+}
+
 export async function listEntries(
   logicalPath: string,
   options?: { limit?: number; since?: string; before?: string }

@@ -5,7 +5,7 @@
 
 import { getServerInfo, isServerAlive } from "./db.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
-import type { GhAccount, GhConnection, GhMonitor } from "./github/types.ts";
+import type { GhAccount, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
 function getBaseUrl(): string {
   const info = getServerInfo();
@@ -273,4 +273,14 @@ export async function addGithubConnection(input: AddGithubConnectionInput): Prom
 
 export async function removeGithubConnection(id: number): Promise<void> {
   await request(`/github/connections/${id}`, { method: "DELETE" });
+}
+
+export async function syncGithub(opts?: {
+  logPath?: string;
+  connectionId?: number;
+}): Promise<GhSyncResult[]> {
+  return request<GhSyncResult[]>("/github/sync", {
+    method: "POST",
+    body: JSON.stringify(opts ?? {}),
+  });
 }
