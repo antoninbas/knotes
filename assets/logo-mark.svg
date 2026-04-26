@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Knotes mark — just the "K" on transparent. Use on light backgrounds.
+       For dark backgrounds, set fill via CSS or override the <g fill="…">. -->
+  <g fill="#11111b">
+    <rect x="128" y="120" width="56" height="272" rx="6" ry="6"/>
+    <path d="M 184 240 L 320 120 L 384 120 L 220 264 Z"/>
+    <path d="M 184 272 L 220 248 L 384 392 L 320 392 Z"/>
+  </g>
+</svg>
