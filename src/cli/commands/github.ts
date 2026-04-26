@@ -115,7 +115,7 @@ export function registerGithubCommands(program: Command): void {
     .command("login")
     .description("Authenticate with a GitHub host")
     .option("--host <host>", "GitHub host (e.g. github.com or ghe.example.com)", "github.com")
-    .option("--method <method>", "Authentication method: pat | gh | device", "pat")
+    .option("--method <method>", "Authentication method: device | pat | gh", "device")
     .option("--token <token>", "PAT (when --method pat)")
     .option(
       "--client-id <id>",

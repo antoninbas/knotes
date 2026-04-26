@@ -20,7 +20,7 @@ import type { GhAccount } from "./types.ts";
  * client_id (you can't pre-register apps on every GHES install).
  */
 const BUILTIN_GITHUB_CLIENT_IDS: Record<string, string> = {
-  // "github.com": "Iv1.xxxxxxxxxxxxxxxx",  // populate after registering the App
+  "github.com": "Ov23licq0sDVhDGRvnoj",
 };
 
 function resolveClientId(host: string, override?: string | null): string | null {
