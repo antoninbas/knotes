@@ -57,10 +57,35 @@ test("startDeviceFlow posts the supplied client_id and scope to /login/device/co
   expect(calls[0]!.body.scope).toContain("repo");
 });
 
-test("startDeviceFlow throws a helpful error when no client_id is provided and no built-in is registered", async () => {
+test("startDeviceFlow uses the built-in client_id for github.com when no override is given", async () => {
+  const calls: { url: string; body: any }[] = [];
+  globalThis.fetch = vi.fn(async (input: any, init?: any) => {
+    const url = typeof input === "string" ? input : input.url;
+    const body = init?.body ? JSON.parse(init.body) : null;
+    calls.push({ url, body });
+    return new Response(
+      JSON.stringify({
+        device_code: "D",
+        user_code: "U",
+        verification_uri: "https://github.com/login/device",
+        expires_in: 900,
+        interval: 5,
+      }),
+      { status: 200, headers: { "content-type": "application/json" } }
+    );
+  }) as any;
+  const { startDeviceFlow } = await import("../src/core/github/auth.ts");
+  const info = await startDeviceFlow("github.com");
+  // The built-in id is shipped in source; the test just checks the request
+  // carried *some* non-empty client_id, so rotating the App without
+  // touching this test stays painless.
+  expect(calls[0]!.body.client_id).toBeTruthy();
+  expect(info.clientId).toBe(calls[0]!.body.client_id);
+});
+
+test("startDeviceFlow throws a helpful error for hosts with no built-in client_id", async () => {
   globalThis.fetch = vi.fn(async () => new Response("should not be called", { status: 500 })) as any;
   const { startDeviceFlow } = await import("../src/core/github/auth.ts");
-  await expect(startDeviceFlow("github.com")).rejects.toThrow(/requires an OAuth App client_id/);
   await expect(startDeviceFlow("ghe.example.com")).rejects.toThrow(
     /https:\/\/ghe\.example\.com\/settings\/applications\/new/
   );
