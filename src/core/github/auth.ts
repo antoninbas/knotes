@@ -218,11 +218,7 @@ export async function loginPat(
 export async function loginGhCli(hostInput: string): Promise<GhAccount> {
   const host = normalizeHost(hostInput);
   const token = ghAuthToken(host);
-  if (!token) {
-    throw new Error(
-      `gh CLI is not authenticated for ${host}. Run: gh auth login --hostname ${host}`
-    );
-  }
+  if (!token) throw new Error(`gh CLI returned an empty token for ${host}.`);
   const client = createClient({
     authHeader: `token ${token}`,
     host,
@@ -244,7 +240,24 @@ function ghAuthToken(host: string): string | null {
   const result = spawnSync("gh", ["auth", "token", "--hostname", host], {
     encoding: "utf-8",
   });
-  if (result.status !== 0) return null;
+  if (result.error) {
+    const isNotFound =
+      (result.error as NodeJS.ErrnoException).code === "ENOENT";
+    if (isNotFound) {
+      throw new Error(
+        `gh CLI not found in PATH. The knotes server may be running as a background service with a restricted PATH. ` +
+        `Either use --method pat, or ensure gh is accessible to the server process.`
+      );
+    }
+    throw new Error(`Failed to invoke gh CLI: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    const detail = result.stderr?.trim();
+    throw new Error(
+      `gh CLI failed to retrieve token for ${host}` +
+      (detail ? `: ${detail}` : ". Run: gh auth login --hostname " + host)
+    );
+  }
   const token = result.stdout.trim();
   return token || null;
 }
@@ -256,11 +269,7 @@ export async function getAuthHeader(accountId: number): Promise<string> {
   let token: string | null;
   if (acct.authMethod === "gh-cli") {
     token = ghAuthToken(acct.host);
-    if (!token) {
-      throw new Error(
-        `gh CLI authentication for ${acct.host} is not available. Run: gh auth login --hostname ${acct.host}`
-      );
-    }
+    if (!token) throw new Error(`gh CLI returned an empty token for ${acct.host}.`);
   } else {
     tryAutoUnlock();
     token = getToken(acct.host, acct.login);
