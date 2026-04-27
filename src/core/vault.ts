@@ -16,7 +16,7 @@ import { getHome } from "./config.ts";
 
 const ALGO = "aes-256-gcm";
 const IV_LEN = 12;
-const KDF_N = process.env["KNOTES_VAULT_TEST_FAST"] === "1" ? 1024 : 32768;
+const KDF_N = process.env["KNOTES_VAULT_TEST_FAST"] === "1" ? 1024 : 131072;
 const KDF_R = 8;
 const KDF_P = 1;
 const KDF_KEYLEN = 32;
@@ -64,8 +64,7 @@ function ensureGitignore(): void {
   if (!lines.includes("vault.json")) {
     writeFileSync(
       gitignorePath,
-      content + (content.endsWith("\n") ? "" : "\n") + "vault.json\n",
-      { mode: 0o600 }
+      content + (content.endsWith("\n") ? "" : "\n") + "vault.json\n"
     );
   }
 }
@@ -73,9 +72,7 @@ function ensureGitignore(): void {
 function readStore(): Store {
   const path = vaultPath();
   if (!existsSync(path)) {
-    const empty: PlaintextStore = { version: 1, encrypted: false, entries: {} };
-    writeStore(empty);
-    return empty;
+    return { version: 1, encrypted: false, entries: {} };
   }
   const raw = readFileSync(path, "utf-8");
   return JSON.parse(raw) as Store;
@@ -237,17 +234,19 @@ export function setToken(host: string, login: string, token: string): void {
 export function getToken(host: string, login: string): string | null {
   const store = readStore();
   const key = makeKey(host, login);
-  const entry = store.entries[key];
-  if (!entry) return null;
   if (store.encrypted) {
     if (!cachedKey) {
       throw new VaultLockedError(
         "Vault is locked. Run 'knotes vault unlock' or set KNOTES_VAULT_PASSPHRASE."
       );
     }
-    return decryptToken(entry as EncryptedStore["entries"][string], cachedKey);
+    const entry = store.entries[key];
+    if (!entry) return null;
+    return decryptToken(entry, cachedKey);
   }
-  return (entry as PlaintextStore["entries"][string]).token;
+  const entry = store.entries[key];
+  if (!entry) return null;
+  return entry.token;
 }
 
 export function deleteToken(host: string, login: string): void {
@@ -280,7 +279,7 @@ export function tryAutoUnlock(): void {
     try {
       unlock(passphrase);
     } catch {
-      // Ignore — will fail later with a better error if actually needed
+      console.warn("Warning: KNOTES_VAULT_PASSPHRASE is set but the passphrase is incorrect; vault remains locked.");
     }
   }
 }
@@ -297,28 +296,3 @@ export class VaultLockedError extends Error {
   }
 }
 
-/** Export a plain map of all tokens (used during migration). */
-export function exportTokens(): Record<string, string> {
-  const store = readStore();
-  const result: Record<string, string> = {};
-  for (const [id, entry] of Object.entries(store.entries)) {
-    if (store.encrypted) {
-      if (!cachedKey) {
-        throw new Error("Vault is locked. Cannot export tokens.");
-      }
-      result[id] = decryptToken(entry as EncryptedStore["entries"][string], cachedKey);
-    } else {
-      result[id] = (entry as PlaintextStore["entries"][string]).token;
-    }
-  }
-  return result;
-}
-
-/** Import a plain map of tokens (used during migration). */
-export function importTokens(tokens: Record<string, string>): void {
-  const store: PlaintextStore = { version: 1, encrypted: false, entries: {} };
-  for (const [id, token] of Object.entries(tokens)) {
-    store.entries[id] = { token };
-  }
-  writeStore(store);
-}

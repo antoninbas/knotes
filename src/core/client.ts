@@ -327,3 +327,17 @@ export async function lockVault(): Promise<void> {
 export async function getVaultLockStatus(): Promise<{ locked: boolean; encrypted: boolean }> {
   return request<{ locked: boolean; encrypted: boolean }>("/vault/lock-status");
 }
+
+export async function setupVaultEncryption(passphrase: string): Promise<void> {
+  await request("/vault/encrypt", {
+    method: "POST",
+    body: JSON.stringify({ passphrase }),
+  });
+}
+
+export async function disableVaultEncryption(passphrase: string): Promise<void> {
+  await request("/vault/decrypt", {
+    method: "POST",
+    body: JSON.stringify({ passphrase }),
+  });
+}

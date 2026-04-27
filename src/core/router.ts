@@ -269,6 +269,16 @@ export async function getVaultLockStatus(): Promise<{ locked: boolean; encrypted
   return { locked: directVault.isLocked(), encrypted: directVault.isEncrypted() };
 }
 
+export async function setupVaultEncryption(passphrase: string): Promise<void> {
+  if (useServer()) return client.setupVaultEncryption(passphrase);
+  directVault.setupEncryption(passphrase);
+}
+
+export async function disableVaultEncryption(passphrase: string): Promise<void> {
+  if (useServer()) return client.disableVaultEncryption(passphrase);
+  directVault.disableEncryption(passphrase);
+}
+
 // --- Import ---
 
 export async function importDocument(filePath: string, opts?: { to?: string }): Promise<NoteResult> {

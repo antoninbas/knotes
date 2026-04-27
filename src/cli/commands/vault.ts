@@ -2,18 +2,15 @@ import type { Command } from "commander";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import {
-  setupEncryption,
-  disableEncryption,
-  unlock,
-  lock,
   isEncrypted,
-  isLocked,
 } from "../../core/vault.ts";
 import { ensureHome } from "../../core/config.ts";
 import {
   unlockVault,
   lockVault,
   getVaultLockStatus,
+  setupVaultEncryption,
+  disableVaultEncryption,
 } from "../../core/router.ts";
 
 async function readPasswordFromStdin(prompt: string): Promise<string> {
@@ -98,7 +95,7 @@ export function registerVaultCommand(program: Command): void {
           process.exit(1);
         }
       }
-      setupEncryption(passphrase);
+      await setupVaultEncryption(passphrase);
       console.log("Vault encrypted successfully.");
     });
 
@@ -127,7 +124,7 @@ export function registerVaultCommand(program: Command): void {
           process.exit(1);
         }
       }
-      disableEncryption(passphrase);
+      await disableVaultEncryption(passphrase);
       console.log("Vault decrypted successfully.");
     });
 
@@ -179,11 +176,13 @@ export function registerVaultCommand(program: Command): void {
   vault
     .command("status")
     .description("Show vault status")
-    .action(() => {
-      if (!isEncrypted()) {
+    .action(async () => {
+      await ensureHome();
+      const s = await getVaultLockStatus();
+      if (!s.encrypted) {
         console.log("Vault: plaintext (not encrypted)");
         return;
       }
-      console.log(`Vault: encrypted, ${isLocked() ? "locked" : "unlocked"}`);
+      console.log(`Vault: encrypted, ${s.locked ? "locked" : "unlocked"}`);
     });
 }

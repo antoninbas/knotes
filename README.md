@@ -247,9 +247,32 @@ different `--client-id`s if you want to point them at different OAuth
 Apps (e.g. personal vs. org-owned). The `client_id` is stored per
 account.
 
-Tokens are stored as plaintext in `$KNOTES_HOME/.data/knotes.sqlite` and
-the file is `chmod 0600` on first open. Anyone with read access to that
-file can read the tokens — back it up accordingly.
+Tokens are stored in `$KNOTES_HOME/.data/vault.json` (mode `0600`),
+which is auto-added to `$KNOTES_HOME/.data/.gitignore`. By default the
+vault is plaintext. Run `knotes vault encrypt` to protect it with a
+passphrase (AES-256-GCM, scrypt KDF).
+
+```bash
+knotes vault encrypt       # enable passphrase encryption
+knotes vault decrypt       # remove encryption (requires current passphrase)
+knotes vault unlock        # unlock for the current session
+knotes vault lock          # lock immediately
+knotes vault status        # show plaintext / encrypted / locked state
+```
+
+Set `KNOTES_VAULT_PASSPHRASE` to auto-unlock on server boot without an
+interactive prompt.
+
+**Security notes:**
+
+- The `/api/vault/unlock` and `/api/vault/encrypt` endpoints have no
+  per-request rate limiting. The server binds to `127.0.0.1` only, so
+  exposure is limited to processes on the local machine. If you expose
+  the server remotely (e.g. via a reverse proxy), add your own rate
+  limiting in front of those endpoints.
+- The `/api/vault/encrypt` endpoint does not require authentication
+  beyond localhost access. Encryption can be enabled from the web UI or
+  any local process that can reach the server.
 
 In server mode, the running server polls every `githubSyncInterval`
 seconds (default 600). In serverless mode, run `knotes github sync` from
