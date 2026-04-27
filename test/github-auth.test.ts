@@ -22,6 +22,8 @@ afterEach(async () => {
   globalThis.fetch = originalFetch;
   const { resetDb } = await import("../src/core/db.ts");
   resetDb();
+  const { resetVaultCache } = await import("../src/core/vault.ts");
+  resetVaultCache();
   await rm(testHome, { recursive: true, force: true });
   delete process.env["KNOTES_HOME"];
 });
@@ -109,7 +111,6 @@ test("getAuthHeader for gh-cli account fails when gh is not authenticated", asyn
     login: "alice",
     userNodeId: "U_1",
     authMethod: "gh-cli",
-    token: null,
   });
 
   const { getAuthHeader } = await import("../src/core/github/auth.ts");

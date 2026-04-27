@@ -20,6 +20,8 @@ beforeEach(async () => {
 afterEach(async () => {
   const { resetDb } = await import("../src/core/db.ts");
   resetDb();
+  const { resetVaultCache } = await import("../src/core/vault.ts");
+  resetVaultCache();
   await rm(testHome, { recursive: true, force: true });
   delete process.env["KNOTES_HOME"];
 });
@@ -42,7 +44,6 @@ test("insertAccount + getAccount round-trip", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "ghp_test123",
     tokenScopes: "repo,read:user",
   });
   expect(id).toBeGreaterThan(0);
@@ -63,32 +64,18 @@ test("insertAccount upserts on (host, login) conflict", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "v1",
   });
   const id2 = insertAccount({
     host: "github.com",
     login: "alice",
     userNodeId: "U_1",
     authMethod: "device",
-    token: "v2",
   });
   expect(id2).toBe(id1);
 
   const acct = getAccount("github.com", "alice")!;
   expect(acct.authMethod).toBe("device");
   expect(listAccounts()).toHaveLength(1);
-});
-
-test("readToken returns the stored plaintext token", async () => {
-  const { insertAccount, readToken } = await import("../src/core/github/db.ts");
-  const id = insertAccount({
-    host: "github.com",
-    login: "alice",
-    userNodeId: "U_1",
-    authMethod: "pat",
-    token: "secret-token",
-  });
-  expect(readToken(id)).toBe("secret-token");
 });
 
 test("deleteAccount cascades to connections", async () => {
@@ -103,7 +90,6 @@ test("deleteAccount cascades to connections", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   insertConnection({
     logPath: "logs/work",
@@ -127,7 +113,6 @@ test("insertConnection round-trips JSON-encoded fields", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid = insertConnection({
     logPath: "logs/work/activity",
@@ -160,7 +145,6 @@ test("insertConnection upserts on (logPath, accountId) conflict", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid1 = insertConnection({
     logPath: "logs/work",
@@ -191,7 +175,6 @@ test("insertConnection on conflict preserves stored `since` when overwriteSince 
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid = insertConnection({
     logPath: "logs/work",
@@ -218,7 +201,6 @@ test("updateConnection patches selected fields", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid = insertConnection({
     logPath: "logs/work",
@@ -252,7 +234,6 @@ test("upsertSyncedEvent and getSyncedEvent round-trip", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid = insertConnection({
     logPath: "logs/work",
@@ -300,7 +281,6 @@ test("deleteConnection cascades to synced events", async () => {
     login: "alice",
     userNodeId: "U_1",
     authMethod: "pat",
-    token: "t",
   });
   const cid = insertConnection({
     logPath: "logs/work",

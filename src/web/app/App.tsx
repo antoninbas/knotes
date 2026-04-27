@@ -7,6 +7,7 @@ import SearchView from "./components/SearchView.tsx";
 import ThemeToggle from "./components/ThemeToggle.tsx";
 import DropdownMenu from "./components/DropdownMenu.tsx";
 import JobsList from "./components/JobsList.tsx";
+import VaultStatus from "./components/VaultStatus.tsx";
 import { notes, searchApi, versionApi, type NoteResult } from "./lib/api.ts";
 
 export type ViewMode = "view" | "edit";
@@ -292,6 +293,7 @@ export default function App() {
               {readOnly() ? "RO" : "RW"}
             </button>
             <ThemeToggle />
+            <VaultStatus />
             <DropdownMenu
               items={[
                 { label: embedding() ? "Embedding..." : "Run Embed Job", onClick: triggerEmbed, disabled: embedding() },

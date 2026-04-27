@@ -3,10 +3,10 @@ import {
   insertAccount,
   getAccount,
   getAccountById,
-  readToken,
   touchAccount,
   deleteAccount,
 } from "./db.ts";
+import { setToken, getToken, deleteToken, tryAutoUnlock } from "../vault.ts";
 import { createClient, normalizeHost } from "./api.ts";
 import type { GhAccount } from "./types.ts";
 
@@ -180,10 +180,10 @@ export async function loginDevice(
         login: viewer.login,
         userNodeId: viewer.nodeId,
         authMethod: "device",
-        token: r.token,
         tokenScopes: r.scope ?? viewer.scopes ?? null,
         clientId: startInfo.clientId,
       });
+      setToken(startInfo.host, viewer.login, r.token);
       const acct = getAccount(startInfo.host, viewer.login);
       if (!acct) throw new Error("Failed to insert account");
       return acct;
@@ -207,9 +207,9 @@ export async function loginPat(
     login: viewer.login,
     userNodeId: viewer.nodeId,
     authMethod: "pat",
-    token,
     tokenScopes: viewer.scopes,
   });
+  setToken(host, viewer.login, token);
   const acct = getAccount(host, viewer.login);
   if (!acct) throw new Error("Failed to insert account");
   return acct;
@@ -233,7 +233,6 @@ export async function loginGhCli(hostInput: string): Promise<GhAccount> {
     login: viewer.login,
     userNodeId: viewer.nodeId,
     authMethod: "gh-cli",
-    token: null,
     tokenScopes: viewer.scopes,
   });
   const acct = getAccount(host, viewer.login);
@@ -263,7 +262,8 @@ export async function getAuthHeader(accountId: number): Promise<string> {
       );
     }
   } else {
-    token = readToken(accountId);
+    tryAutoUnlock();
+    token = getToken(acct.host, acct.login);
     if (!token) {
       throw new Error(
         `No token stored for ${acct.host}:${acct.login}. Run: knotes github auth login`
@@ -279,5 +279,6 @@ export async function logout(hostInput: string, login: string): Promise<void> {
   const host = normalizeHost(hostInput);
   const acct = getAccount(host, login);
   if (!acct) throw new Error(`Account not found: ${host}:${login}`);
+  deleteToken(host, login);
   deleteAccount(acct.id);
 }

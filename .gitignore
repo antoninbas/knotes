@@ -39,3 +39,11 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Personal agent instructions (not shared)
 AGENTS.local.md
 opencode.json
+
+# AI assistant work directories
+.claude/
+
+# Local notes / summaries / reviews (not shared)
+notes/
+
+.ignore

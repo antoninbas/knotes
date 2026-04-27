@@ -15,6 +15,7 @@ import {
 } from "./db.ts";
 import { getAuthHeader } from "./auth.ts";
 import { createClient, RateLimitError } from "./api.ts";
+import { VaultLockedError } from "../vault.ts";
 import { passesFilters } from "./connections.ts";
 import type {
   GhAccount,
@@ -559,6 +560,21 @@ async function syncConnectionImpl(
         monitors: conn.monitors,
         trigger,
       });
+    } else if (err instanceof VaultLockedError) {
+      recordJobFailed(
+        jobId,
+        err.message,
+        Date.now() - startedAt
+      );
+      return {
+        connectionId,
+        logPath: conn.logPath,
+        pulled: 0,
+        written: 0,
+        updated: 0,
+        skipped: 0,
+        rateLimited: false,
+      };
     } else {
       recordJobFailed(
         jobId,

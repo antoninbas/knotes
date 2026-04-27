@@ -45,6 +45,7 @@ check:
 
 install: build
 	install -d $(LIBDIR)
+	rm -rf $(LIBDIR)/node_modules
 	cp -r dist node_modules package.json $(LIBDIR)/
 	install -d $(PREFIX)/bin
 	@printf '#!/bin/sh\nKNOTES_BIN="$(PREFIX)/bin/knotes"\nexport KNOTES_BIN\nexec node "$(LIBDIR)/dist/main.js" "$$@"\n' > $(PREFIX)/bin/knotes
