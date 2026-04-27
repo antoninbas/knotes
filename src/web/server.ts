@@ -121,7 +121,7 @@ export function createWebServer(port: number) {
     }
 
     // Frontend not built / service restart pending
-    return c.html(process.env.KNOTES_BIN ? PROD_HTML : DEV_HTML);
+    return c.html(process.env.KNOTES_BIN ? prodHtml() : DEV_HTML);
   });
 
   const hostname = "127.0.0.1";
@@ -201,7 +201,8 @@ export function createWebServer(port: number) {
   return server;
 }
 
-const PROD_HTML = `<!DOCTYPE html>
+function restartHtml(hint: string): string {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -224,9 +225,20 @@ const PROD_HTML = `<!DOCTYPE html>
   <div class="container">
     <h1>Knotes</h1>
     <p>The service was recently upgraded. Restart it to apply the update.</p>
+    ${hint}
   </div>
 </body>
 </html>`;
+}
+
+const RESTART_HINTS: Record<string, string> = {
+  brew: `<p><code>brew services restart antoninbas/tap/knotes</code></p>`,
+};
+
+function prodHtml(): string {
+  const hint = RESTART_HINTS[process.env.KNOTES_INSTALL_METHOD ?? ""] ?? "";
+  return restartHtml(hint);
+}
 
 const DEV_HTML = `<!DOCTYPE html>
 <html lang="en">

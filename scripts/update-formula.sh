@@ -44,6 +44,8 @@ FORMULA='class Knotes < Formula
       #!/bin/sh
       KNOTES_BIN="#{bin}/knotes"
       export KNOTES_BIN
+      KNOTES_INSTALL_METHOD=brew
+      export KNOTES_INSTALL_METHOD
       exec "#{Formula["node"].opt_bin}/node" "#{libexec}/dist/main.js" "$@"
     SH
   end
