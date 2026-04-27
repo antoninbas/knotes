@@ -138,6 +138,12 @@ export function vaultEntryCount(): number {
   return Object.keys(store.entries).length;
 }
 
+export function ensureVaultExists(): void {
+  if (!existsSync(vaultPath())) {
+    writeStore({ version: 1, encrypted: false, entries: {} });
+  }
+}
+
 export function unlock(passphrase: string): void {
   const store = readStore();
   if (!store.encrypted) return;

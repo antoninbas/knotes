@@ -24,7 +24,7 @@ import {
   isServerAlive,
   getServerInfo,
 } from "../core/db.ts";
-import { tryAutoUnlock } from "../core/vault.ts";
+import { tryAutoUnlock, ensureVaultExists } from "../core/vault.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +90,9 @@ export function createWebServer(port: number) {
   }
 
   const app = createApp();
+
+  // Ensure vault file exists so the UI always shows the vault status
+  ensureVaultExists();
 
   // Auto-unlock vault if KNOTES_VAULT_PASSPHRASE is set
   tryAutoUnlock();
