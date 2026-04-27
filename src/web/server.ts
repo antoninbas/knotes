@@ -223,8 +223,7 @@ const PROD_HTML = `<!DOCTYPE html>
 <body>
   <div class="container">
     <h1>Knotes</h1>
-    <p>The service was recently upgraded. Restart it to apply the update:</p>
-    <p><code>brew services restart antoninbas/tap/knotes</code></p>
+    <p>The service was recently upgraded. Restart it to apply the update.</p>
   </div>
 </body>
 </html>`;
