@@ -53,6 +53,7 @@ FORMULA='class Knotes < Formula
     keep_alive true
     log_path var/"log/knotes.log"
     error_log_path var/"log/knotes.log"
+    environment_variables PATH: std_service_path_env
   end
 
   def caveats
