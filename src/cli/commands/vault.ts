@@ -18,20 +18,61 @@ async function readPasswordFromStdin(prompt: string): Promise<string> {
   process.stdout.write(prompt);
   return new Promise((resolve) => {
     let data = "";
-    process.stdin.setEncoding("utf-8");
-    const onData = (chunk: string) => {
-      const newlineIdx = chunk.indexOf("\n");
-      if (newlineIdx >= 0) {
-        data += chunk.slice(0, newlineIdx);
-        process.stdin.removeListener("data", onData);
-        process.stdin.pause();
-        resolve(data.trim());
-      } else {
-        data += chunk;
-      }
-    };
-    process.stdin.on("data", onData);
-    process.stdin.resume();
+
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.setEncoding("utf-8");
+
+      const onData = (chunk: string) => {
+        for (const ch of chunk) {
+          const code = ch.charCodeAt(0);
+          if (code === 3) {
+            // Ctrl+C
+            process.stdout.write("\n");
+            process.exit(130);
+          }
+          if (code === 13 || code === 10) {
+            // Enter
+            process.stdout.write("\n");
+            process.stdin.setRawMode(false);
+            process.stdin.pause();
+            process.stdin.removeListener("data", onData);
+            resolve(data);
+            return;
+          }
+          if (code === 127 || code === 8) {
+            // Backspace
+            if (data.length > 0) {
+              data = data.slice(0, -1);
+              process.stdout.write("\b \b");
+            }
+            continue;
+          }
+          // Printable characters
+          if (code >= 32 && code < 127) {
+            data += ch;
+            // Don't echo
+          }
+        }
+      };
+      process.stdin.on("data", onData);
+    } else {
+      process.stdin.setEncoding("utf-8");
+      const onData = (chunk: string) => {
+        const newlineIdx = chunk.indexOf("\n");
+        if (newlineIdx >= 0) {
+          data += chunk.slice(0, newlineIdx);
+          process.stdin.removeListener("data", onData);
+          process.stdin.pause();
+          resolve(data.trim());
+        } else {
+          data += chunk;
+        }
+      };
+      process.stdin.on("data", onData);
+      process.stdin.resume();
+    }
   });
 }
 
@@ -51,6 +92,9 @@ export function registerVaultCommand(program: Command): void {
         process.exit(1);
       }
       let passphrase = opts.passphrase as string | undefined;
+      if (passphrase) {
+        console.warn("Warning: passing passphrase on the command line is insecure; it will appear in shell history.");
+      }
       if (!passphrase) {
         if (!process.stdin.isTTY) {
           console.error("No --passphrase provided and stdin is not a TTY. Pass --passphrase <p> or run interactively.");
@@ -82,6 +126,9 @@ export function registerVaultCommand(program: Command): void {
         process.exit(1);
       }
       let passphrase = opts.passphrase as string | undefined;
+      if (passphrase) {
+        console.warn("Warning: passing passphrase on the command line is insecure; it will appear in shell history.");
+      }
       if (!passphrase) {
         if (!process.stdin.isTTY) {
           console.error("No --passphrase provided and stdin is not a TTY. Pass --passphrase <p> or run interactively.");
@@ -108,6 +155,9 @@ export function registerVaultCommand(program: Command): void {
         return;
       }
       let passphrase = opts.passphrase as string | undefined;
+      if (passphrase) {
+        console.warn("Warning: passing passphrase on the command line is insecure; it will appear in shell history.");
+      }
       if (!passphrase) {
         passphrase = process.env["KNOTES_VAULT_PASSPHRASE"];
       }

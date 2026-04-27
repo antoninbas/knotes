@@ -15,7 +15,7 @@ import {
 import { getHome } from "./config.ts";
 
 const ALGO = "aes-256-gcm";
-const IV_LEN = 16;
+const IV_LEN = 12;
 const KDF_N = process.env["KNOTES_VAULT_TEST_FAST"] === "1" ? 1024 : 32768;
 const KDF_R = 8;
 const KDF_P = 1;
@@ -37,6 +37,11 @@ interface EncryptedStore {
     r: number;
     p: number;
   };
+  verifier: {
+    iv: string; // base64
+    authTag: string; // base64
+    ciphertext: string; // base64
+  };
   entries: Record<string, {
     iv: string; // base64
     authTag: string; // base64
@@ -54,8 +59,14 @@ function vaultPath(): string {
 
 function ensureGitignore(): void {
   const gitignorePath = join(getHome(), ".data", ".gitignore");
-  if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath, "vault.json\n", { mode: 0o600 });
+  const content = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+  const lines = content.split("\n");
+  if (!lines.includes("vault.json")) {
+    writeFileSync(
+      gitignorePath,
+      content + (content.endsWith("\n") ? "" : "\n") + "vault.json\n",
+      { mode: 0o600 }
+    );
   }
 }
 
@@ -128,14 +139,11 @@ export function unlock(passphrase: string): void {
   if (!store.encrypted) return;
   const salt = Buffer.from(store.kdf.salt, "base64");
   const key = deriveKey(passphrase, salt);
-  // Verify by trying to decrypt the first entry
-  const entries = Object.values(store.entries);
-  if (entries.length > 0) {
-    try {
-      decryptToken(entries[0]!, key);
-    } catch {
-      throw new Error("Invalid passphrase");
-    }
+  // Verify by decrypting the canary
+  try {
+    decryptToken(store.verifier, key);
+  } catch {
+    throw new Error("Invalid passphrase");
   }
   cachedKey = key;
 }
@@ -172,6 +180,7 @@ export function setupEncryption(passphrase: string): void {
       r: KDF_R,
       p: KDF_P,
     },
+    verifier: encryptToken("knotes-vault-canary", key),
     entries: newEntries,
   };
   writeStore(encryptedStore);
@@ -185,14 +194,11 @@ export function disableEncryption(passphrase: string): void {
   }
   const salt = Buffer.from(store.kdf.salt, "base64");
   const key = deriveKey(passphrase, salt);
-  // Verify
-  const entries = Object.values(store.entries);
-  if (entries.length > 0) {
-    try {
-      decryptToken(entries[0]!, key);
-    } catch {
-      throw new Error("Invalid passphrase");
-    }
+  // Verify by decrypting the canary
+  try {
+    decryptToken(store.verifier, key);
+  } catch {
+    throw new Error("Invalid passphrase");
   }
   const newEntries: PlaintextStore["entries"] = {};
   for (const [id, entry] of Object.entries(store.entries)) {

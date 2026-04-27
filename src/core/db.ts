@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { mkdirSync, chmodSync, existsSync, writeFileSync } from "node:fs";
+import { mkdirSync, chmodSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import Database from "better-sqlite3";
 
 type DatabaseInstance = InstanceType<typeof Database>;
@@ -122,8 +122,14 @@ const migrations: Migration[] = [
       }
       const vaultData = { version: 1, encrypted: false, entries };
       writeFileSync(vaultJsonPath, JSON.stringify(vaultData, null, 2) + "\n", { mode: 0o600 });
-      if (!existsSync(gitignorePath)) {
-        writeFileSync(gitignorePath, "vault.json\n", { mode: 0o600 });
+      const gitignoreContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+      const lines = gitignoreContent.split("\n");
+      if (!lines.includes("vault.json")) {
+        writeFileSync(
+          gitignorePath,
+          gitignoreContent + (gitignoreContent.endsWith("\n") ? "" : "\n") + "vault.json\n",
+          { mode: 0o600 }
+        );
       }
     }
     // Drop token column from github_accounts

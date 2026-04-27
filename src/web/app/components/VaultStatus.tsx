@@ -55,11 +55,8 @@ export default function VaultStatus() {
     return "UNLOCKED";
   };
 
-  // Don't render if no vault exists or not encrypted
-  if (!status()?.encrypted) return null;
-
   return (
-    <>
+    <Show when={status()?.encrypted}>
       <button
         onClick={() => {
           if (status()?.locked) {
@@ -133,6 +130,6 @@ export default function VaultStatus() {
           </div>
         </div>
       </Show>
-    </>
+    </Show>
   );
 }
