@@ -12,6 +12,7 @@ import { jobsApi } from "./api/jobs.ts";
 import { configApi } from "./api/config.ts";
 import { contextApi } from "./api/context.ts";
 import { githubApi } from "./api/github.ts";
+import { vaultApi } from "./api/vault.ts";
 import { updateIndex, embed } from "../core/search.ts";
 import { syncAll as githubSyncAll } from "../core/github/sync.ts";
 import { getVersion } from "../core/version.ts";
@@ -23,6 +24,7 @@ import {
   isServerAlive,
   getServerInfo,
 } from "../core/db.ts";
+import { tryAutoUnlock } from "../core/vault.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -71,6 +73,7 @@ export function createApp(): Hono {
   app.route("/api/config", configApi);
   app.route("/api/context", contextApi);
   app.route("/api/github", githubApi);
+  app.route("/api/vault", vaultApi);
 
   return app;
 }
@@ -87,6 +90,9 @@ export function createWebServer(port: number) {
   }
 
   const app = createApp();
+
+  // Auto-unlock vault if KNOTES_VAULT_PASSPHRASE is set
+  tryAutoUnlock();
 
   app.get("/*", async (c) => {
     const url = new URL(c.req.url);

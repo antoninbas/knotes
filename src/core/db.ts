@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { mkdirSync, chmodSync } from "node:fs";
+import { mkdirSync, chmodSync, existsSync, writeFileSync } from "node:fs";
 import Database from "better-sqlite3";
 
 type DatabaseInstance = InstanceType<typeof Database>;
@@ -105,6 +105,53 @@ const migrations: Migration[] = [
       )
     `);
     db.exec(`CREATE INDEX idx_gh_evt_entry ON github_synced_events(entry_id)`);
+  },
+  // Migration 5: Move GitHub tokens from DB to vault.json, drop token column
+  (db) => {
+    // Migrate existing tokens to vault.json (plaintext)
+    const accounts = db.prepare("SELECT host, login, token FROM github_accounts WHERE token IS NOT NULL").all() as { host: string; login: string; token: string }[];
+    if (accounts.length > 0) {
+      const home = resolveHome();
+      const dataDir = join(home, ".data");
+      const vaultJsonPath = join(dataDir, "vault.json");
+      const gitignorePath = join(dataDir, ".gitignore");
+      mkdirSync(dataDir, { recursive: true });
+      const entries: Record<string, { token: string }> = {};
+      for (const acct of accounts) {
+        entries[`${acct.host}:${acct.login}`] = { token: acct.token };
+      }
+      const vaultData = { version: 1, encrypted: false, entries };
+      writeFileSync(vaultJsonPath, JSON.stringify(vaultData, null, 2) + "\n", { mode: 0o600 });
+      if (!existsSync(gitignorePath)) {
+        writeFileSync(gitignorePath, "vault.json\n", { mode: 0o600 });
+      }
+    }
+    // Drop token column from github_accounts
+    // SQLite doesn't support DROP COLUMN directly, so we recreate the table
+    db.exec(`
+      CREATE TABLE github_accounts_new (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        host         TEXT NOT NULL,
+        login        TEXT NOT NULL,
+        user_node_id TEXT NOT NULL,
+        auth_method  TEXT NOT NULL,
+        token_scopes TEXT,
+        client_id    TEXT,
+        created_at   TEXT NOT NULL,
+        last_used_at TEXT,
+        UNIQUE(host, login)
+      )
+    `);
+    db.exec(`
+      INSERT INTO github_accounts_new (id, host, login, user_node_id, auth_method, token_scopes, client_id, created_at, last_used_at)
+      SELECT id, host, login, user_node_id, auth_method, token_scopes, client_id, created_at, last_used_at
+      FROM github_accounts
+    `);
+    db.exec(`DROP TABLE github_accounts`);
+    db.exec(`ALTER TABLE github_accounts_new RENAME TO github_accounts`);
+    if (accounts.length > 0) {
+      console.log("Migration 5: GitHub tokens moved to vault.json (plaintext). Run 'knotes vault encrypt' to enable passphrase protection.");
+    }
   },
 ];
 

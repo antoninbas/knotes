@@ -14,6 +14,7 @@ import { createClient, normalizeHost } from "../../core/github/api.ts";
 import { insertAccount, getAccount } from "../../core/github/db.ts";
 import { syncAll, syncConnection, syncForLog } from "../../core/github/sync.ts";
 import { getJobs } from "../../core/db.ts";
+import { setToken, VaultLockedError } from "../../core/vault.ts";
 
 const MonitorSchema = z.enum([
   "opened_prs",
@@ -127,6 +128,9 @@ githubApi.post("/auth/pat", async (c) => {
     const acct = await loginPat(parsed.data.host, parsed.data.token);
     return c.json(acct, 201);
   } catch (err: any) {
+    if (err instanceof VaultLockedError) {
+      return c.json({ error: err.message, unlockHint: "Run knotes vault unlock or set KNOTES_VAULT_PASSPHRASE" }, 423);
+    }
     return c.json({ error: err.message }, 400);
   }
 });
@@ -185,13 +189,16 @@ githubApi.post("/auth/device/poll", async (c) => {
       login: viewer.login,
       userNodeId: viewer.nodeId,
       authMethod: "device",
-      token: result.token!,
       tokenScopes: result.scope ?? viewer.scopes ?? null,
       clientId: parsed.data.clientId ?? null,
     });
+    setToken(host, viewer.login, result.token!);
     const acct = getAccount(host, viewer.login)!;
     return c.json({ status: "ok", account: acct });
   } catch (err: any) {
+    if (err instanceof VaultLockedError) {
+      return c.json({ error: err.message, unlockHint: "Run knotes vault unlock or set KNOTES_VAULT_PASSPHRASE" }, 423);
+    }
     return c.json({ error: err.message }, 400);
   }
 });

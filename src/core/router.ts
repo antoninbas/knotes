@@ -14,6 +14,7 @@ import * as directContext from "./context.ts";
 import * as directGhConnections from "./github/connections.ts";
 import * as directGhAuth from "./github/auth.ts";
 import * as directGhSync from "./github/sync.ts";
+import * as directVault from "./vault.ts";
 import type { NoteResult, LogEntry, SearchResult, SearchMode, CreateNoteOptions, UpdateNoteOptions, ListEntry } from "./types.ts";
 import type { GhAccount, GhBodyMode, GhConnection, GhMonitor, GhSyncResult } from "./github/types.ts";
 
@@ -249,6 +250,23 @@ export async function syncGithub(opts?: {
   }
   if (opts?.logPath) return directGhSync.syncForLog(opts.logPath);
   return directGhSync.syncAll();
+}
+
+// --- Vault ---
+
+export async function unlockVault(passphrase: string): Promise<void> {
+  if (useServer()) return client.unlockVault(passphrase);
+  directVault.unlock(passphrase);
+}
+
+export async function lockVault(): Promise<void> {
+  if (useServer()) return client.lockVault();
+  directVault.lock();
+}
+
+export async function getVaultLockStatus(): Promise<{ locked: boolean; encrypted: boolean }> {
+  if (useServer()) return client.getVaultLockStatus();
+  return { locked: directVault.isLocked(), encrypted: directVault.isEncrypted() };
 }
 
 // --- Import ---

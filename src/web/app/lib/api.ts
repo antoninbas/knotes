@@ -248,6 +248,17 @@ export const githubApi = {
     request<JobRecord[]>(`/github/sync/status?limit=${limit}`),
 };
 
+// Vault API
+export const vaultApi = {
+  lockStatus: () => request<{ locked: boolean; encrypted: boolean }>("/vault/lock-status"),
+  unlock: (passphrase: string) =>
+    request<{ ok: boolean }>("/vault/unlock", {
+      method: "POST",
+      body: JSON.stringify({ passphrase }),
+    }),
+  lock: () => request<{ ok: boolean }>("/vault/lock", { method: "POST" }),
+};
+
 // Context API
 export const contextApi = {
   list: () =>
