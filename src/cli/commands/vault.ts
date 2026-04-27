@@ -1,4 +1,6 @@
 import type { Command } from "commander";
+import { createInterface } from "node:readline";
+import { Writable } from "node:stream";
 import {
   setupEncryption,
   disableEncryption,
@@ -20,43 +22,23 @@ async function readPasswordFromStdin(prompt: string): Promise<string> {
     let data = "";
 
     if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-      process.stdin.resume();
-      process.stdin.setEncoding("utf-8");
-
-      const onData = (chunk: string) => {
-        for (const ch of chunk) {
-          const code = ch.charCodeAt(0);
-          if (code === 3) {
-            // Ctrl+C
-            process.stdout.write("\n");
-            process.exit(130);
-          }
-          if (code === 13 || code === 10) {
-            // Enter
-            process.stdout.write("\n");
-            process.stdin.setRawMode(false);
-            process.stdin.pause();
-            process.stdin.removeListener("data", onData);
-            resolve(data);
-            return;
-          }
-          if (code === 127 || code === 8) {
-            // Backspace
-            if (data.length > 0) {
-              data = data.slice(0, -1);
-              process.stdout.write("\b \b");
-            }
-            continue;
-          }
-          // Printable characters
-          if (code >= 32 && code < 127) {
-            data += ch;
-            // Don't echo
-          }
-        }
-      };
-      process.stdin.on("data", onData);
+      // Use readline with a muted output stream so nothing is echoed.
+      // This handles UTF-8, backspace, and arrow keys correctly.
+      const muted = new Writable({
+        write(_chunk, _encoding, callback) {
+          callback();
+        },
+      });
+      const rl = createInterface({
+        input: process.stdin,
+        output: muted,
+        terminal: true,
+      });
+      rl.on("line", (line) => {
+        rl.close();
+        process.stdout.write("\n");
+        resolve(line.trim());
+      });
     } else {
       process.stdin.setEncoding("utf-8");
       const onData = (chunk: string) => {
