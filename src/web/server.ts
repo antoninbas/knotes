@@ -120,8 +120,8 @@ export function createWebServer(port: number) {
       });
     }
 
-    // Frontend not built
-    return c.html(DEV_HTML);
+    // Frontend not built / service restart pending
+    return c.html(process.env.KNOTES_BIN ? PROD_HTML : DEV_HTML);
   });
 
   const hostname = "127.0.0.1";
@@ -200,6 +200,34 @@ export function createWebServer(port: number) {
 
   return server;
 }
+
+const PROD_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Knotes</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; margin: 0;
+      background: #1e1e2e; color: #cdd6f4;
+    }
+    .container { text-align: center; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    p { color: #a6adc8; }
+    code { background: #313244; padding: 2px 8px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Knotes</h1>
+    <p>The service was recently upgraded. Restart it to apply the update:</p>
+    <p><code>brew services restart antoninbas/tap/knotes</code></p>
+  </div>
+</body>
+</html>`;
 
 const DEV_HTML = `<!DOCTYPE html>
 <html lang="en">

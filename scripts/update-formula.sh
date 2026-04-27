@@ -50,7 +50,7 @@ FORMULA='class Knotes < Formula
 
   service do
     run [bin/"knotes", "server"]
-    keep_alive true
+    keep_alive crashed: true
     log_path var/"log/knotes.log"
     error_log_path var/"log/knotes.log"
     environment_variables PATH: std_service_path_env
