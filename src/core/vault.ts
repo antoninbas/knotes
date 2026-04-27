@@ -73,7 +73,9 @@ function ensureGitignore(): void {
 function readStore(): Store {
   const path = vaultPath();
   if (!existsSync(path)) {
-    return { version: 1, encrypted: false, entries: {} };
+    const empty: PlaintextStore = { version: 1, encrypted: false, entries: {} };
+    writeStore(empty);
+    return empty;
   }
   const raw = readFileSync(path, "utf-8");
   return JSON.parse(raw) as Store;

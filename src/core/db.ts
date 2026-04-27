@@ -108,30 +108,30 @@ const migrations: Migration[] = [
   },
   // Migration 5: Move GitHub tokens from DB to vault.json, drop token column
   (db) => {
-    // Migrate existing tokens to vault.json (plaintext)
+    const home = resolveHome();
+    const dataDir = join(home, ".data");
+    const vaultJsonPath = join(dataDir, "vault.json");
+    const gitignorePath = join(dataDir, ".gitignore");
+    mkdirSync(dataDir, { recursive: true });
+
+    // Always create vault.json (general credential store, not GitHub-specific)
+    const entries: Record<string, { token: string }> = {};
     const accounts = db.prepare("SELECT host, login, token FROM github_accounts WHERE token IS NOT NULL").all() as { host: string; login: string; token: string }[];
-    if (accounts.length > 0) {
-      const home = resolveHome();
-      const dataDir = join(home, ".data");
-      const vaultJsonPath = join(dataDir, "vault.json");
-      const gitignorePath = join(dataDir, ".gitignore");
-      mkdirSync(dataDir, { recursive: true });
-      const entries: Record<string, { token: string }> = {};
-      for (const acct of accounts) {
-        entries[`${acct.host}:${acct.login}`] = { token: acct.token };
-      }
-      const vaultData = { version: 1, encrypted: false, entries };
-      writeFileSync(vaultJsonPath, JSON.stringify(vaultData, null, 2) + "\n", { mode: 0o600 });
-      const gitignoreContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
-      const lines = gitignoreContent.split("\n");
-      if (!lines.includes("vault.json")) {
-        writeFileSync(
-          gitignorePath,
-          gitignoreContent + (gitignoreContent.endsWith("\n") ? "" : "\n") + "vault.json\n",
-          { mode: 0o600 }
-        );
-      }
+    for (const acct of accounts) {
+      entries[`${acct.host}:${acct.login}`] = { token: acct.token };
     }
+    const vaultData = { version: 1, encrypted: false, entries };
+    writeFileSync(vaultJsonPath, JSON.stringify(vaultData, null, 2) + "\n", { mode: 0o600 });
+    const gitignoreContent = existsSync(gitignorePath) ? readFileSync(gitignorePath, "utf-8") : "";
+    const lines = gitignoreContent.split("\n");
+    if (!lines.includes("vault.json")) {
+      writeFileSync(
+        gitignorePath,
+        gitignoreContent + (gitignoreContent.endsWith("\n") ? "" : "\n") + "vault.json\n",
+        { mode: 0o600 }
+      );
+    }
+
     // Drop token column from github_accounts
     // SQLite doesn't support DROP COLUMN directly, so we recreate the table
     db.exec(`
