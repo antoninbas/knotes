@@ -1,14 +1,17 @@
-import { createSignal, createEffect, Show } from "solid-js";
+import { createSignal, createEffect, Show, onCleanup } from "solid-js";
 import { vaultApi } from "../lib/api.ts";
 
 export default function VaultStatus() {
-  const [status, setStatus] = createSignal<{ encrypted: boolean; locked: boolean; vaultExists: boolean } | null>(null);
+  const [status, setStatus] = createSignal<{ encrypted: boolean; locked: boolean; vaultExists: boolean; entryCount: number } | null>(null);
+  const [menuOpen, setMenuOpen] = createSignal(false);
   const [showUnlockModal, setShowUnlockModal] = createSignal(false);
   const [showEncryptModal, setShowEncryptModal] = createSignal(false);
   const [passphrase, setPassphrase] = createSignal("");
   const [confirmPassphrase, setConfirmPassphrase] = createSignal("");
   const [error, setError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
+
+  let menuRef: HTMLDivElement | undefined;
 
   async function fetchStatus() {
     try {
@@ -23,6 +26,24 @@ export default function VaultStatus() {
     fetchStatus();
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
+  });
+
+  function handleClickOutside(e: MouseEvent) {
+    if (menuRef && !menuRef.contains(e.target as Node)) {
+      setMenuOpen(false);
+    }
+  }
+
+  function toggleMenu() {
+    const willOpen = !menuOpen();
+    setMenuOpen(willOpen);
+    if (willOpen) {
+      document.addEventListener("click", handleClickOutside, { once: true });
+    }
+  }
+
+  onCleanup(() => {
+    document.removeEventListener("click", handleClickOutside);
   });
 
   async function handleUnlock() {
@@ -69,64 +90,90 @@ export default function VaultStatus() {
     }
   }
 
-  const label = () => {
+  const statusLabel = () => {
     const s = status();
-    if (!s) return "";
-    if (!s.encrypted) return "PLAINTEXT";
-    if (s.locked) return "LOCKED";
-    return "UNLOCKED";
+    if (!s) return "Unknown";
+    if (!s.encrypted) return "Plaintext";
+    if (s.locked) return "Locked";
+    return "Unlocked";
   };
 
-  const icon = () => {
+  const actionLabel = () => {
     const s = status();
-    if (!s) return "";
-    if (!s.encrypted) return "⚠️";
-    if (s.locked) return "🔒";
-    return "🔓";
+    if (!s) return null;
+    if (!s.encrypted) return "Encrypt";
+    if (s.locked) return "Unlock";
+    return "Lock";
   };
 
-  const color = () => {
+  function handleAction() {
     const s = status();
-    if (!s) return "var(--color-text-secondary)";
-    if (!s.encrypted) return "var(--color-warning, #f59e0b)";
-    if (s.locked) return "var(--color-danger)";
-    return "var(--color-text-secondary)";
-  };
+    if (!s) return;
+    setMenuOpen(false);
+    setError("");
+    if (!s.encrypted) {
+      setShowEncryptModal(true);
+    } else if (s.locked) {
+      setShowUnlockModal(true);
+    } else {
+      handleLock();
+    }
+  }
 
   return (
     <Show when={status()?.vaultExists}>
-      <button
-        onClick={() => {
-          const s = status();
-          if (!s) return;
-          if (!s.encrypted) {
-            setShowEncryptModal(true);
-            setError("");
-          } else if (s.locked) {
-            setShowUnlockModal(true);
-            setError("");
-          } else {
-            handleLock();
-          }
-        }}
-        class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer flex items-center gap-1.5"
-        style={{
-          background: "var(--color-bg-surface)",
-          color: color(),
-        }}
-        title={
-          !status()?.encrypted
-            ? "Vault is plaintext — click to encrypt"
-            : status()?.locked
-              ? "Vault is locked — click to unlock"
-              : "Vault is unlocked — click to lock"
-        }
-      >
-        <span style={{ "font-size": "1rem" }}>{icon()}</span>
-        <span class="hidden sm:inline" style={{ width: "5.5rem", display: "inline-block", "text-align": "center" }}>
-          {label()}
-        </span>
-      </button>
+      <div class="relative" ref={menuRef}>
+        <button
+          onClick={toggleMenu}
+          class="px-2 sm:px-3 py-1 text-sm rounded transition-colors cursor-pointer"
+          style={{
+            background: "var(--color-bg-surface)",
+            color: "var(--color-text-secondary)",
+          }}
+        >
+          Vault
+        </button>
+
+        <Show when={menuOpen()}>
+          <div
+            class="absolute right-0 top-full mt-1 rounded-lg shadow-lg border py-3 px-4 min-w-[180px] z-50"
+            style={{
+              background: "var(--color-bg-secondary)",
+              "border-color": "var(--color-border)",
+              color: "var(--color-text-primary)",
+            }}
+          >
+            <div class="space-y-2 text-sm" style={{ color: "var(--color-text-secondary)" }}>
+              <div class="flex justify-between">
+                <span style={{ color: "var(--color-text-muted)" }}>Status</span>
+                <span>{statusLabel()}</span>
+              </div>
+              <div class="flex justify-between">
+                <span style={{ color: "var(--color-text-muted)" }}>Entries</span>
+                <span>{status()?.entryCount ?? 0}</span>
+              </div>
+            </div>
+            <div class="mt-3 pt-2" style={{ "border-top": "1px solid var(--color-border)" }}>
+              <button
+                onClick={handleAction}
+                class="w-full text-left px-3 py-1.5 text-sm rounded cursor-pointer transition-colors"
+                style={{
+                  background: "var(--color-bg-surface)",
+                  color: "var(--color-text-secondary)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--color-bg-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "var(--color-bg-surface)";
+                }}
+              >
+                {actionLabel()}
+              </button>
+            </div>
+          </div>
+        </Show>
+      </div>
 
       {/* Unlock modal */}
       <Show when={showUnlockModal()}>

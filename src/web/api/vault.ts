@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { unlock, lock, setupEncryption, isLocked, isEncrypted, vaultExists } from "../../core/vault.ts";
+import { unlock, lock, setupEncryption, isLocked, isEncrypted, vaultExists, vaultEntryCount } from "../../core/vault.ts";
 
 const UnlockSchema = z.object({
   passphrase: z.string().min(1),
@@ -30,7 +30,7 @@ vaultApi.post("/unlock", async (c) => {
 });
 
 vaultApi.get("/lock-status", (c) => {
-  return c.json({ locked: isLocked(), encrypted: isEncrypted(), vaultExists: vaultExists() });
+  return c.json({ locked: isLocked(), encrypted: isEncrypted(), vaultExists: vaultExists(), entryCount: vaultEntryCount() });
 });
 
 vaultApi.post("/lock", (c) => {

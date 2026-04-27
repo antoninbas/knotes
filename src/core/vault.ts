@@ -136,6 +136,11 @@ export function vaultExists(): boolean {
   return existsSync(vaultPath());
 }
 
+export function vaultEntryCount(): number {
+  const store = readStore();
+  return Object.keys(store.entries).length;
+}
+
 export function unlock(passphrase: string): void {
   const store = readStore();
   if (!store.encrypted) return;
