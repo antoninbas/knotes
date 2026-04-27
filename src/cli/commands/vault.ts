@@ -34,6 +34,11 @@ async function readPasswordFromStdin(prompt: string): Promise<string> {
         output: muted,
         terminal: true,
       });
+      rl.on("SIGINT", () => {
+        process.stdout.write("\n");
+        rl.close();
+        process.exit(130);
+      });
       rl.on("line", (line) => {
         rl.close();
         process.stdout.write("\n");
