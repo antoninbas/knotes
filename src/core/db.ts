@@ -153,8 +153,10 @@ const migrations: Migration[] = [
       SELECT id, host, login, user_node_id, auth_method, token_scopes, client_id, created_at, last_used_at
       FROM github_accounts
     `);
+    db.exec(`PRAGMA foreign_keys = OFF`);
     db.exec(`DROP TABLE github_accounts`);
     db.exec(`ALTER TABLE github_accounts_new RENAME TO github_accounts`);
+    db.exec(`PRAGMA foreign_keys = ON`);
     if (accounts.length > 0) {
       console.log("Migration 5: GitHub tokens moved to vault.json (plaintext). Run 'knotes vault encrypt' to enable passphrase protection.");
     }
