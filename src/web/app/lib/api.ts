@@ -250,13 +250,18 @@ export const githubApi = {
 
 // Vault API
 export const vaultApi = {
-  lockStatus: () => request<{ locked: boolean; encrypted: boolean }>("/vault/lock-status"),
+  lockStatus: () => request<{ locked: boolean; encrypted: boolean; vaultExists: boolean }>("/vault/lock-status"),
   unlock: (passphrase: string) =>
     request<{ ok: boolean }>("/vault/unlock", {
       method: "POST",
       body: JSON.stringify({ passphrase }),
     }),
   lock: () => request<{ ok: boolean }>("/vault/lock", { method: "POST" }),
+  encrypt: (passphrase: string) =>
+    request<{ ok: boolean }>("/vault/encrypt", {
+      method: "POST",
+      body: JSON.stringify({ passphrase }),
+    }),
 };
 
 // Context API
