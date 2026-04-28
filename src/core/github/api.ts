@@ -24,7 +24,13 @@ export class GhApiError extends Error {
 export interface GhClient {
   graphql<T>(query: string, vars?: Record<string, unknown>): Promise<T>;
   rest<T>(path: string, init?: RequestInit): Promise<T>;
-  rateLimitInfo(): { remaining: number | null; resetAt: string | null };
+  rateLimitInfo(): {
+    remaining: number | null;
+    resetAt: string | null;
+    graphQLCost: number | null;
+    graphQLRemaining: number | null;
+    graphQLResetAt: string | null;
+  };
   resolveViewer(): Promise<{ login: string; nodeId: string; scopes: string | null }>;
 }
 
@@ -64,6 +70,9 @@ export function createClient(opts: ClientOpts): GhClient {
   const fetchImpl = opts.fetchImpl ?? fetch;
   let lastRemaining: number | null = null;
   let lastResetAt: string | null = null;
+  let lastGraphQLCost: number | null = null;
+  let lastGraphQLRemaining: number | null = null;
+  let lastGraphQLResetAt: string | null = null;
 
   function trackRateLimit(res: Response) {
     const remaining = res.headers.get("x-ratelimit-remaining");
@@ -124,7 +133,14 @@ export function createClient(opts: ClientOpts): GhClient {
         const body = await res.json().catch(() => ({}));
         throw new GhApiError(res.status, `GitHub GraphQL ${res.status}`, body);
       }
-      const payload = (await res.json()) as { data?: T; errors?: unknown[] };
+      const payload = (await res.json()) as { data?: Record<string, unknown>; errors?: unknown[] };
+      if (payload.data?.rateLimit) {
+        const rl = payload.data.rateLimit as { cost?: unknown; remaining?: unknown; resetAt?: unknown };
+        lastGraphQLCost = typeof rl.cost === "number" ? rl.cost : null;
+        lastGraphQLRemaining = typeof rl.remaining === "number" ? rl.remaining : null;
+        lastGraphQLResetAt = typeof rl.resetAt === "string" ? rl.resetAt : null;
+        delete payload.data.rateLimit;
+      }
       if (payload.errors && payload.errors.length > 0) {
         throw new GhApiError(200, "GitHub GraphQL errors", payload.errors);
       }
@@ -132,7 +148,13 @@ export function createClient(opts: ClientOpts): GhClient {
     },
 
     rateLimitInfo() {
-      return { remaining: lastRemaining, resetAt: lastResetAt };
+      return {
+        remaining: lastRemaining,
+        resetAt: lastResetAt,
+        graphQLCost: lastGraphQLCost,
+        graphQLRemaining: lastGraphQLRemaining,
+        graphQLResetAt: lastGraphQLResetAt,
+      };
     },
 
     async resolveViewer() {

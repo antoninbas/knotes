@@ -12,9 +12,10 @@ import {
   listConnections as dbListConnections,
   upsertSyncedEvent,
   updateConnection as dbUpdateConnection,
+  markAccountNeedsReauth,
 } from "./db.ts";
 import { getAuthHeader } from "./auth.ts";
-import { createClient, RateLimitError } from "./api.ts";
+import { createClient, RateLimitError, GhApiError } from "./api.ts";
 import { VaultLockedError } from "../vault.ts";
 import { passesFilters } from "./connections.ts";
 import type {
@@ -34,6 +35,7 @@ export type SyncClient = GhClient;
 function prSearchQuery(includeBody: boolean): string {
   return /* GraphQL */ `
     query SearchPRs($q: String!, $cursor: String) {
+      rateLimit { cost remaining resetAt }
       search(type: ISSUE, query: $q, first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -63,6 +65,7 @@ function prSearchQuery(includeBody: boolean): string {
 function issueSearchQuery(includeBody: boolean): string {
   return /* GraphQL */ `
     query SearchIssues($q: String!, $cursor: String) {
+      rateLimit { cost remaining resetAt }
       search(type: ISSUE, query: $q, first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -87,6 +90,7 @@ function issueSearchQuery(includeBody: boolean): string {
 
 const REVIEW_SEARCH_QUERY = /* GraphQL */ `
   query SearchReviewedPRs($q: String!, $cursor: String, $viewer: String!) {
+    rateLimit { cost remaining resetAt }
     search(type: ISSUE, query: $q, first: 25, after: $cursor) {
       pageInfo { hasNextPage endCursor }
       nodes {
@@ -322,6 +326,8 @@ function stateHashOf(content: string): string {
 
 // --- Pagination helpers ---
 
+const GRAPHQL_POINTS_LOW_WATER = 500;
+
 async function paginatedSearch<T>(
   client: SyncClient,
   query: string,
@@ -338,6 +344,13 @@ async function paginatedSearch<T>(
       cursor,
       ...extraVars,
     })) as SearchPage<T>;
+    const rl = client.rateLimitInfo();
+    if (rl.graphQLRemaining !== null && rl.graphQLRemaining < GRAPHQL_POINTS_LOW_WATER) {
+      throw new RateLimitError(
+        `GitHub GraphQL rate limit low (${rl.graphQLRemaining} points remaining)`,
+        rl.graphQLResetAt
+      );
+    }
     all.push(...data.search.nodes);
     if (!data.search.pageInfo.hasNextPage) break;
     cursor = data.search.pageInfo.endCursor;
@@ -495,11 +508,24 @@ async function syncConnectionImpl(
       updated: 0,
       skipped: 0,
       rateLimited: false,
+      authError: false,
     };
   }
 
   const account = getAccountById(conn.accountId);
   if (!account) throw new Error(`Account not found for connection ${connectionId}`);
+  if (account.needsReauth) {
+    return {
+      connectionId,
+      logPath: conn.logPath,
+      pulled: 0,
+      written: 0,
+      updated: 0,
+      skipped: 0,
+      rateLimited: false,
+      authError: true,
+    };
+  }
 
   const ghClient: SyncClient =
     client ??
@@ -560,6 +586,23 @@ async function syncConnectionImpl(
         monitors: conn.monitors,
         trigger,
       });
+    } else if (err instanceof GhApiError && err.status === 401) {
+      markAccountNeedsReauth(account.id);
+      recordJobFailed(
+        jobId,
+        `Token revoked or invalid for ${account.host}:${account.login}`,
+        Date.now() - startedAt
+      );
+      return {
+        connectionId,
+        logPath: conn.logPath,
+        pulled: 0,
+        written: 0,
+        updated: 0,
+        skipped: 0,
+        rateLimited: false,
+        authError: true,
+      };
     } else if (err instanceof VaultLockedError) {
       recordJobFailed(
         jobId,
@@ -574,6 +617,7 @@ async function syncConnectionImpl(
         updated: 0,
         skipped: 0,
         rateLimited: false,
+        authError: false,
       };
     } else {
       recordJobFailed(
@@ -593,6 +637,7 @@ async function syncConnectionImpl(
     updated,
     skipped,
     rateLimited,
+    authError: false,
     ...(resetAt ? { nextRetryAt: resetAt } : {}),
   };
 }

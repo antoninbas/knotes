@@ -161,6 +161,10 @@ const migrations: Migration[] = [
       console.log("Migration 5: GitHub tokens moved to vault.json (plaintext). Run 'knotes vault encrypt' to enable passphrase protection.");
     }
   },
+  // Migration 6: Add needs_reauth flag to github_accounts
+  (db) => {
+    db.exec(`ALTER TABLE github_accounts ADD COLUMN needs_reauth INTEGER NOT NULL DEFAULT 0`);
+  },
 ];
 
 function runMigrations(db: DatabaseInstance): void {

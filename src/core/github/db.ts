@@ -16,6 +16,7 @@ interface AccountRow {
   auth_method: string;
   token_scopes: string | null;
   client_id: string | null;
+  needs_reauth: number;
   created_at: string;
   last_used_at: string | null;
 }
@@ -57,6 +58,7 @@ function rowToAccount(row: AccountRow): GhAccount {
     authMethod: row.auth_method as GhAuthMethod,
     tokenScopes: row.token_scopes,
     clientId: row.client_id,
+    needsReauth: row.needs_reauth === 1,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,
   };
@@ -175,6 +177,16 @@ export function touchAccount(id: number): void {
     new Date().toISOString(),
     id
   );
+}
+
+export function markAccountNeedsReauth(id: number): void {
+  const db = getDb();
+  db.prepare("UPDATE github_accounts SET needs_reauth = 1 WHERE id = ?").run(id);
+}
+
+export function clearAccountNeedsReauth(id: number): void {
+  const db = getDb();
+  db.prepare("UPDATE github_accounts SET needs_reauth = 0 WHERE id = ?").run(id);
 }
 
 // --- Connections ---

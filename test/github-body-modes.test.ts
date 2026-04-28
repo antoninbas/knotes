@@ -132,7 +132,7 @@ function makeStubClient(prs: any[], issues: any[] = []): GhClient {
       throw new Error("not used");
     },
     rateLimitInfo() {
-      return { remaining: 5000, resetAt: null };
+      return { remaining: 5000, resetAt: null, graphQLCost: null, graphQLRemaining: null, graphQLResetAt: null };
     },
     async resolveViewer() {
       return { login: "alice", nodeId: "U_1", scopes: null };
@@ -257,7 +257,7 @@ test("title-only connections do NOT request `body` over GraphQL", async () => {
       throw new Error("not used");
     },
     rateLimitInfo() {
-      return { remaining: 5000, resetAt: null };
+      return { remaining: 5000, resetAt: null, graphQLCost: null, graphQLRemaining: null, graphQLResetAt: null };
     },
     async resolveViewer() {
       return { login: "alice", nodeId: "U_1", scopes: null };
@@ -285,7 +285,7 @@ test("non-title connections DO request `body` over GraphQL", async () => {
       throw new Error("not used");
     },
     rateLimitInfo() {
-      return { remaining: 5000, resetAt: null };
+      return { remaining: 5000, resetAt: null, graphQLCost: null, graphQLRemaining: null, graphQLResetAt: null };
     },
     async resolveViewer() {
       return { login: "alice", nodeId: "U_1", scopes: null };
