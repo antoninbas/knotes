@@ -336,7 +336,7 @@ export default function App() {
                           onCheckboxToggle={readOnly() ? undefined : (newContent) => {
                             const note = currentNote()!;
                             setCurrentNote({ ...note, content: newContent });
-                            notes.update(note.path, { content: newContent });
+                            notes.update(note.path, { content: newContent }).catch(() => setCurrentNote(note));
                           }}
                         />
                       }
