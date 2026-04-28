@@ -335,7 +335,6 @@ export default function App() {
                           note={currentNote()!}
                           onCheckboxToggle={readOnly() ? undefined : async (newContent) => {
                             const note = currentNote()!;
-                            setCurrentNote({ ...note, content: newContent });
                             const updated = await notes.update(note.path, { content: newContent });
                             setCurrentNote(updated);
                             setSidebarRefresh((n) => n + 1);
