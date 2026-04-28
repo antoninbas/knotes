@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import type { NoteResult } from "../lib/api.ts";
+import { toggleNthCheckbox } from "../lib/checkbox.ts";
 
 interface Props {
   note: NoteResult;
@@ -12,16 +13,6 @@ function renderMarkdown(md: string): string {
   const sanitized = DOMPurify.sanitize(raw);
   // Remove disabled so task-list checkboxes are interactive
   return sanitized.replace(/(<input\b[^>]*)\bdisabled(?:="")?([^>]*>)/gi, "$1$2");
-}
-
-function toggleNthCheckbox(content: string, index: number): string {
-  let count = 0;
-  return content.replace(/^(\s*(?:[-*+]|\d+\.)\s+)\[([ xX])\]/gm, (match, prefix, state) => {
-    if (count++ === index) {
-      return `${prefix}[${state.trim() === "" ? "x" : " "}]`;
-    }
-    return match;
-  });
 }
 
 export default function NoteView(props: Props) {
