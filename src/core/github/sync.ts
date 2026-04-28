@@ -35,6 +35,7 @@ export type SyncClient = GhClient;
 function prSearchQuery(includeBody: boolean): string {
   return /* GraphQL */ `
     query SearchPRs($q: String!, $cursor: String) {
+      rateLimit { cost remaining resetAt }
       search(type: ISSUE, query: $q, first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -64,6 +65,7 @@ function prSearchQuery(includeBody: boolean): string {
 function issueSearchQuery(includeBody: boolean): string {
   return /* GraphQL */ `
     query SearchIssues($q: String!, $cursor: String) {
+      rateLimit { cost remaining resetAt }
       search(type: ISSUE, query: $q, first: 50, after: $cursor) {
         pageInfo { hasNextPage endCursor }
         nodes {
@@ -88,6 +90,7 @@ function issueSearchQuery(includeBody: boolean): string {
 
 const REVIEW_SEARCH_QUERY = /* GraphQL */ `
   query SearchReviewedPRs($q: String!, $cursor: String, $viewer: String!) {
+    rateLimit { cost remaining resetAt }
     search(type: ISSUE, query: $q, first: 25, after: $cursor) {
       pageInfo { hasNextPage endCursor }
       nodes {
@@ -339,6 +342,13 @@ async function paginatedSearch<T>(
       cursor,
       ...extraVars,
     })) as SearchPage<T>;
+    const rl = client.rateLimitInfo();
+    if (rl.graphQLRemaining !== null && rl.graphQLRemaining < 500) {
+      throw new RateLimitError(
+        `GitHub GraphQL rate limit low (${rl.graphQLRemaining} points remaining)`,
+        rl.graphQLResetAt
+      );
+    }
     all.push(...data.search.nodes);
     if (!data.search.pageInfo.hasNextPage) break;
     cursor = data.search.pageInfo.endCursor;

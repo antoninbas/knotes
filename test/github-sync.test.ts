@@ -63,7 +63,7 @@ function makeStubClient(prs: PRFixture[]): GhClient {
       throw new Error("not used in this test");
     },
     rateLimitInfo() {
-      return { remaining: 5000, resetAt: null };
+      return { remaining: 5000, resetAt: null, graphQLCost: null, graphQLRemaining: null, graphQLResetAt: null };
     },
     async resolveViewer() {
       return { login: "alice", nodeId: "U_1", scopes: null };
