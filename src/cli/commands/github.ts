@@ -164,7 +164,8 @@ export function registerGithubCommands(program: Command): void {
       }
       for (const a of accounts) {
         const last = a.lastUsedAt ? ` last_used=${a.lastUsedAt}` : "";
-        console.log(`${a.host}:${a.login} (method: ${a.authMethod})${last}`);
+        const reauth = a.needsReauth ? " (needs re-auth)" : "";
+        console.log(`${a.host}:${a.login} (method: ${a.authMethod})${last}${reauth}`);
       }
     });
 

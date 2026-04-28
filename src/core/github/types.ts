@@ -17,6 +17,8 @@ export interface GhAccount {
   tokenScopes: string | null;
   /** OAuth App client_id used to authenticate this account (device flow only). */
   clientId: string | null;
+  /** True when the token has been revoked (401 received during sync). */
+  needsReauth: boolean;
   createdAt: string;
   lastUsedAt: string | null;
 }
@@ -59,5 +61,6 @@ export interface GhSyncResult {
   updated: number;
   skipped: number;
   rateLimited: boolean;
+  authError?: boolean;
   nextRetryAt?: string;
 }

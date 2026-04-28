@@ -5,6 +5,7 @@ import {
   getAccountById,
   touchAccount,
   deleteAccount,
+  clearAccountNeedsReauth,
 } from "./db.ts";
 import { setToken, getToken, deleteToken, tryAutoUnlock } from "../vault.ts";
 import { createClient, normalizeHost } from "./api.ts";
@@ -186,6 +187,7 @@ export async function loginDevice(
       setToken(startInfo.host, viewer.login, r.token);
       const acct = getAccount(startInfo.host, viewer.login);
       if (!acct) throw new Error("Failed to insert account");
+      clearAccountNeedsReauth(acct.id);
       return acct;
     }
   }
@@ -212,6 +214,7 @@ export async function loginPat(
   setToken(host, viewer.login, token);
   const acct = getAccount(host, viewer.login);
   if (!acct) throw new Error("Failed to insert account");
+  clearAccountNeedsReauth(acct.id);
   return acct;
 }
 
@@ -233,6 +236,7 @@ export async function loginGhCli(hostInput: string): Promise<GhAccount> {
   });
   const acct = getAccount(host, viewer.login);
   if (!acct) throw new Error("Failed to insert account");
+  clearAccountNeedsReauth(acct.id);
   return acct;
 }
 

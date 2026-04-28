@@ -12,9 +12,10 @@ import {
   listConnections as dbListConnections,
   upsertSyncedEvent,
   updateConnection as dbUpdateConnection,
+  markAccountNeedsReauth,
 } from "./db.ts";
 import { getAuthHeader } from "./auth.ts";
-import { createClient, RateLimitError } from "./api.ts";
+import { createClient, RateLimitError, GhApiError } from "./api.ts";
 import { VaultLockedError } from "../vault.ts";
 import { passesFilters } from "./connections.ts";
 import type {
@@ -500,6 +501,18 @@ async function syncConnectionImpl(
 
   const account = getAccountById(conn.accountId);
   if (!account) throw new Error(`Account not found for connection ${connectionId}`);
+  if (account.needsReauth) {
+    return {
+      connectionId,
+      logPath: conn.logPath,
+      pulled: 0,
+      written: 0,
+      updated: 0,
+      skipped: 0,
+      rateLimited: false,
+      authError: true,
+    };
+  }
 
   const ghClient: SyncClient =
     client ??
@@ -560,6 +573,23 @@ async function syncConnectionImpl(
         monitors: conn.monitors,
         trigger,
       });
+    } else if (err instanceof GhApiError && err.status === 401) {
+      markAccountNeedsReauth(account.id);
+      recordJobFailed(
+        jobId,
+        `Token revoked or invalid for ${account.host}:${account.login}`,
+        Date.now() - startedAt
+      );
+      return {
+        connectionId,
+        logPath: conn.logPath,
+        pulled: 0,
+        written: 0,
+        updated: 0,
+        skipped: 0,
+        rateLimited: false,
+        authError: true,
+      };
     } else if (err instanceof VaultLockedError) {
       recordJobFailed(
         jobId,
