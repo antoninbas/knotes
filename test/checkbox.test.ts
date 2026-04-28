@@ -57,6 +57,33 @@ test("handles deeply indented items", () => {
   expect(toggleNthCheckbox(content, 2)).toBe("- [ ] a\n    - [ ] b\n        - [x] c");
 });
 
+// --- fenced code blocks ---
+
+test("skips checkboxes inside backtick fences", () => {
+  const content = "```\n- [ ] not a checkbox\n```\n- [ ] real checkbox";
+  expect(toggleNthCheckbox(content, 0)).toBe("```\n- [ ] not a checkbox\n```\n- [x] real checkbox");
+});
+
+test("skips checkboxes inside tilde fences", () => {
+  const content = "~~~\n- [ ] not a checkbox\n~~~\n- [ ] real checkbox";
+  expect(toggleNthCheckbox(content, 0)).toBe("~~~\n- [ ] not a checkbox\n~~~\n- [x] real checkbox");
+});
+
+test("handles content before and after a fence", () => {
+  const content = "- [ ] before\n```\n- [ ] inside\n```\n- [ ] after";
+  expect(toggleNthCheckbox(content, 1)).toBe("- [ ] before\n```\n- [ ] inside\n```\n- [x] after");
+});
+
+test("handles fences with language tags", () => {
+  const content = "```python\n- [ ] inside\n```\n- [ ] real";
+  expect(toggleNthCheckbox(content, 0)).toBe("```python\n- [ ] inside\n```\n- [x] real");
+});
+
+test("handles multiple fences", () => {
+  const content = "- [ ] a\n```\n- [ ] b\n```\n- [ ] c\n```\n- [ ] d\n```\n- [ ] e";
+  expect(toggleNthCheckbox(content, 2)).toBe("- [ ] a\n```\n- [ ] b\n```\n- [ ] c\n```\n- [ ] d\n```\n- [x] e");
+});
+
 // --- mixed content ---
 
 test("ignores non-checkbox list items", () => {
@@ -67,13 +94,6 @@ test("ignores non-checkbox list items", () => {
 test("ignores [ ] not at the start of a list item", () => {
   const content = "Some text with [ ] inline\n- [ ] actual checkbox";
   expect(toggleNthCheckbox(content, 0)).toBe("Some text with [ ] inline\n- [x] actual checkbox");
-});
-
-test("ignores checkboxes inside fenced code blocks", () => {
-  const content = "```\n- [ ] not a checkbox\n```\n- [ ] real checkbox";
-  expect(toggleNthCheckbox(content, 0)).toBe("```\n- [x] not a checkbox\n```\n- [ ] real checkbox");
-  // NOTE: the regex does not parse fenced code blocks — it matches by line shape only.
-  // This is a known limitation; in practice notes rarely have task-list syntax inside fences.
 });
 
 // --- out of range / empty ---
