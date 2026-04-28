@@ -61,6 +61,6 @@ export interface GhSyncResult {
   updated: number;
   skipped: number;
   rateLimited: boolean;
-  authError?: boolean;
+  authError: boolean;
   nextRetryAt?: string;
 }

@@ -326,6 +326,8 @@ function stateHashOf(content: string): string {
 
 // --- Pagination helpers ---
 
+const GRAPHQL_POINTS_LOW_WATER = 500;
+
 async function paginatedSearch<T>(
   client: SyncClient,
   query: string,
@@ -343,7 +345,7 @@ async function paginatedSearch<T>(
       ...extraVars,
     })) as SearchPage<T>;
     const rl = client.rateLimitInfo();
-    if (rl.graphQLRemaining !== null && rl.graphQLRemaining < 500) {
+    if (rl.graphQLRemaining !== null && rl.graphQLRemaining < GRAPHQL_POINTS_LOW_WATER) {
       throw new RateLimitError(
         `GitHub GraphQL rate limit low (${rl.graphQLRemaining} points remaining)`,
         rl.graphQLResetAt
@@ -506,6 +508,7 @@ async function syncConnectionImpl(
       updated: 0,
       skipped: 0,
       rateLimited: false,
+      authError: false,
     };
   }
 
@@ -614,6 +617,7 @@ async function syncConnectionImpl(
         updated: 0,
         skipped: 0,
         rateLimited: false,
+        authError: false,
       };
     } else {
       recordJobFailed(
@@ -633,6 +637,7 @@ async function syncConnectionImpl(
     updated,
     skipped,
     rateLimited,
+    authError: false,
     ...(resetAt ? { nextRetryAt: resetAt } : {}),
   };
 }

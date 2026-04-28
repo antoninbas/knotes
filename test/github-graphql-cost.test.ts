@@ -2,7 +2,7 @@ import { test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
-import { RateLimitError } from "../src/core/github/api.ts";
+import { RateLimitError, createClient } from "../src/core/github/api.ts";
 import type { GhClient } from "../src/core/github/api.ts";
 
 let testHome: string;
@@ -31,7 +31,7 @@ afterEach(async () => {
 
 async function setupAccountAndConnection(): Promise<number> {
   const { insertAccount } = await import("../src/core/github/db.ts");
-  const aid = insertAccount({
+  insertAccount({
     host: "github.com",
     login: "alice",
     userNodeId: "U_1",
@@ -89,6 +89,28 @@ function makeLowCostClient(remaining: number, resetAt: string | null): GhClient 
     },
   };
 }
+
+test("createClient extracts rateLimit from GraphQL response and strips it from returned data", async () => {
+  const responseBody = {
+    data: {
+      rateLimit: { cost: 2, remaining: 4800, resetAt: "2026-04-28T00:00:00Z" },
+      search: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+    },
+  };
+  const mockFetch: typeof fetch = async () =>
+    new Response(JSON.stringify(responseBody), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  const client = createClient({ authHeader: "token test_token", host: "github.com", fetchImpl: mockFetch });
+  const data = await client.graphql("query { rateLimit { cost remaining resetAt } search { pageInfo { hasNextPage endCursor } nodes } }") as Record<string, unknown>;
+  expect(data.rateLimit).toBeUndefined();
+  expect(data.search).toBeDefined();
+  const rl = client.rateLimitInfo();
+  expect(rl.graphQLCost).toBe(2);
+  expect(rl.graphQLRemaining).toBe(4800);
+  expect(rl.graphQLResetAt).toBe("2026-04-28T00:00:00Z");
+});
 
 test("syncConnection returns rateLimited=true when GraphQL points are below 500", async () => {
   const cid = await setupAccountAndConnection();

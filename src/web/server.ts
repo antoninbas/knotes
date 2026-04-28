@@ -164,14 +164,26 @@ export function createWebServer(port: number) {
   async function backgroundGithubSync() {
     const cfg = getConfig();
     if (!cfg.githubEnabled) return;
-    if (ghRunning) return;
+    if (ghRunning) {
+      // A sync is already in flight (e.g. interval fired during a retry window).
+      // Push this attempt back 30 s so the running sync can finish first.
+      if (ghRetryTimer) clearTimeout(ghRetryTimer);
+      ghRetryTimer = setTimeout(backgroundGithubSync, 30_000);
+      return;
+    }
     ghRunning = true;
     try {
       const results = await githubSyncAll({ trigger: "background" });
       // If any connection was rate-limited, schedule an early retry at the
       // earliest reset time instead of waiting for the next interval tick.
+      // ISO-8601 strings sort lexicographically, so string < comparison is correct.
       let earliestReset: string | null = null;
       for (const r of results) {
+        if (r.authError) {
+          console.warn(
+            `GitHub token needs re-auth for connection ${r.connectionId} (${r.logPath}). Run 'knotes github auth login'.`
+          );
+        }
         if (r.rateLimited && r.nextRetryAt) {
           if (!earliestReset || r.nextRetryAt < earliestReset) {
             earliestReset = r.nextRetryAt;

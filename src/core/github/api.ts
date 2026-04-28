@@ -133,9 +133,9 @@ export function createClient(opts: ClientOpts): GhClient {
         const body = await res.json().catch(() => ({}));
         throw new GhApiError(res.status, `GitHub GraphQL ${res.status}`, body);
       }
-      const payload = (await res.json()) as { data?: any; errors?: unknown[] };
+      const payload = (await res.json()) as { data?: Record<string, unknown>; errors?: unknown[] };
       if (payload.data?.rateLimit) {
-        const rl = payload.data.rateLimit;
+        const rl = payload.data.rateLimit as { cost?: unknown; remaining?: unknown; resetAt?: unknown };
         lastGraphQLCost = typeof rl.cost === "number" ? rl.cost : null;
         lastGraphQLRemaining = typeof rl.remaining === "number" ? rl.remaining : null;
         lastGraphQLResetAt = typeof rl.resetAt === "string" ? rl.resetAt : null;

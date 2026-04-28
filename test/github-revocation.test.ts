@@ -48,7 +48,7 @@ function makeFailingClient(status: number): GhClient {
 
 async function setupAccountAndConnection(): Promise<number> {
   const { insertAccount } = await import("../src/core/github/db.ts");
-  const aid = insertAccount({
+  insertAccount({
     host: "github.com",
     login: "alice",
     userNodeId: "U_1",
