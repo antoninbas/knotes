@@ -330,7 +330,15 @@ export default function App() {
                   fallback={
                     <Show
                       when={viewMode() === "edit" && !readOnly()}
-                      fallback={<NoteView note={currentNote()!} />}
+                      fallback={
+                        <NoteView
+                          note={currentNote()!}
+                          onCheckboxToggle={readOnly() ? undefined : async (newContent) => {
+                            const updated = await notes.update(currentNote()!.path, { content: newContent });
+                            setCurrentNote(updated);
+                          }}
+                        />
+                      }
                     >
                       <Editor
                         note={currentNote()!}
