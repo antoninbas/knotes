@@ -12,8 +12,9 @@ export function toggleNthCheckbox(content: string, index: number): string {
 
     const m = line.match(/^(\s*(?:[-*+]|\d+\.)\s+)\[([ xX])\]/);
     if (m && count++ === index) {
-      const newState = m[2].trim() === "" ? "x" : " ";
-      return line.slice(0, m[1].length) + `[${newState}]` + line.slice(m[1].length + 3);
+      const [, prefix, state] = m as [string, string, string];
+      const newState = state.trim() === "" ? "x" : " ";
+      return line.slice(0, prefix.length) + `[${newState}]` + line.slice(prefix.length + 3);
     }
     return line;
   });
