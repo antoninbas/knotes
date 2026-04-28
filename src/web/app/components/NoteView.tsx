@@ -32,6 +32,8 @@ export default function NoteView(props: Props) {
     const target = e.target as HTMLElement;
     if (target.tagName !== "INPUT" || (target as HTMLInputElement).type !== "checkbox") return;
 
+    e.preventDefault();
+
     const checkboxes = Array.from(articleRef.querySelectorAll('input[type="checkbox"]'));
     const index = checkboxes.indexOf(target as HTMLInputElement);
     if (index === -1) return;

@@ -333,10 +333,9 @@ export default function App() {
                       fallback={
                         <NoteView
                           note={currentNote()!}
-                          onCheckboxToggle={readOnly() ? undefined : (newContent) => {
-                            const note = currentNote()!;
-                            setCurrentNote({ ...note, content: newContent });
-                            notes.update(note.path, { content: newContent }).catch(() => setCurrentNote(note));
+                          onCheckboxToggle={readOnly() ? undefined : async (newContent) => {
+                            const updated = await notes.update(currentNote()!.path, { content: newContent });
+                            setCurrentNote(updated);
                           }}
                         />
                       }
