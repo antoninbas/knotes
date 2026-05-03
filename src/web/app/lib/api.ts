@@ -88,9 +88,11 @@ export const logs = {
       method: "DELETE",
     }),
 
-  listEntries: (path: string, limit?: number) =>
+  listEntries: (path: string, limit?: number, before?: string) =>
     request<LogEntry[]>(
-      `/logs/entries?path=${encodeURIComponent(path)}${limit ? `&limit=${limit}` : ""}`
+      `/logs/entries?path=${encodeURIComponent(path)}` +
+      (limit ? `&limit=${limit}` : "") +
+      (before ? `&before=${encodeURIComponent(before)}` : "")
     ),
 
   addEntry: (path: string, content: string) =>

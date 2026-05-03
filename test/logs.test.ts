@@ -1,5 +1,6 @@
 import { test, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, readFile, writeFile } from "fs/promises";
+import { existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -260,6 +261,118 @@ test("listEntries date filter combined with limit", async () => {
     limit: 2,
   });
   expect(entries.length).toBe(2);
+});
+
+test("rotation: addEntry rotates log.md into log.1.md when size limit is reached", async () => {
+  const { saveConfig } = await import("../src/core/config.ts");
+  await saveConfig({ logSegmentMaxBytes: 1 }); // tiny limit so any write triggers rotation
+
+  const { createLog, addEntry, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/rot", "Rotation Test");
+  await addEntry("logs/rot", "Entry A");
+  // log.md now exceeds 1 byte — next write should rotate
+  await addEntry("logs/rot", "Entry B");
+
+  const seg1 = await readFile(join(testHome, "logs/rot.1.md"), "utf-8");
+  expect(seg1).toContain("Entry A");
+
+  const main = await readFile(join(testHome, "logs/rot.md"), "utf-8");
+  expect(main).toContain("Entry B");
+  expect(main).not.toContain("Entry A");
+
+  // listEntries merges both segments
+  const all = await listEntries("logs/rot");
+  expect(all).toHaveLength(2);
+  expect(all[0]!.content).toBe("Entry B"); // newest first
+  expect(all[1]!.content).toBe("Entry A");
+});
+
+test("rotation: cascade rotates existing segments up", async () => {
+  const { saveConfig } = await import("../src/core/config.ts");
+  await saveConfig({ logSegmentMaxBytes: 1 });
+
+  const { createLog, addEntry, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/cascade", "Cascade Test");
+  await addEntry("logs/cascade", "Entry A");
+  await addEntry("logs/cascade", "Entry B"); // A → log.1.md
+  await addEntry("logs/cascade", "Entry C"); // B → log.1.md, A → log.2.md
+
+  expect(existsSync(join(testHome, "logs/cascade.1.md"))).toBe(true);
+  expect(existsSync(join(testHome, "logs/cascade.2.md"))).toBe(true);
+
+  const all = await listEntries("logs/cascade");
+  expect(all).toHaveLength(3);
+  expect(all.map((e) => e.content)).toEqual(["Entry C", "Entry B", "Entry A"]);
+});
+
+test("rotation: updateEntry and deleteEntry find entries in older segments", async () => {
+  const { saveConfig } = await import("../src/core/config.ts");
+  await saveConfig({ logSegmentMaxBytes: 1 });
+
+  const { createLog, addEntry, updateEntry, deleteEntry, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/seg-ops", "Segment ops");
+  const e1 = await addEntry("logs/seg-ops", "Old entry");
+  await addEntry("logs/seg-ops", "New entry"); // e1 moves to log.1.md
+
+  // Update entry that is now in a segment
+  await updateEntry("logs/seg-ops", e1.id, "Old entry (updated)");
+  const afterUpdate = await listEntries("logs/seg-ops");
+  expect(afterUpdate.find((e) => e.id === e1.id)!.content).toBe("Old entry (updated)");
+
+  // Delete entry from a segment
+  await deleteEntry("logs/seg-ops", e1.id);
+  const afterDelete = await listEntries("logs/seg-ops");
+  expect(afterDelete).toHaveLength(1);
+  expect(afterDelete[0]!.content).toBe("New entry");
+});
+
+test("rotation: listEntries with limit and before span across segments", async () => {
+  const { saveConfig } = await import("../src/core/config.ts");
+  await saveConfig({ logSegmentMaxBytes: 1 });
+
+  const { createLog, listEntries } = await import("../src/core/logs.ts");
+  await createLog("logs/paginate", "Paginate");
+  // Write entries directly to simulate a rotated log
+  await writeFile(join(testHome, "logs/paginate.1.md"), [
+    "## 2025-04-06T00:00:00.000Z {#e-aa00000000000001}",
+    "",
+    "Old entry",
+  ].join("\n") + "\n");
+  await writeFile(join(testHome, "logs/paginate.md"), [
+    "---",
+    "title: Paginate",
+    "type: log",
+    "---",
+    "",
+    "## 2025-04-10T00:00:00.000Z {#e-aa00000000000002}",
+    "",
+    "New entry",
+  ].join("\n") + "\n");
+
+  // Load page 1 (limit=1, no before) → newest entry
+  const page1 = await listEntries("logs/paginate", { limit: 1 });
+  expect(page1).toHaveLength(1);
+  expect(page1[0]!.content).toBe("New entry");
+
+  // Load page 2 (before=page1 oldest timestamp) → entry from segment
+  const page2 = await listEntries("logs/paginate", { limit: 1, before: page1[0]!.timestamp });
+  expect(page2).toHaveLength(1);
+  expect(page2[0]!.content).toBe("Old entry");
+});
+
+test("listJournals does not expose segment files", async () => {
+  const { createLog, addEntry, listJournals } = await import("../src/core/logs.ts");
+  const { saveConfig } = await import("../src/core/config.ts");
+  await saveConfig({ logSegmentMaxBytes: 1 });
+
+  await createLog("logs/visible", "Visible");
+  await addEntry("logs/visible", "A");
+  await addEntry("logs/visible", "B"); // triggers rotation, creates logs/visible.1.md
+
+  const journals = await listJournals();
+  const paths = journals.map((j) => j.path);
+  expect(paths).toContain("logs/visible");
+  expect(paths.every((p) => !p.endsWith(".1"))).toBe(true);
 });
 
 test("log file format is valid markdown", async () => {

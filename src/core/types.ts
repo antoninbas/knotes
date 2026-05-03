@@ -21,6 +21,8 @@ export interface KnotesConfig {
   githubEnabled: boolean;
   /** Interval in seconds for the background GitHub sync loop (default: 600). */
   githubSyncInterval: number;
+  /** Max bytes per log segment before rotation (default: 1MB). */
+  logSegmentMaxBytes: number;
 }
 
 export interface NoteMeta {
