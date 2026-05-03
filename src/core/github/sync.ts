@@ -4,7 +4,7 @@ import {
   recordJobComplete,
   recordJobFailed,
 } from "../db.ts";
-import { upsertEntryFromSource, scanGithubMarkers } from "../logs.ts";
+import { upsertEntryFromSource, batchUpsertEntriesFromSource, scanGithubMarkers } from "../logs.ts";
 import {
   getAccountById,
   getConnection,
@@ -404,7 +404,7 @@ async function fetchReviewedPRs(
   return nodes.filter((n) => n && n.repository);
 }
 
-// --- Per-event processor ---
+// --- Event classification and batch processing ---
 
 interface ProcessedEvent {
   eventId: string;
@@ -415,65 +415,15 @@ interface ProcessedEvent {
   repo: string;
 }
 
-async function processEvent(
-  conn: GhConnection,
-  event: ProcessedEvent,
-  markers: Map<string, string>
-): Promise<"written" | "updated" | "skipped"> {
-  if (
-    !passesFilters(
-      {
-        includeOrgs: conn.includeOrgs,
-        excludeOrgs: conn.excludeOrgs,
-        includeRepos: conn.includeRepos,
-        excludeRepos: conn.excludeRepos,
-      },
-      event.owner,
-      event.repo
-    )
-  ) {
-    return "skipped";
-  }
+interface WriteItem {
+  event: ProcessedEvent;
+  adoptedId: string | undefined;
+}
 
-  const newHash = stateHashOf(event.content);
-  const existing = getSyncedEvent(conn.id, event.eventId);
-
-  if (existing) {
-    if (existing.stateHash === newHash) return "skipped";
-    const updated = await upsertEntryFromSource(conn.logPath, {
-      entryId: existing.entryId,
-      timestamp: event.timestamp,
-      content: event.content,
-    });
-    upsertSyncedEvent({
-      connectionId: conn.id,
-      eventId: event.eventId,
-      entryId: updated.id,
-      timestamp: event.timestamp,
-      stateHash: newHash,
-      url: event.url,
-    });
-    return "updated";
-  }
-
-  // Marker recovery: if the markdown already has this event's marker but the
-  // DB row is missing (crash between writes, restored backup), adopt the
-  // existing entry id rather than creating a duplicate.
-  const adoptedId = markers.get(event.eventId);
-  const written = await upsertEntryFromSource(conn.logPath, {
-    entryId: adoptedId,
-    timestamp: event.timestamp,
-    content: event.content,
-  });
-  upsertSyncedEvent({
-    connectionId: conn.id,
-    eventId: event.eventId,
-    entryId: written.id,
-    timestamp: event.timestamp,
-    stateHash: newHash,
-    url: event.url,
-  });
-  return adoptedId ? "updated" : "written";
+interface UpdateItem {
+  event: ProcessedEvent;
+  existingEntryId: string;
+  newHash: string;
 }
 
 // --- Public entry points ---
@@ -559,14 +509,85 @@ async function syncConnectionImpl(
     pulled = events.length;
 
     let maxTimestamp: string | null = null;
+    const toWrite: WriteItem[] = [];
+    const toUpdate: UpdateItem[] = [];
+
     for (const event of events) {
-      const result = await processEvent(conn, event, markers);
-      if (result === "written") written++;
-      else if (result === "updated") updated++;
-      else skipped++;
-      if (!maxTimestamp || event.timestamp > maxTimestamp) {
-        maxTimestamp = event.timestamp;
+      if (!maxTimestamp || event.timestamp > maxTimestamp) maxTimestamp = event.timestamp;
+
+      if (
+        !passesFilters(
+          {
+            includeOrgs: conn.includeOrgs,
+            excludeOrgs: conn.excludeOrgs,
+            includeRepos: conn.includeRepos,
+            excludeRepos: conn.excludeRepos,
+          },
+          event.owner,
+          event.repo
+        )
+      ) {
+        skipped++;
+        continue;
       }
+
+      const newHash = stateHashOf(event.content);
+      const existing = getSyncedEvent(conn.id, event.eventId);
+
+      if (existing) {
+        if (existing.stateHash === newHash) {
+          skipped++;
+        } else {
+          toUpdate.push({ event, existingEntryId: existing.entryId, newHash });
+        }
+      } else {
+        // Marker recovery: adopt existing entry id if the markdown already has
+        // this event's marker but the DB row was lost (crash between writes).
+        toWrite.push({ event, adoptedId: markers.get(event.eventId) });
+      }
+    }
+
+    // Batch-write all new entries in a single read/write cycle
+    if (toWrite.length > 0) {
+      const results = await batchUpsertEntriesFromSource(
+        conn.logPath,
+        toWrite.map((w) => ({
+          entryId: w.adoptedId,
+          timestamp: w.event.timestamp,
+          content: w.event.content,
+        }))
+      );
+      for (let i = 0; i < toWrite.length; i++) {
+        const { event, adoptedId } = toWrite[i]!;
+        const result = results[i]!;
+        upsertSyncedEvent({
+          connectionId: conn.id,
+          eventId: event.eventId,
+          entryId: result.id,
+          timestamp: event.timestamp,
+          stateHash: stateHashOf(event.content),
+          url: event.url,
+        });
+        if (adoptedId) updated++; else written++;
+      }
+    }
+
+    // Update existing entries individually (scans segments to locate each entry)
+    for (const { event, existingEntryId, newHash } of toUpdate) {
+      const updatedEntry = await upsertEntryFromSource(conn.logPath, {
+        entryId: existingEntryId,
+        timestamp: event.timestamp,
+        content: event.content,
+      });
+      upsertSyncedEvent({
+        connectionId: conn.id,
+        eventId: event.eventId,
+        entryId: updatedEntry.id,
+        timestamp: event.timestamp,
+        stateHash: newHash,
+        url: event.url,
+      });
+      updated++;
     }
 
     const newLastSyncedAt = maxTimestamp ?? new Date().toISOString();

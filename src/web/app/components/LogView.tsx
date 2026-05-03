@@ -1,4 +1,4 @@
-import { createSignal, createEffect, For, Show } from "solid-js";
+import { createSignal, createEffect, onMount, onCleanup, For, Show } from "solid-js";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { logs, type LogEntry, type NoteResult } from "../lib/api.ts";
@@ -15,8 +15,12 @@ interface Props {
   onUpdateJournal?: () => void;
 }
 
+const PAGE_SIZE = 100;
+
 export default function LogView(props: Props) {
   const [entries, setEntries] = createSignal<LogEntry[]>([]);
+  const [hasMore, setHasMore] = createSignal(false);
+  const [loadingMore, setLoadingMore] = createSignal(false);
   const [newContent, setNewContent] = createSignal("");
   const [adding, setAdding] = createSignal(false);
   const [addError, setAddError] = createSignal<string | null>(null);
@@ -24,6 +28,7 @@ export default function LogView(props: Props) {
   const [editContent, setEditContent] = createSignal("");
   const [editError, setEditError] = createSignal<string | null>(null);
   const [deleteError, setDeleteError] = createSignal<string | null>(null);
+  let sentinelRef!: HTMLDivElement;
 
   // Description state
   const [editingDesc, setEditingDesc] = createSignal(false);
@@ -35,12 +40,42 @@ export default function LogView(props: Props) {
 
   async function loadEntries() {
     try {
-      const items = await logs.listEntries(props.note.path);
+      const items = await logs.listEntries(props.note.path, PAGE_SIZE);
       setEntries(items);
+      setHasMore(items.length === PAGE_SIZE);
     } catch (err) {
       console.error("Failed to load log entries:", err);
     }
   }
+
+  async function loadMore() {
+    const current = entries();
+    if (current.length === 0) return;
+    const oldest = current[current.length - 1]!;
+    setLoadingMore(true);
+    try {
+      const items = await logs.listEntries(props.note.path, PAGE_SIZE, oldest.timestamp);
+      setEntries([...current, ...items]);
+      setHasMore(items.length === PAGE_SIZE);
+    } catch (err) {
+      console.error("Failed to load more entries:", err);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  onMount(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting && hasMore() && !loadingMore()) {
+          void loadMore();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(sentinelRef);
+    onCleanup(() => observer.disconnect());
+  });
 
   createEffect(() => {
     const _ = props.note.path;
@@ -333,6 +368,13 @@ export default function LogView(props: Props) {
         <Show when={entries().length === 0}>
           <p class="text-center py-8" style={{ color: "var(--color-text-muted)" }}>
             No entries yet. Add one above.
+          </p>
+        </Show>
+
+        <div ref={sentinelRef} style={{ height: "1px" }} />
+        <Show when={loadingMore()}>
+          <p class="text-center py-4 text-sm" style={{ color: "var(--color-text-muted)" }}>
+            Loading more…
           </p>
         </Show>
       </div>

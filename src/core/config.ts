@@ -27,6 +27,7 @@ export function getConfig(): KnotesConfig {
     queryExpand: getConfigValue("queryExpand") === "true",
     githubEnabled: getConfigValue("githubEnabled") !== "false",
     githubSyncInterval: parseInt(getConfigValue("githubSyncInterval") || "600", 10),
+    logSegmentMaxBytes: parseInt(getConfigValue("logSegmentMaxBytes") || String(1024 * 1024), 10),
   };
 }
 
@@ -51,6 +52,7 @@ export async function saveConfig(
   if (updates.queryExpand !== undefined) setConfigValue("queryExpand", String(updates.queryExpand));
   if (updates.githubEnabled !== undefined) setConfigValue("githubEnabled", String(updates.githubEnabled));
   if (updates.githubSyncInterval !== undefined) setConfigValue("githubSyncInterval", String(updates.githubSyncInterval));
+  if (updates.logSegmentMaxBytes !== undefined) setConfigValue("logSegmentMaxBytes", String(updates.logSegmentMaxBytes));
 }
 
 /**

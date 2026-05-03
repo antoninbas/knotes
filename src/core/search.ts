@@ -327,10 +327,15 @@ export async function search(
   return results.map((r: any) => ({
     path: (() => {
       const abs: string = r.filepath || r.file || "";
+      let p: string;
       if (abs.startsWith(home + "/")) {
-        return abs.slice(home.length + 1).replace(/\.md$/, "");
+        p = abs.slice(home.length + 1).replace(/\.md$/, "");
+      } else {
+        p = r.displayPath?.replace(/\.md$/, "") || r.id || "";
       }
-      return r.displayPath?.replace(/\.md$/, "") || r.id || "";
+      // Strip segment suffix from log paths: logs/work/activity.1 → logs/work/activity
+      if (p.startsWith("logs/")) p = p.replace(/\.\d+$/, "");
+      return p;
     })(),
     title: resolveTitle(r),
     snippet: buildSnippet(r, query, extractSnippet),
