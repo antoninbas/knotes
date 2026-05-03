@@ -95,6 +95,7 @@ const REVIEW_SEARCH_QUERY = /* GraphQL */ `
       pageInfo { hasNextPage endCursor }
       nodes {
         ... on PullRequest {
+          id
           number
           title
           url
@@ -146,6 +147,7 @@ interface IssueNode {
 }
 
 interface ReviewedPRNode {
+  id: string;
   number: number;
   title: string;
   url: string;
@@ -305,17 +307,24 @@ function renderIssue(
   };
 }
 
-function renderReview(
+function renderReviews(
   pr: ReviewedPRNode,
-  review: ReviewedPRNode["reviews"]["nodes"][number]
+  reviews: ReviewedPRNode["reviews"]["nodes"]
 ): { content: string; timestamp: string } {
   const link = `[${pr.repository.nameWithOwner}#${pr.number} — ${pr.title}](${pr.url})`;
-  const ts = review.submittedAt ?? new Date().toISOString();
+  const sorted = [...reviews].sort(
+    (a, b) =>
+      new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
+  );
+  const lines = sorted
+    .map((r) => `- ${r.submittedAt} — ${r.state} (${r.comments.totalCount} comments)`)
+    .join("\n");
+  const ts = sorted[0]!.submittedAt ?? new Date().toISOString();
   return {
     content:
       `${bold("Reviewed PR")} ${link}\n\n` +
-      `State: ${review.state} · ${review.comments.totalCount} comments · ${ts}\n\n` +
-      `<!-- gh-event:review:${review.id} -->`,
+      lines +
+      `\n\n<!-- gh-event:pr-reviews:${pr.id} -->`,
     timestamp: ts,
   };
 }
@@ -690,19 +699,21 @@ async function collectEvents(
     const reviewed = await fetchReviewedPRs(client, account.login, cutoff);
     const cutoffMs = new Date(cutoff).getTime();
     for (const pr of reviewed) {
-      for (const review of pr.reviews.nodes) {
-        if (!review.submittedAt) continue;
-        if (new Date(review.submittedAt).getTime() < cutoffMs) continue;
-        const rendered = renderReview(pr, review);
-        events.push({
-          eventId: `review:${review.id}`,
-          url: pr.url,
-          content: rendered.content,
-          timestamp: rendered.timestamp,
-          owner: pr.repository.owner.login,
-          repo: pr.repository.name,
-        });
-      }
+      const validReviews = pr.reviews.nodes.filter((r) => r.submittedAt);
+      if (validReviews.length === 0) continue;
+      const hasRecentReview = validReviews.some(
+        (r) => new Date(r.submittedAt!).getTime() >= cutoffMs
+      );
+      if (!hasRecentReview) continue;
+      const rendered = renderReviews(pr, validReviews);
+      events.push({
+        eventId: `pr-reviews:${pr.id}`,
+        url: pr.url,
+        content: rendered.content,
+        timestamp: rendered.timestamp,
+        owner: pr.repository.owner.login,
+        repo: pr.repository.name,
+      });
     }
   }
 
@@ -734,6 +745,6 @@ export async function syncAll(opts?: {
 export const __test__ = {
   renderPR,
   renderIssue,
-  renderReview,
+  renderReviews,
   stateHashOf,
 };
