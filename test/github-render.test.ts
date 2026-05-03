@@ -1,7 +1,7 @@
 import { test, expect } from "vitest";
 import { __test__ } from "../src/core/github/sync.ts";
 
-const { renderPR, renderIssue, renderReview, stateHashOf } = __test__;
+const { renderPR, renderIssue, renderReviews, stateHashOf } = __test__;
 
 const repo = {
   name: "thing",
@@ -92,25 +92,26 @@ test("renderIssue (OPEN) includes labels", () => {
   expect(r.content).toContain("<!-- gh-event:issue:ISS_NID1 -->");
 });
 
-test("renderReview surfaces state and submission timestamp", () => {
+test("renderReviews combines multiple reviews into one entry, newest first", () => {
   const pr = {
+    id: "PR_NID11",
     number: 11,
     title: "Refactor pipeline",
     url: "https://github.com/acme/thing/pull/11",
     repository: repo,
     reviews: { nodes: [] },
   };
-  const review = {
-    id: "REV_NID1",
-    state: "APPROVED",
-    submittedAt: "2026-04-23T15:01:00Z",
-    comments: { totalCount: 4 },
-  };
-  const r = renderReview(pr, review);
+  const reviews = [
+    { id: "REV_1", state: "COMMENTED", submittedAt: "2026-04-21T09:00:00Z", comments: { totalCount: 3 } },
+    { id: "REV_2", state: "APPROVED", submittedAt: "2026-04-23T15:01:00Z", comments: { totalCount: 0 } },
+  ];
+  const r = renderReviews(pr, reviews);
   expect(r.timestamp).toBe("2026-04-23T15:01:00Z");
   expect(r.content).toContain("**Reviewed PR**");
-  expect(r.content).toContain("State: APPROVED");
-  expect(r.content).toContain("4 comments");
+  expect(r.content).toContain("acme/thing#11");
+  expect(r.content).toMatch(/APPROVED.*\n.*COMMENTED/s);
+  expect(r.content).toContain("3 comments");
+  expect(r.content).toContain("<!-- gh-event:pr-reviews:PR_NID11 -->");
 });
 
 test("stateHashOf is deterministic and changes on content change", () => {

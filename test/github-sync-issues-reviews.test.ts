@@ -160,11 +160,12 @@ test("syncConnection updates issue entry when state moves OPEN → CLOSED", asyn
   expect(entries[0]!.timestamp).toBe("2026-04-23T11:00:00Z");
 });
 
-test("syncConnection writes one entry per review (multiple reviews on one PR)", async () => {
+test("syncConnection writes one combined entry for multiple reviews on one PR", async () => {
   const cid = await setupConnection(["pr_reviews"]);
   const client = makeStubClient({
     reviewed: [
       {
+        id: "PR_7",
         number: 7,
         title: "Refactor",
         url: "https://github.com/acme/thing/pull/7",
@@ -190,22 +191,26 @@ test("syncConnection writes one entry per review (multiple reviews on one PR)", 
   });
   const { syncConnection } = await import("../src/core/github/sync.ts");
   const r = await syncConnection(cid, client);
-  expect(r.written).toBe(2);
+  expect(r.written).toBe(1);
 
   const { listEntries } = await import("../src/core/logs.ts");
   const entries = await listEntries("logs/work/activity");
-  expect(entries).toHaveLength(2);
-  // Newest first
-  expect(entries[0]!.content).toContain("State: APPROVED");
-  expect(entries[1]!.content).toContain("State: COMMENTED");
+  expect(entries).toHaveLength(1);
+  // Both reviews in a single entry, newest first
+  expect(entries[0]!.content).toContain("APPROVED");
+  expect(entries[0]!.content).toContain("COMMENTED");
+  expect(entries[0]!.content).toMatch(/APPROVED.*\n.*COMMENTED/s);
+  expect(entries[0]!.timestamp).toBe("2026-04-23T15:00:00Z");
 });
 
-test("syncConnection skips reviews older than the cutoff", async () => {
-  // since = 2026-04-22 — should drop REV_OLD on 2026-04-01.
+test("syncConnection includes all reviews for a PR when at least one is within the cutoff", async () => {
+  // since = 2026-04-22 — PR has one old review and one new review.
+  // The combined entry should include both, since the PR has a recent review.
   const cid = await setupConnection(["pr_reviews"], "2026-04-22T00:00:00Z");
   const client = makeStubClient({
     reviewed: [
       {
+        id: "PR_7",
         number: 7,
         title: "Refactor",
         url: "https://github.com/acme/thing/pull/7",
@@ -233,6 +238,12 @@ test("syncConnection skips reviews older than the cutoff", async () => {
   const r = await syncConnection(cid, client);
   expect(r.pulled).toBe(1);
   expect(r.written).toBe(1);
+
+  const { listEntries } = await import("../src/core/logs.ts");
+  const entries = await listEntries("logs/work/activity");
+  expect(entries).toHaveLength(1);
+  expect(entries[0]!.content).toContain("APPROVED");
+  expect(entries[0]!.content).toContain("COMMENTED");
 });
 
 test("syncConnection processes PRs, issues, and reviews together when all monitors are enabled", async () => {
@@ -277,6 +288,7 @@ test("syncConnection processes PRs, issues, and reviews together when all monito
     ],
     reviewed: [
       {
+        id: "PR_9",
         number: 9,
         title: "Other",
         url: "https://github.com/acme/thing/pull/9",
